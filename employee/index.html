@@ -122,7 +122,8 @@ body.sunday-active{background:linear-gradient(180deg,#d1fae5 0%,#f0fdf4 30%,#f1f
 .att-day{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;}
 .att-day-n{font-size:9px;color:var(--txtm);}
 .att-box{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;border:1px solid transparent;}
-.att-box.P,.att-box.HD,.att-box.LA{background:#dcfce7;color:#15803d;}
+.att-box.P,.att-box.HD{background:#dcfce7;color:#15803d;}
+.att-box.LA{background:#fef3c7;color:#b45309;}
 .att-box.A{background:#fee2e2;color:#b91c1c;}
 .att-box.L,.att-box.H{background:#dbeafe;color:#1d4ed8;}
 .att-box.S{background:#fce7f3;color:#9d174d;}
@@ -799,15 +800,41 @@ function confirmLogout(){
   if(confirm('Sign out? You will need your PIN to sign back in.'))doLogout();
 }
 function doLogout(){
+  // Clear localStorage session
   localStorage.removeItem('dam_emp_id');
   localStorage.removeItem('dam_emp_ts');
-  if(realtimeChannel)SB.removeChannel(realtimeChannel);
-  emp=null;myAtt=[];myExp=[];myMsgs=[];myBatches=[];mySalHist=[];myPaySt=[];notifications=[];
+  // Disconnect realtime
+  if(realtimeChannel){SB.removeChannel(realtimeChannel);realtimeChannel=null;}
+  // Clear ALL in-memory data — no stale data for next employee
+  emp=null;
+  myAtt=[];myExp=[];myMsgs=[];myBatches=[];mySalHist=[];myPaySt=[];myAttReqs=[];
+  allEmps=[];cfg={};
+  // Reset UI state
+  attM=new Date().getMonth();attY=new Date().getFullYear();
+  expM=new Date().getMonth();expY=new Date().getFullYear();
+  payM=new Date().getMonth();payY=new Date().getFullYear();
+  // Clear rendered content so previous employee's data is invisible
+  const clearIds=['hmTodayMark','homeTodayMark','hmPayStatus','hmStats','hmStrip','hmExp',
+    'hmBase','hmOT','hmBonus','hmDays','hmAmount','hmMonth',
+    'attRecords','attStrip','attTitle','attSummary',
+    'myExp','payCards','payHistory','lifetimeStats','msgArea',
+    'todayMarkSection'];
+  clearIds.forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='';});
+  // Reset topbar
+  const av=document.getElementById('tbAv');if(av)av.textContent='?';
+  const nm=document.getElementById('tbName');if(nm)nm.textContent='Loading...';
+  const rl=document.getElementById('tbRole');if(rl)rl.textContent='Employee Portal';
+  // Remove Sunday theme + particles
+  document.body.style.background='';removeParticles();
+  const sb=document.getElementById('sundayBanner');if(sb)sb.remove();
+  // Show auth screen
   document.getElementById('app').style.display='none';
   document.getElementById('auth').style.display='flex';
   document.getElementById('step2').style.display='none';
   document.getElementById('step1').style.display='block';
   pinEntry='';selEmpId='';renderPinDots();
+  // Reload employee list fresh from DB
+  setTimeout(()=>initAuth(),100);
 }
 
 function setSyncUI(state){
@@ -889,10 +916,10 @@ async function loadAll(){
 function startRealtime(){
   realtimeChannel=SB.channel('emp-'+emp.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`employee_id=eq.${emp.id}`},payload=>{
-      myMsgs.push(payload.new);
+      if(!myMsgs.find(m=>m.id===payload.new.id))myMsgs.push(payload.new);
       updateBadges();
       if(document.getElementById('pg-msg').classList.contains('on'))renderMsgs();
-      else showPopupNotif('💬 New message from Office','office-msg');
+      else showPopupNotif('💬 New message from Office');
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'expense_batches',filter:`employee_id=eq.${emp.id}`},async payload=>{
       const idx=myBatches.findIndex(b=>b.id===payload.new.id);
@@ -905,12 +932,17 @@ function startRealtime(){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'attendance',filter:`employee_id=eq.${emp.id}`},payload=>{
       const idx=myAtt.findIndex(a=>a.date===payload.new.date);
       if(idx>=0)myAtt[idx]=payload.new;else myAtt.unshift(payload.new);
-      if(document.getElementById('pg-home').classList.contains('on'))renderHome();
+      const curPg=document.querySelector('.pg.on')?.id?.replace('pg-','');
+      if(curPg==='home')renderHome();
+      else if(curPg==='att')renderAtt();
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'attendance',filter:`employee_id=eq.${emp.id}`},payload=>{
       const idx=myAtt.findIndex(a=>a.id===payload.new.id);
-      if(idx>=0)myAtt[idx]=payload.new;
-      if(document.getElementById('pg-home').classList.contains('on'))renderHome();
+      if(idx>=0)myAtt[idx]=payload.new;else myAtt.unshift(payload.new);
+      // Always refresh whichever page is visible
+      const curPg=document.querySelector('.pg.on')?.id?.replace('pg-','');
+      if(curPg==='home')renderHome();
+      else if(curPg==='att')renderAtt();
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'payment_status',filter:`employee_id=eq.${emp.id}`},payload=>{
       myPaySt.push(payload.new);
@@ -1231,12 +1263,13 @@ function renderAtt(){
           ?`<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
               <span class="att-box ${rec.status}" style="width:auto;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">${STATUSES[rec.status]||rec.status}</span>
               ${rec.sign_in?`<span style="font-size:11px;color:var(--txtm);">${rec.sign_in}–${rec.sign_out||'?'}</span>`:''}
+              ${rec.status==='LA'&&rec.sign_in?(()=>{const si=rec.sign_in.split(':');const lateM=parseInt(si[0])*60+parseInt(si[1])-(9*60);return lateM>0?`<span style="font-size:10px;font-weight:700;color:var(--amb);">+${lateM}m late</span>`:''})():''}
             </div>`
           :`<span style="font-size:12px;color:var(--txtm);font-style:italic;">${sat?'Saturday':'Not marked'}</span>`
         }
       </div>
       <div style="text-align:right;flex-shrink:0;">
-        ${rec?.hours?`<div style="font-size:13px;font-weight:700;">${parseFloat(rec.hours).toFixed(0)}h</div>`:''}
+        ${rec?.hours?`<div style="font-size:13px;font-weight:700;">${parseFloat(rec.hours).toFixed(1)}h</div>`:''}
         ${rec?.overtime>0?`<div style="font-size:10px;color:var(--amb);font-weight:600;">+${parseFloat(rec.overtime).toFixed(1)}h OT</div>`:''}
         ${rec?.bonus?`<div style="font-size:11px;font-weight:700;color:var(--grn);">+${fmt(rec.bonus)}</div>`:''}
       </div>
@@ -1538,11 +1571,19 @@ async function renderMsgs(){
   }).join('');
   area.scrollTop=area.scrollHeight;
 }
+let _sendingMsg=false;
 async function sendMsg(){
-  const body=document.getElementById('msgInput').value.trim();if(!body)return;
+  if(_sendingMsg)return;
+  const input=document.getElementById('msgInput');
+  const body=input.value.trim();if(!body)return;
+  _sendingMsg=true;
+  input.disabled=true;
   const r=await SB.from('messages').insert({employee_id:emp.id,sender:emp.id,body,read:false}).select().single();
+  input.disabled=false;_sendingMsg=false;
   if(r.error){toast(r.error.message,'e');return;}
-  myMsgs.push(r.data);document.getElementById('msgInput').value='';renderMsgs();
+  // Only add if not already in list (realtime may have already added it)
+  if(!myMsgs.find(m=>m.id===r.data.id))myMsgs.push(r.data);
+  input.value='';renderMsgs();
 }
 
 
