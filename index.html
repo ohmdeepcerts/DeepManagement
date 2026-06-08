@@ -1946,6 +1946,16 @@ function onMC(el){
   const empId=el.dataset.eid,field=el.dataset.f;
   _touched.add(empId);
   if(field==='sign_in'||field==='sign_out')recalcHOT(empId);
+  if(field==='hours'){
+    // Manual hours edit — recalculate OT only
+    const hEl=document.getElementById(`hr-${empId}`);
+    const otEl=document.getElementById(`ot-${empId}`);
+    if(hEl&&otEl){
+      const emp=employees.find(e=>e.id===empId);
+      const ot=calcOT(parseFloat(hEl.value)||0,emp);
+      otEl.value=ot>0?ot:'';
+    }
+  }
   if(field==='status'){
     const row=document.getElementById(`mr-${empId}`);
     if(row){
@@ -1968,7 +1978,8 @@ function recalcHOT(empId){
     if(hEl)hEl.value=h;
     const emp=employees.find(e=>e.id===empId);
     const ot=calcOT(h,emp);
-    if(otEl&&ot>0)otEl.value=ot;
+    // Always update OT — clear it if it drops to 0
+    if(otEl)otEl.value=ot>0?ot:'';
   }
 }
 async function saveAttSilent(){
