@@ -1554,9 +1554,7 @@ function shiftDash(n){
 function renderDashboard(){
   if(!employees||employees.length===0){
     // Data not loaded yet - show loading state
-    const g=document.getElementById('dashGrid');
     const k=document.getElementById('kpiRow');
-    if(g)g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--txtm);"><i class="fa-solid fa-rotate fa-spin" style="font-size:28px;margin-bottom:12px;display:block;"></i>Loading dashboard...</div>';
     if(k)k.innerHTML='';
     return;
   }
@@ -2181,7 +2179,7 @@ function checkAutoNextRow(rowId,rowIdx,totalRows){
       // Only add if last row merchant has content AND no row was added since
       const lastRows=document.querySelectorAll('#ledBody tr');
       const currentTotal=lastRows.length;
-      if(currentTotal>rowIdx)return; // already added
+      if(currentTotal>rowIdx+1)return; // already added
       const val=document.querySelector('#ledBody tr:last-child td:nth-child(3) input')?.value||'';
       if(val.trim().length>0)await addLedRowSilent();
     },1400);
@@ -3278,8 +3276,8 @@ function renderDocReminders(){
 let _docFile=null;
 function docFileChosen(input){
   _docFile=input.files[0];
-  const el=document.getElementById('docFileChosen');
-  if(_docFile){el.textContent=`✓ ${_docFile.name}`;el.style.display='block';}
+  const el=document.getElementById('docFileName');
+  if(_docFile&&el)el.textContent=`✓ ${_docFile.name}`;
 }
 
 
@@ -3595,9 +3593,14 @@ function editAttReq(id){
   if(!newIn)return;
   const newOut=prompt('Edit end time:',req.sign_out);
   if(!newOut)return;
-  const sm=parseInt(newIn.split(':')[0])*60+parseInt(newIn.split(':')[1]||0);
-  const em=parseInt(newOut.split(':')[0])*60+parseInt(newOut.split(':')[1]||0);
+  // Validate time format
+  const validTime=/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+  if(!validTime.test(newIn)||!validTime.test(newOut)){toast('Invalid time format. Use HH:MM (e.g. 09:00)','e');return;}
+  const [ih,im]=newIn.split(':').map(Number);
+  const [oh,om]=newOut.split(':').map(Number);
+  const sm=ih*60+im,em=oh*60+om;
   const hrs=parseFloat(((em-sm)/60).toFixed(1));
+  if(isNaN(hrs)||hrs<0){toast('End time must be after start time','e');return;}
   sb.from('attendance_requests').update({sign_in:newIn,sign_out:newOut,hours:hrs}).eq('id',id).then(()=>{
     const idx=attRequests.findIndex(r=>r.id===id);
     if(idx>=0){attRequests[idx].sign_in=newIn;attRequests[idx].sign_out=newOut;attRequests[idx].hours=hrs;}
@@ -3788,9 +3791,7 @@ window.addEventListener('online', ()=>{
 });
 window.addEventListener('offline', ()=>{
   toast('No internet connection','e');
-  const sd=document.getElementById('syncStrip')||document.getElementById('syncBadge');
-  if(sd&&typeof setSyncUI==='function')setSyncUI('offline');
-  else if(sd&&typeof setSyncStatus==='function')setSyncStatus('err','Offline');
+  if(typeof setSyncUI==='function')setSyncUI('offline');
 });
 window.onerror=function(msg,url,line,col,err){
   console.error('DAM Error:',msg,'at',url,line);
