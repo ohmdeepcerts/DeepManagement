@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DAM Pro — Office</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 :root{
   --sb:#0f172a;--sbh:#1e293b;--sbb:#1e293b;--sbt:#94a3b8;
@@ -3768,7 +3768,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){document.querySelectorAll('.mo.open').forEach(m=>m.classList.remove('open'));}
 });
 document.getElementById('empModal').addEventListener('click',function(e){if(e.target===this)closeEmpModal();});
-document.getElementById('adminPin').addEventListener('keydown',e=>{if(e.key==='Enter')doAdminLogin();});
+// PIN replaced by email/password auth
 
 // ── NETWORK & ERROR HANDLING ──
 window.addEventListener('online', ()=>{
