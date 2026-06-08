@@ -1987,12 +1987,17 @@ function initHiddenGems(){
 
 // ── INIT ──
 async function tryAutoLogin(){
-  // Always ensure portal auth session is active
+  // Step 1: Sign into portal (always needed for RLS)
   const {data:{session}}=await SB.auth.getSession();
   if(!session){
     const {error:authErr}=await SB.auth.signInWithPassword({email:PORTAL_EMAIL,password:PORTAL_PASS});
-    if(authErr){initAuth();return;}
+    if(authErr){
+      console.error('Portal login failed:',authErr.message);
+      document.getElementById('empList').innerHTML='<div style="color:#fca5a5;text-align:center;padding:14px;">Could not connect. Check internet.</div>';
+      return;
+    }
   }
+  // Step 2: Check for saved employee session (7-day auto-login)
   const savedId=localStorage.getItem('dam_emp_id');
   const savedTs=parseInt(localStorage.getItem('dam_emp_ts')||'0');
   const sevenDays=7*24*60*60*1000;
@@ -2006,7 +2011,22 @@ async function tryAutoLogin(){
       return;
     }
   }
-  initAuth();
+  // Step 3: Show employee list (portal is already authenticated)
+  const r=await SB.from('employees').select('*').eq('status','Active').order('name');
+  if(r.error){
+    document.getElementById('empList').innerHTML='<div style="color:#fca5a5;text-align:center;padding:14px;">Could not load employees.</div>';
+    return;
+  }
+  allEmps=r.data||[];
+  const cfgR=await SB.from('settings').select('*').eq('id',1).single();
+  if(cfgR.data)cfg=cfgR.data;
+  document.getElementById('empList').innerHTML=allEmps.map((e,i)=>`
+    <div class="emp-card" onclick="selEmp('${e.id}')">
+      <div class="emp-av" style="background:${AVCOLS[i%AVCOLS.length]}">${ini(e.name)}</div>
+      <div><div class="emp-cn">${e.name}</div><div class="emp-cr">${e.role||'Employee'}</div></div>
+      <i class="fa-solid fa-chevron-right" style="margin-left:auto;color:rgba(255,255,255,0.35);font-size:13px;"></i>
+    </div>`).join('');
+  document.getElementById('step1').style.display='block';
 }
 tryAutoLogin();
 
