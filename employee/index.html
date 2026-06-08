@@ -623,7 +623,10 @@ body.sunday-active{background:linear-gradient(180deg,#d1fae5 0%,#f0fdf4 30%,#f1f
 <div class="toast-wrap" id="toasts"></div>
 
 <script>
-const SB=supabase.createClient('https://pajpoerteyjrprcaisom.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhanBvZXJ0ZXlqcnByY2Fpc29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI4NDEsImV4cCI6MjA5NjQ4ODg0MX0.zUzCg-bq_9ZxYWSmk-Y9a_QqAe0t-45tjHP5Eiyxjcc');
+const SB=supabase.createClient('https://pajpoerteyjrprcaisom.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhanBvZXJ0ZXlqcnByY2Fpc29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI4NDEsImV4cCI6MjA5NjQ4ODg0MX0.zUzCg-bq_9ZxYWSmk-Y9a_QqAe0t-45tjHP5Eiyxjcc',{auth:{persistSession:true,autoRefreshToken:true}});
+// Portal credentials — shared auth account for employee app
+const PORTAL_EMAIL='employee@app.com';
+const PORTAL_PASS='888888';
 
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const AVCOLS=['#2563eb','#16a34a','#dc2626','#7c3aed','#d97706','#0891b2','#be185d','#0f766e','#9333ea','#c2410c'];
@@ -686,8 +689,15 @@ function toggleTheme(){const h=document.documentElement;h.dataset.theme=h.datase
 
 // ── AUTH ──
 async function initAuth(){
+  // Sign in to shared portal account first so RLS allows DB access
+  const {data:authData,error:authErr}=await SB.auth.signInWithPassword({email:PORTAL_EMAIL,password:PORTAL_PASS});
+  if(authErr){
+    document.getElementById('empList').innerHTML='<div style="color:#fca5a5;text-align:center;padding:14px;">Could not connect to server. Please try again.</div>';
+    console.error('Portal auth error:',authErr.message);
+    return;
+  }
   const r=await SB.from('employees').select('*').eq('status','Active').order('name');
-  if(r.error){document.getElementById('empList').innerHTML='<div style="color:#fca5a5;text-align:center;padding:14px;">Could not connect. Check your internet.</div>';return;}
+  if(r.error){document.getElementById('empList').innerHTML='<div style="color:#fca5a5;text-align:center;padding:14px;">Could not load employees. Check your internet.</div>';return;}
   allEmps=r.data||[];
   const cfgR=await SB.from('settings').select('*').eq('id',1).single();
   if(cfgR.data)cfg=cfgR.data;
@@ -1735,11 +1745,16 @@ function removeParticles(){document.querySelectorAll('.sun-particle').forEach(p=
 
 // ── INIT ──
 async function tryAutoLogin(){
+  // Always ensure portal auth session is active
+  const {data:{session}}=await SB.auth.getSession();
+  if(!session){
+    const {error:authErr}=await SB.auth.signInWithPassword({email:PORTAL_EMAIL,password:PORTAL_PASS});
+    if(authErr){initAuth();return;}
+  }
   const savedId=localStorage.getItem('dam_emp_id');
   const savedTs=parseInt(localStorage.getItem('dam_emp_ts')||'0');
   const sevenDays=7*24*60*60*1000;
   if(savedId&&Date.now()-savedTs<sevenDays){
-    // Load employees first
     const r=await SB.from('employees').select('*').eq('id',savedId).single();
     const cfgR=await SB.from('settings').select('*').eq('id',1).single();
     if(cfgR.data)cfg=cfgR.data;
