@@ -63,7 +63,7 @@ body.sunday-active{background:linear-gradient(180deg,#d1fae5 0%,#f0fdf4 30%,#f1f
 
 /* ── APP SHELL ── */
 #app{display:none;flex-direction:column;height:100%;}
-.topbar{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;padding:12px 16px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:relative;}
+.topbar{background:var(--card);color:var(--txt);display:flex;flex-direction:column;flex-shrink:0;position:relative;z-index:10;border-bottom:1px solid var(--bdr);}
 .tb-left{display:flex;align-items:center;gap:10px;}
 .tb-av{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
 .tb-name{font-size:15px;font-weight:700;line-height:1.2;}
@@ -403,50 +403,35 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
 <div id="app">
   <!-- TOPBAR - Beautiful hero header -->
   <div class="topbar">
-    <!-- Gradient background layers -->
-    <div style="position:absolute;inset:0;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 55%,#2563eb 100%);z-index:0;"></div>
-    <div style="position:absolute;top:-40px;right:-30px;width:160px;height:160px;background:rgba(99,102,241,0.15);border-radius:50%;z-index:0;"></div>
-    <div style="position:absolute;bottom:-50px;left:-20px;width:130px;height:130px;background:rgba(37,99,235,0.1);border-radius:50%;z-index:0;"></div>
 
     <!-- MAIN ROW -->
-    <div style="position:relative;z-index:1;display:flex;align-items:center;gap:10px;padding:14px 14px 10px;">
-      <!-- Identity pill — tappable, opens menu -->
-      <div id="idPill" onclick="togglePillMenu()" style="display:inline-flex;align-items:center;gap:9px;background:rgba(255,255,255,0.12);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,0.2);border-radius:40px;padding:7px 13px 7px 7px;cursor:pointer;transition:all 0.2s;flex-shrink:1;min-width:0;max-width:62%;" onmouseover="this.style.background='rgba(255,255,255,0.18)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
-        <div id="tbAv" style="width:36px;height:36px;border-radius:50%;background:#2563eb;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;border:2px solid rgba(255,255,255,0.3);">?</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;gap:12px;">
+
+      <!-- LEFT: Identity pill -->
+      <div id="idPill" onclick="togglePillMenu()" style="display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--bdr);border-radius:40px;padding:6px 12px 6px 6px;cursor:pointer;flex-shrink:1;min-width:0;max-width:70%;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--bdr)'">
+        <div id="tbAv" style="width:36px;height:36px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;">?</div>
         <div style="min-width:0;">
-          <div id="tbName" style="font-size:14px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;">Loading...</div>
-          <div id="tbRole" style="font-size:10px;color:rgba(255,255,255,0.55);margin-top:1px;">Employee Portal</div>
+          <div id="tbName" style="font-size:14px;font-weight:800;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;">Loading...</div>
+          <div id="tbRole" style="font-size:11px;color:var(--txtm);margin-top:1px;">Employee Portal</div>
         </div>
-        <i class="fa-solid fa-chevron-down" style="font-size:9px;color:rgba(255,255,255,0.45);flex-shrink:0;margin-left:2px;"></i>
+        <i class="fa-solid fa-chevron-down" style="font-size:9px;color:var(--txtm);flex-shrink:0;margin-left:2px;"></i>
       </div>
 
-      <!-- RIGHT BUTTONS -->
-      <div style="margin-left:auto;display:flex;align-items:center;gap:7px;flex-shrink:0;">
-
-        <!-- Theme -->
-        <button onclick="toggleTheme()" style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:all 0.18s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
-          <i class="fa-solid fa-circle-half-stroke"></i>
-        </button>
+      <!-- RIGHT: Sync pill -->
+      <div id="syncPill" style="display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--bdr);border-radius:20px;padding:5px 11px 5px 8px;flex-shrink:0;">
+        <div id="syncDot" style="width:7px;height:7px;border-radius:50%;background:#4ade80;flex-shrink:0;animation:livepulse 2.5s ease-in-out infinite;"></div>
+        <span id="syncTxt" style="font-size:11px;font-weight:700;color:var(--grn);">live</span>
+        <span id="syncTime" style="font-size:10px;color:var(--txtm);font-weight:500;">· --:--</span>
       </div>
     </div>
 
     <!-- Pill dropdown -->
-    <div id="pillMenu" style="display:none;position:absolute;top:74px;left:14px;z-index:300;background:var(--card);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.18);min-width:190px;overflow:hidden;">
+    <div id="pillMenu" style="display:none;position:absolute;top:62px;left:14px;z-index:300;background:var(--card);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.18);min-width:190px;overflow:hidden;">
       <div onclick="showPg('home');togglePillMenu()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-house" style="width:16px;color:var(--txtm);"></i>Home</div>
-
       <div onclick="toggleTheme()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-circle-half-stroke" style="width:16px;color:var(--txtm);"></i>Toggle Theme</div>
-      <div onclick="doLogout()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--red);cursor:pointer;" onmouseover="this.style.background='var(--redl)'" onmouseout="this.style.background=''"><i class="fa-solid fa-right-from-bracket" style="width:16px;"></i>Sign Out</div>
+      <div onclick="confirmLogout()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--red);cursor:pointer;" onmouseover="this.style.background='var(--redl)'" onmouseout="this.style.background=''"><i class="fa-solid fa-right-from-bracket" style="width:16px;"></i>Sign Out</div>
     </div>
 
-    <!-- SYNC STRIP — colour pill not boring text -->
-    <div id="syncStrip" style="position:relative;z-index:1;padding:0 14px 12px;display:flex;align-items:center;gap:8px;">
-      <!-- Colour pill with last sync time -->
-      <div id="syncPill" style="display:inline-flex;align-items:center;gap:6px;background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.35);border-radius:20px;padding:3px 10px 3px 7px;">
-        <div id="syncDot" style="width:7px;height:7px;border-radius:50%;background:#4ade80;flex-shrink:0;animation:livepulse 2.5s ease-in-out infinite;"></div>
-        <span id="syncTxt" style="font-size:10px;font-weight:700;color:#4ade80;letter-spacing:0.02em;">live</span>
-        <span id="syncTime" style="font-size:10px;color:rgba(74,222,128,0.7);font-weight:500;">· --:--</span>
-      </div>
-    </div>
   </div>
 
 <!-- CONTENT -->
@@ -672,7 +657,6 @@ const STATUSES={P:'Present',A:'Absent',L:'Annual Leave',S:'Sick Leave',H:'Bank H
 let emp=null, allEmps=[], cfg={};
 let myAtt=[], myExp=[], myMsgs=[], myBatches=[], mySalHist=[], myPaySt=[], myAttReqs=[];
 let pinEntry='', selEmpId='';
-let receiptFile=null;
 let attM=new Date().getMonth(), attY=new Date().getFullYear();
 let expM=new Date().getMonth(), expY=new Date().getFullYear();
 let payM=new Date().getMonth(), payY=new Date().getFullYear();
@@ -689,12 +673,12 @@ function C(){return cfg.currency||'£';}
 function fmt(v){return C()+parseFloat(v||0).toFixed(2);}
 function ini(n){return(n||'').split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';}
 function avc(id){const i=allEmps.findIndex(e=>e.id===id);return AVCOLS[Math.abs(i)%AVCOLS.length];}
-function toast(msg,type='i'){
+function toast(msg,type='i',duration=3200){
   const ic={s:'fa-circle-check',e:'fa-circle-xmark',i:'fa-circle-info'};
   const t=document.createElement('div');t.className=`toast ${type}`;
-  t.innerHTML=`<i class="fa-solid ${ic[type]}"></i>${msg}`;
+  t.innerHTML=`<i class="fa-solid ${ic[type]}"></i><span style="flex:1;">${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--txtm);cursor:pointer;font-size:16px;padding:0 0 0 6px;line-height:1;">×</button>`;
   document.getElementById('toasts').appendChild(t);
-  setTimeout(()=>t.remove(),3200);
+  if(duration>0)setTimeout(()=>{if(t.parentElement)t.remove();},duration);
 }
 function calcPay(e,rec){
   const pt=e.pay_type||'hourly';
@@ -720,8 +704,27 @@ document.addEventListener('click',e=>{
   const menu=document.getElementById('pillMenu');
   if(menu&&pill&&!pill.contains(e.target))menu.style.display='none';
 });
-function toggleTheme(){const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';localStorage.setItem('dam_emp_theme',h.dataset.theme);}
-(()=>document.documentElement.dataset.theme=localStorage.getItem('dam_emp_theme')||'light')();
+function toggleTheme(){const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';localStorage.setItem('dam_emp_theme',h.dataset.theme);localStorage.setItem('dam_emp_theme_manual',Date.now().toString());}
+(()=>{
+  const saved=localStorage.getItem('dam_emp_theme');
+  const manual=localStorage.getItem('dam_emp_theme_manual');
+  if(saved&&manual&&Date.now()-parseInt(manual)<86400000){
+    document.documentElement.dataset.theme=saved;
+  } else {
+    const h=new Date().getHours();
+    document.documentElement.dataset.theme=(h>=20||h<6)?'dark':'light';
+  }
+})();
+function applyAutoTheme(){
+  const manual=localStorage.getItem('dam_emp_theme_manual');
+  if(manual&&Date.now()-parseInt(manual)<86400000)return;
+  const h=new Date().getHours();
+  const t=(h>=20||h<6)?'dark':'light';
+  if(document.documentElement.dataset.theme!==t){
+    document.documentElement.dataset.theme=t;
+    localStorage.setItem('dam_emp_theme',t);
+  }
+}
 
 // ── AUTH ──
 async function initAuth(){
@@ -788,7 +791,12 @@ async function enterApp(e){
   setSyncUI('live');
   checkSundayMode();
   initHiddenGems();
+  applyAutoTheme();
+  setInterval(applyAutoTheme, 3600000);
   setInterval(silentSync, 30000);
+}
+function confirmLogout(){
+  if(confirm('Sign out? You will need your PIN to sign back in.'))doLogout();
 }
 function doLogout(){
   localStorage.removeItem('dam_emp_id');
@@ -809,28 +817,24 @@ function setSyncUI(state){
   const timeEl=document.getElementById('syncTime');
   if(!pill)return;
   const s=state||'live';
-  // Pill colour by state
   const styles={
-    live:{bg:'rgba(74,222,128,0.15)',border:'rgba(74,222,128,0.35)',col:'#4ade80',dotCol:'#4ade80',anim:'livepulse 2.5s ease-in-out infinite'},
-    syncing:{bg:'rgba(251,191,36,0.15)',border:'rgba(251,191,36,0.35)',col:'#fbbf24',dotCol:'#fbbf24',anim:'none'},
-    err:{bg:'rgba(239,68,68,0.15)',border:'rgba(239,68,68,0.35)',col:'#f87171',dotCol:'#ef4444',anim:'none'},
-    offline:{bg:'rgba(100,116,139,0.15)',border:'rgba(100,116,139,0.35)',col:'#94a3b8',dotCol:'#64748b',anim:'none'}
+    live:   {bg:'var(--card2)',border:'var(--bdr)',      col:'var(--grn)', dot:'#4ade80',anim:'livepulse 2.5s ease-in-out infinite'},
+    syncing:{bg:'var(--ambl)', border:'rgba(217,119,6,0.3)',col:'var(--amb)',dot:'#fbbf24',anim:'none'},
+    err:    {bg:'var(--redl)', border:'rgba(220,38,38,0.3)',col:'var(--red)',dot:'#ef4444',anim:'none'},
+    offline:{bg:'var(--card2)',border:'var(--bdr)',      col:'var(--txtm)',dot:'#94a3b8',anim:'none'}
   };
   const st=styles[s]||styles.live;
   pill.style.background=st.bg;pill.style.borderColor=st.border;
-  if(dot){dot.style.background=st.dotCol;dot.style.animation=st.anim;}
-  const labels={live:'live',syncing:'syncing…',err:'sync error',offline:'offline'};
+  if(dot){dot.style.background=st.dot;dot.style.animation=st.anim;}
+  const labels={live:'live',syncing:'sync…',err:'error',offline:'offline'};
   if(txt){txt.textContent=labels[s]||'live';txt.style.color=st.col;}
   if(timeEl){
-    if(s==='live'||s==='syncing'){
-      const now=new Date();
-      const t=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-      timeEl.textContent='· '+t;timeEl.style.color=s==='live'?'rgba(74,222,128,0.7)':st.col+'99';
-    } else if(s==='err'){
-      timeEl.textContent='· failed';timeEl.style.color='rgba(239,68,68,0.6)';
-    } else if(s==='offline'){
-      timeEl.textContent='· no internet';timeEl.style.color='rgba(100,116,139,0.6)';
-    }
+    if(s==='live'){
+      const t=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      timeEl.textContent='· '+t;timeEl.style.color='var(--txtm)';timeEl.style.display='';
+    } else if(s==='err'){timeEl.textContent='· failed';timeEl.style.color='var(--red)';timeEl.style.display='';}
+    else if(s==='offline'){timeEl.textContent='· offline';timeEl.style.color='var(--txtm)';timeEl.style.display='';}
+    else{timeEl.style.display='none';}
   }
 }
 
@@ -850,7 +854,7 @@ async function silentSync(){
   myBatches=batR.error?myBatches:batR.data||[];
   myPaySt=payStR.error?myPaySt:payStR.data||[];
   myAttReqs=attReqR2.error?myAttReqs:attReqR2.data||[];
-  updateBadges();updateBadges();
+  updateBadges();
   setSyncUI('live');
   // Refresh current page silently
   const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
@@ -879,7 +883,6 @@ async function loadAll(){
   myPaySt=payStR.error?[]:payStR.data||[];
   myAttReqs=attReqR.error?[]:attReqR.data||[];
   updateBadges();
-  updateBadges();
 }
 
 // ── REALTIME ──
@@ -887,14 +890,14 @@ function startRealtime(){
   realtimeChannel=SB.channel('emp-'+emp.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`employee_id=eq.${emp.id}`},payload=>{
       myMsgs.push(payload.new);
-      updateBadges();updateBadges();
+      updateBadges();
       if(document.getElementById('pg-msg').classList.contains('on'))renderMsgs();
       else showPopupNotif('💬 New message from Office','office-msg');
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'expense_batches',filter:`employee_id=eq.${emp.id}`},async payload=>{
       const idx=myBatches.findIndex(b=>b.id===payload.new.id);
       if(idx>=0)myBatches[idx]=payload.new;else myBatches.push(payload.new);
-      updateBadges();updateBadges();
+      updateBadges();
       const st=payload.new.status;
       if(st==='approved'){confettiBurst(window.innerWidth/2,window.innerHeight/3,40);}
       showPopupNotif(st==='approved'?'✅ Expenses Approved!':st==='rejected'?'❌ Expenses Rejected':'📋 Expense batch updated');
@@ -911,13 +914,13 @@ function startRealtime(){
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'payment_status',filter:`employee_id=eq.${emp.id}`},payload=>{
       myPaySt.push(payload.new);
-      updateBadges();updateBadges();
+      updateBadges();
       showPopupNotif(`💰 Payment ${payload.new.bank_paid?'sent to bank':payload.new.cash_paid?'given as cash':'updated'}!`,'payment');
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'payment_status',filter:`employee_id=eq.${emp.id}`},payload=>{
       const idx=myPaySt.findIndex(p=>p.id===payload.new.id);
       if(idx>=0)myPaySt[idx]=payload.new;else myPaySt.push(payload.new);
-      updateBadges();updateBadges();
+      updateBadges();
       const n=payload.new;
       if(n.bank_paid||n.cash_paid){confettiBurst(window.innerWidth/2,120,35);showPopupNotif(`💰 ${n.bank_paid?'Bank transfer':''} ${n.cash_paid?'Cash payment':''} confirmed ✓`);}
     })
@@ -1282,7 +1285,11 @@ async function submitExp(){
   const r=await SB.from('expenses').insert({employee_id:emp.id,date,merchant,category:document.getElementById('expCat').value||null,amount:amt,notes:document.getElementById('expNotes').value||null,receipt_url:fileUrl,status:'pending',tags:document.getElementById('expVAT')?.checked?['VAT']:[],flagged:false}).select().single();
   if(r.error){toast(r.error.message,'e');return;}
   myExp.unshift(r.data);
-  document.getElementById('expMerchant').value='';document.getElementById('expAmt').value='';document.getElementById('expNotes').value='';document.getElementById('expCat').value='';document.getElementById('rcptPreview').style.display='none';_rcptFile=null;document.getElementById('rcptInput').value='';
+  document.getElementById('expMerchant').value='';document.getElementById('expAmt').value='';document.getElementById('expNotes').value='';document.getElementById('expCat').value='';const rp=document.getElementById('rcptPreview');if(rp){rp.style.display='none';rp.src='';}
+  _rcptFile=null;
+  const rc=document.getElementById('rcptCamera');if(rc)rc.value='';
+  const rf=document.getElementById('rcptFile');if(rf)rf.value='';
+  const fn=document.getElementById('rcptFileName');if(fn){fn.textContent='';fn.style.display='none';}
   toast('Expense added!','s');renderExpenses();
 }
 function renderExpenses(){
@@ -1520,7 +1527,7 @@ async function renderMsgs(){
     await SB.from('messages').update({read:true}).eq('employee_id',emp.id).eq('sender','office');
     unread.forEach(m=>m.read=true);
   }
-  updateBadges();updateBadges();
+  updateBadges();
   if(!myMsgs.length){area.innerHTML='<div style="text-align:center;color:var(--txtm);font-size:13px;padding:20px;">No messages yet. Send a message to the office.</div>';return;}
   area.innerHTML=myMsgs.map(m=>{
     const isMe=m.sender!=='office';
@@ -1719,8 +1726,8 @@ async function submitAttRequest(){
   const endStr=`${markEn.h}:${markEn.m}`;
   const startMins=parseInt(markSt.h)*60+parseInt(markSt.m);
   const endMins=parseInt(markEn.h)*60+parseInt(markEn.m);
+  if(endMins<=startMins){toast('End time must be after start time','e');return;}
   const hours=parseFloat(((endMins-startMins)/60).toFixed(1));
-  if(hours<=0){toast('Please pick valid start and end times','e');return;}
   const stdStart=9*60,stdEnd=17*60;
   const lateBy=startMins-stdStart;
   const earlyBy=stdEnd-endMins;
@@ -1830,6 +1837,9 @@ function checkSundayMode(){
 }
 
 function applySundayTheme(theme){
+  // Always clean first to avoid leaks
+  removeParticles();
+  const oldBanner=document.getElementById('sundayBanner');if(oldBanner)oldBanner.remove();
   // Background
   document.body.style.background=theme.bg;
   document.body.style.minHeight='100%';
@@ -1888,7 +1898,10 @@ function initTactileRipples(){
 
 // 2. CONFETTI BURST
 const CONFETTI_COLORS=['#2563eb','#16a34a','#f59e0b','#ec4899','#8b5cf6','#06b6d4','#f97316'];
+let _confettiCount=0;
 function confettiBurst(x,y,amount=30){
+  if(_confettiCount>80)return;
+  amount=Math.min(amount,80-_confettiCount);
   for(let i=0;i<amount;i++){
     const p=document.createElement('div');
     const col=CONFETTI_COLORS[Math.floor(Math.random()*CONFETTI_COLORS.length)];
@@ -1985,6 +1998,16 @@ function initHiddenGems(){
   initParallax();
 }
 
+// Keyboard PIN support
+document.addEventListener('keydown',e=>{
+  const s2=document.getElementById('step2');
+  if(!s2||s2.style.display==='none')return;
+  if(e.key>='0'&&e.key<='9')pk(e.key);
+  else if(e.key==='Backspace')pdel();
+  else if(e.key==='Escape')goBack();
+  else if(e.key==='Enter'&&pinEntry.length>=4)checkPin();
+});
+
 // ── INIT ──
 async function tryAutoLogin(){
   // Step 1: Sign into portal (always needed for RLS)
@@ -2033,14 +2056,14 @@ tryAutoLogin();
 // ── NETWORK & ERROR HANDLING ──
 window.addEventListener('online', ()=>{
   toast('Back online — syncing...','s');
-  if(typeof loadAllData==='function')loadAllData();
+  if(typeof loadAll==='function')loadAll();
   if(typeof silentSync==='function')silentSync();
+  const sd=document.getElementById('syncPill');
+  if(sd&&typeof setSyncUI==='function')setSyncUI('live');
 });
 window.addEventListener('offline', ()=>{
   toast('No internet connection','e');
-  const sd=document.getElementById('syncStrip')||document.getElementById('syncBadge');
-  if(sd&&typeof setSyncUI==='function')setSyncUI('offline');
-  else if(sd&&typeof setSyncStatus==='function')setSyncStatus('err','Offline');
+  if(typeof setSyncUI==='function')setSyncUI('offline');
 });
 window.onerror=function(msg,url,line,col,err){
   console.error('DAM Error:',msg,'at',url,line);
