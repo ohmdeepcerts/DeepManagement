@@ -560,6 +560,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <div class="nav-item" data-page="flags"><i class="fa-solid fa-flag"></i><span>Flagged Items</span><span class="nb" id="flagBadge" style="display:none">0</span></div>
   </div>
   <div class="sb-bot">
+    <div id="recentlyViewedRail"></div>
     <div class="ver" style="padding:10px 12px;font-size:10px;color:#475569;">DAM Pro v2.0 · Supabase</div>
   </div>
 </nav>
@@ -639,7 +640,9 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div class="cb" id="nmList"></div>
       </div>
       <!-- ROW 1: 8 KPI CARDS -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;" id="kpiRow"></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;" <div id="dashEOW"></div>
+      <div id="dashAnniversaries"></div>
+      id="kpiRow"></div>
       <!-- ROW 2: DAILY PRESENCE (scrollable) + PAYROLL TREND -->
       <div style="display:grid;grid-template-columns:320px 1fr;gap:14px;margin-bottom:14px;">
         <div class="card" style="display:flex;flex-direction:column;">
@@ -1215,6 +1218,13 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       </div>
     </div>
   </div>
+</div>
+<div id="activityPanel" class="act-panel">
+  <div class="act-panel-hd" style="padding:12px 14px;">
+    <div style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;"><i class="fa-solid fa-clock-rotate-left" style="color:var(--acc);"></i>Activity Log</div>
+    <button onclick="closeActivityPanel()" style="background:none;border:none;cursor:pointer;color:var(--txtm);font-size:20px;line-height:1;padding:2px 6px;border-radius:6px;">×</button>
+  </div>
+  <div class="act-panel-body" id="activityLogList" style="padding:8px;flex:1;overflow-y:auto;"></div>
 </div>
 <div class="toast-wrap" id="toasts"></div>
 <script>
@@ -2243,7 +2253,7 @@ function buildLedRow(row,i,running,C,isEx,totalRows){
     <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)"></td>
     <td>
       <input type="text" class="shi" placeholder="Description..." value="${(row.merchant||'').replace(/"/g,'&quot;')}" ${isEx?'disabled':''} oninput="updateExp('${row.id}','merchant',this.value);checkAutoNextRow('${row.id}',${i},${totalRows||1})">
-      ${row.receipt_url?`<a href="${row.receipt_url}" target="_blank" style="font-size:10px;color:var(--acc);display:flex;align-items:center;gap:3px;margin-top:2px;"><i class="fa-solid fa-paperclip"></i>Receipt</a>`:''}
+      <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">${row.receipt_url?`<div onclick="openLightbox('${row.receipt_url}')" style="width:30px;height:30px;border-radius:5px;border:1px solid var(--bdr);overflow:hidden;cursor:pointer;flex-shrink:0;background:var(--card2);display:flex;align-items:center;justify-content:center;position:relative;"><img src="${row.receipt_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;" onerror="this.style.display='none'"><i class="fa-solid fa-file-image" style="font-size:14px;color:var(--acc);"></i></div><a href="${row.receipt_url}" target="_blank" title="Open receipt" style="font-size:10px;color:var(--acc);"><i class="fa-solid fa-eye"></i></a>`:''}<label title="${row.receipt_url?'Replace receipt':'Attach receipt'}" style="width:22px;height:22px;border-radius:5px;border:1px dashed ${row.receipt_url?'var(--acc)':'var(--bdr)'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:${row.receipt_url?'var(--acc)':'var(--txtm)'};font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label></div>
       ${row.notes?`<div style="font-size:10px;color:var(--txtm);margin-top:1px;font-style:italic;">"${row.notes}"</div>`:''}
     </td>
     <td><input type="text" class="shi cat-inp" list="ledCatList" placeholder="Category" value="${(row.category||'').replace(/"/g,'&quot;')}" style="${catStyle}" ${isEx?'disabled':''} oninput="updateExp('${row.id}','category',this.value)"></td>
@@ -2254,6 +2264,7 @@ function buildLedRow(row,i,running,C,isEx,totalRows){
       ${st!=='approved'?`<button class="ra-btn" onclick="approveExp('${row.id}')" title="Approve" style="color:var(--grn);"><i class="fa-solid fa-check"></i></button>`:''}
       ${st!=='rejected'?`<button class="ra-btn del" onclick="rejectExp('${row.id}')" title="Reject"><i class="fa-solid fa-xmark"></i></button>`:''}
       ${!row.flagged?`<button class="ra-btn" onclick="flagExp('${row.id}')" title="Flag" style="color:var(--amb);"><i class="fa-solid fa-flag"></i></button>`:`<button class="ra-btn" onclick="unflagExp('${row.id}')" title="Unflag" style="color:var(--red);"><i class="fa-solid fa-flag"></i></button>`}
+      ${row.receipt_url?`<button class="ra-btn" onclick="downloadReceiptAsPDF('${row.id}','${row.receipt_url}','${(row.date||'')}','${(row.merchant||'receipt').replace(/'/g,'').replace(/[^a-zA-Z0-9 ]/g,'_')}')" title="Download PDF" style="color:var(--tel);"><i class="fa-solid fa-file-arrow-down"></i></button>`:''}
       <button class="ra-btn del" onclick="deleteLedRow('${row.id}')" title="Delete"><i class="fa-solid fa-trash-alt"></i></button>
     </td>
   </tr>`;
@@ -2979,18 +2990,8 @@ async function updateBankAmt(el,rowTotal){
   const cashEl=document.querySelector(`.pr-cash-${empId}`);
   if(cashEl)cashEl.textContent=cur()+cashAmt.toFixed(2)+' cash';
 }
-function showMonthClosedStamp(monthName){
-  const stamp=document.createElement('div');
-  stamp.style.cssText='position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;pointer-events:none;';
-  stamp.innerHTML=`<div style="border:6px solid var(--grn);border-radius:12px;padding:18px 36px;transform:rotate(-8deg) scale(0);transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1);opacity:0.92;">
-    <div style="font-size:28px;font-weight:900;color:var(--grn);letter-spacing:2px;text-transform:uppercase;">${monthName}</div>
-    <div style="font-size:13px;font-weight:700;color:var(--grn);text-align:center;letter-spacing:4px;">CLOSED</div>
-  </div>`;
-  document.body.appendChild(stamp);
-  setTimeout(()=>stamp.firstElementChild.style.transform='rotate(-8deg) scale(1)',50);
-  setTimeout(()=>{stamp.firstElementChild.style.opacity='0';stamp.firstElementChild.style.transform='rotate(-8deg) scale(0.8)';},1600);
-  setTimeout(()=>stamp.remove(),2000);
-}
+// showMonthClosedStamp (duplicate removed)
+
 async function togglePayrollLock(){
   const m=parseInt(document.getElementById('prMonth').value);
   const y=parseInt(document.getElementById('prYear').value);
@@ -4253,23 +4254,8 @@ function addToRecovery(type,label,data){
   var filtered=bin.filter(function(i){return Date.now()-i.deletedAt<30*86400000;});
   localStorage.setItem('dam_recovery',JSON.stringify(filtered.slice(0,50)));
 }
-function renderRecoveryBin(){
-  var bin=getRecoveryBin();
-  var modal=document.createElement('div');
-  modal.className='confirm-overlay';
-  var rows=bin.length?bin.map(function(item){
-    return'<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:0.5px solid var(--bdr);">'+
-      '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">'+item.label+'</div>'+
-      '<div style="font-size:11px;color:var(--txtm);">'+item.type+' · Deleted '+new Date(item.deletedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+'</div></div>'+
-      '<button onclick="restoreFromBin('+item.id+')" style="background:var(--grnl);color:var(--grn);border:1px solid var(--grn);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;">Restore</button>'+
-    '</div>';
-  }).join(''):'<div style="padding:20px;text-align:center;color:var(--txtm);">Recovery bin is empty</div>';
-  modal.innerHTML='<div class="confirm-box" style="max-width:520px;"><div class="confirm-title">🗑️ Recovery Bin</div><div class="confirm-msg">Items deleted in the last 30 days. Auto-purged after 30 days.</div><div style="max-height:300px;overflow-y:auto;border:1px solid var(--bdr);border-radius:var(--rs);margin-bottom:16px;">'+rows+'</div><button id="recovCloseBtn" class="btn btn-o">Close</button></div>';
-  modal.onclick=function(e){if(e.target===modal)modal.remove();};
-  document.body.appendChild(modal);
-  var cb=modal.querySelector('#recovCloseBtn');
-  if(cb)cb.onclick=function(){modal.remove();};
-}
+// renderRecoveryBin (duplicate removed)
+
 function restoreFromBin(id){
   var bin=getRecoveryBin();
   var item=bin.find(function(i){return i.id===id;});
@@ -4316,6 +4302,7 @@ function renderRecentlyViewed(){
     el.appendChild(div);
   });
 }
+
 
 // ══════════════════════════════════════════════════════
 // ACTIVITY LOG
@@ -4666,15 +4653,139 @@ function renderRecoveryPage(){
 
 function renderRecoveryBin(){navigate('recovery');}
 
+
+// ══════════════════════════════════════════════
+// DOWNLOAD RECEIPT AS PDF
+// ══════════════════════════════════════════════
+async function downloadReceiptAsPDF(expId,url,date,merchant){
+  // Show progress
+  toast('Preparing PDF download...','i',3000);
+  const exp=expenses.find(function(e){return e.id===expId;});
+  const filename='VAT_Receipt_'+(date||'')+'_'+(merchant||'receipt')+'.pdf';
+
+  // Detect if already a PDF
+  const isPDF=url.toLowerCase().includes('.pdf')||url.toLowerCase().includes('pdf');
+  if(isPDF){
+    // Direct download for PDFs
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=filename;
+    a.target='_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast('PDF downloaded','s');
+    return;
+  }
+
+  // For images: load and convert to PDF using canvas + print
+  const img=new Image();
+  img.crossOrigin='anonymous';
+  img.onload=function(){
+    // Create an off-screen canvas
+    const canvas=document.createElement('canvas');
+    const MAX=1600;
+    let w=img.naturalWidth,h=img.naturalHeight;
+    if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+    if(h>MAX*1.5){w=Math.round(w*MAX*1.5/h);h=MAX*1.5;}
+    canvas.width=w;canvas.height=h;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#fff';
+    ctx.fillRect(0,0,w,h);
+    ctx.drawImage(img,0,0,w,h);
+
+    // Use browser print-to-PDF
+    const dataUrl=canvas.toDataURL('image/jpeg',0.92);
+    const printWin=window.open('','_blank');
+    if(!printWin){toast('Allow popups to download PDF','e');return;}
+    const company=(cfg&&cfg.company)||'DAM Pro';
+    const empName=exp&&employees.find(function(e){return e.id===exp.employee_id;});
+    printWin.document.write(
+      '<!DOCTYPE html><html><head><title>'+filename+'</title>'+
+      '<style>*{margin:0;padding:0;box-sizing:border-box;}'+
+      'body{font-family:Arial,sans-serif;background:#fff;}'+
+      '.header{padding:16px 20px;border-bottom:2px solid #1e3a5f;display:flex;justify-content:space-between;align-items:center;}'+
+      '.header-title{font-size:18px;font-weight:700;color:#1e3a5f;}'+
+      '.header-sub{font-size:11px;color:#64748b;margin-top:2px;}'+
+      '.meta{padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}'+
+      '.meta-item label{font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;display:block;}'+
+      '.meta-item span{font-size:13px;font-weight:600;color:#1e293b;}'+
+      '.img-wrap{padding:16px 20px;text-align:center;}'+
+      '.img-wrap img{max-width:100%;max-height:75vh;border-radius:4px;border:1px solid #e2e8f0;}'+
+      '.footer{padding:10px 20px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;text-align:center;}'+
+      '@media print{@page{margin:0;size:A4;}body{print-color-adjust:exact;-webkit-print-color-adjust:exact;}}'+
+      '</style></head><body>'+
+      '<div class="header"><div><div class="header-title">'+company+'</div><div class="header-sub">VAT Receipt / Expense Document</div></div>'+
+      '<div style="font-size:11px;color:#94a3b8;">'+new Date().toLocaleDateString('en-GB')+'</div></div>'+
+      '<div class="meta">'+
+      '<div class="meta-item"><label>Date</label><span>'+(exp&&exp.date||date||'—')+'</span></div>'+
+      '<div class="meta-item"><label>Merchant</label><span>'+(exp&&exp.merchant||merchant||'—')+'</span></div>'+
+      '<div class="meta-item"><label>Amount</label><span>'+((exp&&exp.amount)?'£'+parseFloat(exp.amount).toFixed(2):'—')+'</span></div>'+
+      '<div class="meta-item"><label>Category</label><span>'+(exp&&exp.category||'—')+'</span></div>'+
+      '</div>'+
+      '<div class="img-wrap"><img src="'+dataUrl+'" alt="Receipt"></div>'+
+      '<div class="footer">Generated by '+company+' · DAM Pro</div>'+
+      '</body></html>'
+    );
+    printWin.document.close();
+    setTimeout(function(){printWin.focus();printWin.print();},600);
+    toast('Printing as PDF — choose Save as PDF in the print dialog','s',6000);
+  };
+  img.onerror=function(){
+    // Fallback: just open original in new tab
+    window.open(url,'_blank');
+    toast('Could not convert — opened original file','i');
+  };
+  img.src=url+'?t='+Date.now(); // cache bust
+}
+
+
+// ══ LEDGER RECEIPT UPLOAD ══
+async function uploadLedReceipt(expId, input){
+  const file=input.files[0];
+  if(!file)return;
+  const ALLOWED=['image/jpeg','image/png','image/webp','application/pdf','image/heic'];
+  if(!ALLOWED.includes(file.type)&&!file.name.match(/\.(jpg|jpeg|png|pdf|heic|webp)$/i)){
+    toast('File type not allowed. Use JPG, PNG or PDF.','e');return;
+  }
+  if(file.size>10*1024*1024){toast('File too large. Max 10MB.','e');return;}
+  toast('Uploading receipt...','i',3000);
+  const ext=file.name.split('.').pop()||'jpg';
+  const path='receipts/office/'+expId+'_'+Date.now()+'.'+ext;
+  const {data,error}=await sb.storage.from('employee-docs').upload(path,file,{upsert:true});
+  if(error){
+    // If storage fails, try saving as base64 data URL (fallback)
+    const reader=new FileReader();
+    reader.onload=async function(e){
+      const url=e.target.result;
+      await sb.from('expenses').update({receipt_url:url}).eq('id',expId);
+      const idx=expenses.findIndex(function(ex){return ex.id===expId;});
+      if(idx>=0)expenses[idx].receipt_url=url;
+      renderLedger();
+      toast('Receipt saved','s');
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
+  const {data:urlData}=sb.storage.from('employee-docs').getPublicUrl(path);
+  const url=urlData.publicUrl;
+  await sb.from('expenses').update({receipt_url:url}).eq('id',expId);
+  const idx=expenses.findIndex(function(ex){return ex.id===expId;});
+  if(idx>=0)expenses[idx].receipt_url=url;
+  renderLedger();
+  toast('Receipt attached','s');
+  logActivity('fa-paperclip','Receipt attached to expense','ledger');
+}
+
 window.onerror=function(msg,url,line,col,err){
   console.error('DAM Error:',msg,'at',url,line);
   if(msg&&!msg.includes('Script error'))
     toast('Something went wrong — try refreshing','e');
   return false;
 };
-window.addEventListener('unhandledrejection',e=>{
+window.addEventListener('unhandledrejection',function(e){
   console.error('Unhandled promise:',e.reason);
-  if(e.reason?.message&&!e.reason.message.includes('aborted'))
+  if(e.reason&&e.reason.message&&e.reason.message.indexOf('aborted')<0)
     toast('Connection error — check internet','e');
 });
 </script>
