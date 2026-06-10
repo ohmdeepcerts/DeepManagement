@@ -448,12 +448,13 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
       <div class="sal-card" id="hmSalCard">
         <div class="sal-month" id="hmMonth">This Month</div>
         <div class="sal-amount" id="hmAmount">£—</div>
-        <div class="sal-sub">Estimated pay · tap Pay tab for details</div>
+        <div class="sal-sub" id="hmPaySub">Estimated pay · tap Pay tab for details</div>
         <div class="sal-grid" id="hmSalGrid">
           <div class="sal-it"><div class="sal-it-l">Base</div><div class="sal-it-v" id="hmBase">—</div></div>
           <div class="sal-it"><div class="sal-it-l">OT</div><div class="sal-it-v" id="hmOT">—</div></div>
           <div class="sal-it" id="hmBonusWrap" style="display:none;"><div class="sal-it-l">Bonus</div><div class="sal-it-v" id="hmBonus">—</div></div>
           <div class="sal-it"><div class="sal-it-l">Days</div><div class="sal-it-v" id="hmDays">—</div></div>
+          <div class="sal-it" id="hmExpWrap" style="display:none;"><div class="sal-it-l">Expenses</div><div class="sal-it-v" id="hmExpAmt" style="color:var(--tel);">—</div></div>
         </div>
       </div>
       <!-- Payment status -->
@@ -1011,7 +1012,13 @@ function renderHome(){
   if(emp.pay_type==='fixed')base=parseFloat(emp.salary)||0;
   else activeR.forEach(r=>{const p=calcPay(emp,r);base+=p.base;ot+=p.ot;});
   const bonus=mRecs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-  const total=base+ot+bonus;
+  // Add expenses to total
+  const mExpAll=myExp.filter(function(e){
+    var d=new Date(e.date+'T00:00:00');
+    return d.getMonth()===m&&d.getFullYear()===y&&(e.merchant||e.description||(e.amount&&parseFloat(e.amount)!==0));
+  });
+  const mExpNetTotal=mExpAll.reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+  const total=base+ot+bonus+mExpNetTotal;
   const days=dim(y,m);
   const wD=Array.from({length:days},(_,i)=>new Date(y,m,i+1).getDay()!==0).filter(Boolean).length;
   const pres=activeR.filter(r=>new Date(r.date+'T00:00:00').getDay()!==0).length;
@@ -1031,6 +1038,19 @@ function renderHome(){
   if(bonusEl)bonusEl.style.display=lifetimeBonus>0?'flex':'none';
   document.getElementById('hmBonus').textContent=fmt(bonus);
   document.getElementById('hmDays').textContent=pres+'/'+wD;
+  // Show expenses in card if any
+  var expWrap=document.getElementById('hmExpWrap');
+  var expAmtEl=document.getElementById('hmExpAmt');
+  var subEl=document.getElementById('hmPaySub');
+  if(mExpNetTotal!==0&&expWrap&&expAmtEl){
+    expWrap.style.display='';
+    expAmtEl.textContent=fmt(mExpNetTotal);
+    expAmtEl.style.color=mExpNetTotal<0?'var(--red)':'var(--tel)';
+    if(subEl)subEl.textContent='Pay + expenses · tap Pay tab for details';
+  } else {
+    if(expWrap)expWrap.style.display='none';
+    if(subEl)subEl.textContent='Estimated pay · tap Pay tab for details';
+  }
 
   // Payment status this month
   const payStM=myPaySt.find(p=>p.month===m&&p.year===y);
@@ -1443,7 +1463,13 @@ function renderPay(){
   else activeR.forEach(r=>{const p=calcPay(emp,r);base+=p.base;ot+=p.ot;});
   const bonus=mRecs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
   const expTotal=mExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
-  const total=base+ot+bonus;
+  // Add expenses to total
+  const mExpAll=myExp.filter(function(e){
+    var d=new Date(e.date+'T00:00:00');
+    return d.getMonth()===m&&d.getFullYear()===y&&(e.merchant||e.description||(e.amount&&parseFloat(e.amount)!==0));
+  });
+  const mExpNetTotal=mExpAll.reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
+  const total=base+ot+bonus+mExpNetTotal;
   const lifetimeBonus=myAtt.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
   const days=dim(y,m);
   const wD=Array.from({length:days},(_,i)=>new Date(y,m,i+1).getDay()!==0).filter(Boolean).length;
