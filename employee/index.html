@@ -78,13 +78,14 @@ body.sunday-active{background:linear-gradient(180deg,#d1fae5 0%,#f0fdf4 30%,#f1f
 /* ── CONTENT AREA ── */
 .content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .content::-webkit-scrollbar{display:none;}
-.pg{display:none;padding:14px 14px calc(var(--nb-h) + 14px);}
+.pg{display:none;padding:14px 14px calc(62px + max(env(safe-area-inset-bottom),12px) + 28px);}
 .pg.on{display:block;}
 
 /* ── BOTTOM NAV ── */
-.bot-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--card);border-top:1px solid var(--bdr);display:flex;z-index:100;height:var(--nb-h);box-shadow:0 -4px 20px rgba(0,0,0,0.08);padding-bottom:env(safe-area-inset-bottom);}
-.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 4px;cursor:pointer;color:var(--txtm);font-size:10px;font-weight:600;border:none;background:none;position:relative;transition:var(--tr);gap:2px;}
-.nb.on{color:var(--acc);}
+.bot-nav{position:fixed;bottom:max(env(safe-area-inset-bottom),12px);left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:400px;background:var(--card);border-radius:20px;border:1px solid var(--bdr);display:flex;z-index:100;height:62px;box-shadow:0 8px 32px rgba(0,0,0,0.15),0 2px 8px rgba(0,0,0,0.08);padding:0 4px;gap:2px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 4px;cursor:pointer;color:var(--txtm);font-size:10px;font-weight:600;border:none;background:none;position:relative;transition:all 0.2s;gap:2px;border-radius:14px;-webkit-tap-highlight-color:transparent;}
+.nb:active{transform:scale(0.88);background:var(--card2);}
+.nb.on{color:var(--acc);background:var(--accl);border-radius:14px;}
 .nb.on i{transform:translateY(-1px);}
 .nb i{font-size:22px;transition:var(--tr);}
 .nb .badge{position:absolute;top:5px;right:calc(50% - 18px);background:var(--red);color:#fff;font-size:8px;font-weight:800;padding:1px 4px;border-radius:10px;min-width:14px;text-align:center;}
@@ -571,9 +572,10 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
         <div style="display:flex;align-items:center;gap:11px;background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--rs);padding:11px 13px;margin-bottom:12px;">
           <i class="fa-solid fa-tag" style="color:var(--amb);font-size:16px;flex-shrink:0;"></i>
           <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--amb);">VAT Receipt</div><div style="font-size:11px;color:var(--txt2);">Toggle if this receipt has VAT you want to reclaim</div></div>
-          <label style="position:relative;width:44px;height:24px;flex-shrink:0;">
-            <input type="checkbox" id="expVAT" style="opacity:0;width:0;height:0;">
-            <span id="vatToggleVis" onclick="toggleVATvis()" style="position:absolute;inset:0;background:var(--bdr);border-radius:12px;cursor:pointer;transition:0.2s;"></span>
+          <label id="vatToggleLabel" onclick="toggleVATvis(event)" style="position:relative;display:inline-block;width:48px;height:26px;flex-shrink:0;cursor:pointer;">
+            <input type="checkbox" id="expVAT" style="opacity:0;width:0;height:0;position:absolute;">
+            <span id="vatToggleVis" style="position:absolute;inset:0;background:var(--bdr);border-radius:13px;transition:0.25s;"></span>
+            <span id="vatToggleKnob" style="position:absolute;left:3px;top:3px;width:20px;height:20px;background:#fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.25);transition:0.25s;"></span>
           </label>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
@@ -1101,8 +1103,10 @@ function renderHome(){
   // Today mark button on home
   buildHomeTodayMark();
 
-  // Recent expenses
-  const recent=myExp.slice(0,5);
+  // Recent expenses - skip blank rows
+  const recent=myExp.filter(function(e){
+    return e.merchant||e.description||(e.amount&&parseFloat(e.amount)!==0);
+  }).slice(0,5);
   const expEl=document.getElementById('hmExp');
   expEl.innerHTML=recent.length?recent.map(e=>`
     <div class="exp-row">
@@ -1297,11 +1301,15 @@ function rcptChosen(input){
   if(!isPdf){const r=new FileReader();r.onload=e=>{const img=document.getElementById('rcptPreview');img.src=e.target.result;img.style.display='block';};r.readAsDataURL(_rcptFile);}
   else{const img=document.getElementById('rcptPreview');img.style.display='none';} // PDF: show name only
 }
-function toggleVATvis(){
+function toggleVATvis(e){
+  if(e){e.preventDefault();e.stopPropagation();}
   const cb=document.getElementById('expVAT');
   const vis=document.getElementById('vatToggleVis');
-  cb.checked=!cb.checked;
-  if(vis)vis.style.background=cb.checked?'var(--grn)':'var(--bdr)';
+  const knob=document.getElementById('vatToggleKnob');
+  const nowOn=!cb.checked;
+  cb.checked=nowOn;
+  if(vis)vis.style.background=nowOn?'var(--grn)':'var(--bdr)';
+  if(knob)knob.style.transform=nowOn?'translateX(22px)':'translateX(0)';
 }
 async function submitExp(){
   const merchant=document.getElementById('expMerchant').value.trim();
@@ -1327,7 +1335,13 @@ async function submitExp(){
 }
 function renderExpenses(){
   const m=expM,y=expY;
-  const mExp=myExp.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;});
+  const mExp=myExp.filter(e=>{
+    const d=new Date(e.date+'T00:00:00');
+    if(d.getMonth()!==m||d.getFullYear()!==y)return false;
+    // Skip blank rows (no merchant AND no amount AND no description)
+    if(!e.merchant&&!e.description&&(!e.amount||parseFloat(e.amount)===0))return false;
+    return true;
+  });
   const total=mExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
   // My expenses list
   document.getElementById('myExp').innerHTML=mExp.length?mExp.map(e=>{
@@ -1416,7 +1430,13 @@ async function toggleFlag(id){
 function renderPay(){
   const m=payM,y=payY;
   const mRecs=myAtt.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;});
-  const mExp=myExp.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;});
+  const mExp=myExp.filter(e=>{
+    const d=new Date(e.date+'T00:00:00');
+    if(d.getMonth()!==m||d.getFullYear()!==y)return false;
+    // Skip blank rows (no merchant AND no amount AND no description)
+    if(!e.merchant&&!e.description&&(!e.amount||parseFloat(e.amount)===0))return false;
+    return true;
+  });
   const activeR=mRecs.filter(r=>isP(r.status));
   let base=0,ot=0;
   if(emp.pay_type==='fixed')base=parseFloat(emp.salary)||0;
