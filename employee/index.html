@@ -1351,6 +1351,9 @@ async function submitExp(){
   const rc=document.getElementById('rcptCamera');if(rc)rc.value='';
   const rf=document.getElementById('rcptFile');if(rf)rf.value='';
   const fn=document.getElementById('rcptFileName');if(fn){fn.textContent='';fn.style.display='none';}
+  const vcb=document.getElementById('expVAT');if(vcb)vcb.checked=false;
+  const vvis=document.getElementById('vatToggleVis');if(vvis)vvis.style.background='var(--bdr)';
+  const vknob=document.getElementById('vatToggleKnob');if(vknob)vknob.style.transform='translateX(0)';
   toast('Expense added!','s');renderExpenses();
 }
 function renderExpenses(){
@@ -1441,7 +1444,8 @@ async function toggleFlag(id){
   const e=myExp.find(x=>x.id===id);if(!e)return;
   const reason=e.flagged?null:prompt('Reason for flagging:');
   if(!e.flagged&&reason===null)return; // cancelled
-  await SB.from('expenses').update({flagged:!e.flagged,flag_note:reason}).eq('id',id);
+  const r=await SB.from('expenses').update({flagged:!e.flagged,flag_note:reason}).eq('id',id);
+  if(r.error){toast(r.error.message,'e');return;}
   e.flagged=!e.flagged;e.flag_note=reason;
   renderExpenses();toast(e.flagged?'Flagged for review':'Flag removed','i');
 }
