@@ -640,9 +640,9 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div class="cb" id="nmList"></div>
       </div>
       <!-- ROW 1: 8 KPI CARDS -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;" <div id="dashEOW"></div>
+      <div id="dashEOW"></div>
       <div id="dashAnniversaries"></div>
-      id="kpiRow"></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;" id="kpiRow"></div>
       <!-- ROW 2: DAILY PRESENCE (scrollable) + PAYROLL TREND -->
       <div style="display:grid;grid-template-columns:320px 1fr;gap:14px;margin-bottom:14px;">
         <div class="card" style="display:flex;flex-direction:column;">
@@ -2232,10 +2232,22 @@ function renderLedger(){
     empty.style.display='none';
     let running=0;const totalRows=data.length;
     tbody.innerHTML=data.map((row,i)=>{running+=(parseFloat(row.amount)||0);return buildLedRow(row,i,running,C,isEx,totalRows);}).join('');
-    // Ensure last row is blank — if last row has content, add a new empty row
-    const lastRow=data[data.length-1];
-    if(lastRow&&(lastRow.merchant||lastRow.description||parseFloat(lastRow.amount)!==0)){
+    // Ensure exactly ONE blank row exists — never accumulate blanks
+    const isBlank=function(r){return !r.merchant&&!r.description&&(!r.amount||parseFloat(r.amount)===0)&&!r.category;};
+    const blanks=data.filter(isBlank);
+    if(blanks.length===0){
       if(!_autoAddingRow)addLedRowSilent();
+    } else if(blanks.length>1){
+      // Clean up extra blank rows from DB (keep only the last one)
+      const extras=blanks.slice(0,-1).map(function(r){return r.id;});
+      if(extras.length&&!_cleaningBlanks){
+        _cleaningBlanks=true;
+        sb.from('expenses').delete().in('id',extras).then(function(){
+          expenses=expenses.filter(function(e){return extras.indexOf(e.id)<0;});
+          _cleaningBlanks=false;
+          renderLedger();
+        }).catch(function(){_cleaningBlanks=false;});
+      }
     }
   }
   renderLedRight(data,C);
@@ -2331,6 +2343,7 @@ async function updateExp(id,field,val){
   deb('exp-save-'+id,async()=>{await sb.from('expenses').update({[field]:val}).eq('id',id);},900);
 }
 var _autoAddingRow=false;
+var _cleaningBlanks=false;
 function checkAutoNextRow(rowId,rowIdx,totalRows){
   if(_autoAddingRow)return;
   if(rowIdx===totalRows-1){
@@ -4364,7 +4377,7 @@ function makeSparkline(data,color){
     var y=h-pad-((v-min)/range)*(h-pad*2);
     return x.toFixed(1)+','+y.toFixed(1);
   }).join(' ');
-  return'<svg class="sparkline" viewBox="0 0 '+w+' '+h+'" style="overflow:visible;"><polyline fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linejoin="round" points="'+pts+'"/><circle cx="'+data[data.length-1]*(w-pad*2)/(data.length-1||1)+'" cy="'+(h-pad-((data[data.length-1]-min)/range)*(h-pad*2)).toFixed(1)+'" r="2" fill="'+color+'"/></svg>';
+  return'<svg class="sparkline" viewBox="0 0 '+w+' '+h+'" width="60" height="20" style="overflow:visible;width:60px;height:20px;vertical-align:middle;margin-left:8px;display:inline-block;"><polyline fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linejoin="round" points="'+pts+'"/><circle cx="'+data[data.length-1]*(w-pad*2)/(data.length-1||1)+'" cy="'+(h-pad-((data[data.length-1]-min)/range)*(h-pad*2)).toFixed(1)+'" r="2" fill="'+color+'"/></svg>';
 }
 function getAttendanceTrend(days){
   var result=[];
