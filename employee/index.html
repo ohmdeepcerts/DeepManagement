@@ -78,11 +78,12 @@ body.sunday-active{background:linear-gradient(180deg,#d1fae5 0%,#f0fdf4 30%,#f1f
 /* ── CONTENT AREA ── */
 .content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .content::-webkit-scrollbar{display:none;}
-.pg{display:none;padding:14px 14px calc(62px + max(env(safe-area-inset-bottom),12px) + 28px);}
+.pg{display:none;padding:14px 14px calc(60px + max(env(safe-area-inset-bottom),10px) + 38px);}
 .pg.on{display:block;}
 
 /* ── BOTTOM NAV ── */
-.bot-nav{position:fixed;bottom:max(env(safe-area-inset-bottom),12px);left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:400px;background:var(--card);border-radius:20px;border:1px solid var(--bdr);display:flex;z-index:100;height:62px;box-shadow:0 8px 32px rgba(0,0,0,0.15),0 2px 8px rgba(0,0,0,0.08);padding:0 4px;gap:2px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);}
+.bot-nav{position:fixed;bottom:calc(max(env(safe-area-inset-bottom),10px) + 10px);left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:400px;background:rgba(255,255,255,0.62);border-radius:22px;border:1px solid rgba(255,255,255,0.55);display:flex;z-index:100;height:60px;box-shadow:0 12px 40px rgba(0,0,0,0.18),0 2px 10px rgba(0,0,0,0.06),inset 0 1px 0 rgba(255,255,255,0.6);padding:0 4px;gap:2px;backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);}
+[data-theme="dark"] .bot-nav{background:rgba(28,30,38,0.6);border-color:rgba(255,255,255,0.1);box-shadow:0 12px 40px rgba(0,0,0,0.45),inset 0 1px 0 rgba(255,255,255,0.06);}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 4px;cursor:pointer;color:var(--txtm);font-size:10px;font-weight:600;border:none;background:none;position:relative;transition:all 0.2s;gap:2px;border-radius:14px;-webkit-tap-highlight-color:transparent;}
 .nb:active{transform:scale(0.88);background:var(--card2);}
 .nb.on{color:var(--acc);background:var(--accl);border-radius:14px;}
@@ -1331,7 +1332,11 @@ function toggleVATvis(e){
   if(vis)vis.style.background=nowOn?'var(--grn)':'var(--bdr)';
   if(knob)knob.style.transform=nowOn?'translateX(22px)':'translateX(0)';
 }
+let _submittingExp=false;
 async function submitExp(){
+  if(_submittingExp)return;
+  _submittingExp=true;
+  setTimeout(function(){_submittingExp=false;},3000);
   const merchant=document.getElementById('expMerchant').value.trim();
   const amt=parseFloat(document.getElementById('expAmt').value);
   const date=document.getElementById('expDate').value;
@@ -1344,7 +1349,7 @@ async function submitExp(){
     if(!error){const {data:ud}=SB.storage.from('employee-docs').getPublicUrl(path);fileUrl=ud?.publicUrl||null;}
   }
   const r=await SB.from('expenses').insert({employee_id:emp.id,date,merchant,category:document.getElementById('expCat').value||null,amount:amt,notes:document.getElementById('expNotes').value||null,receipt_url:fileUrl,status:'pending',tags:document.getElementById('expVAT')?.checked?['VAT']:[],flagged:false}).select().single();
-  if(r.error){toast(r.error.message,'e');return;}
+  if(r.error){_submittingExp=false;toast(r.error.message,'e');return;}
   myExp.unshift(r.data);
   document.getElementById('expMerchant').value='';document.getElementById('expAmt').value='';document.getElementById('expNotes').value='';document.getElementById('expCat').value='';const rp=document.getElementById('rcptPreview');if(rp){rp.style.display='none';rp.src='';}
   _rcptFile=null;
@@ -1354,6 +1359,7 @@ async function submitExp(){
   const vcb=document.getElementById('expVAT');if(vcb)vcb.checked=false;
   const vvis=document.getElementById('vatToggleVis');if(vvis)vvis.style.background='var(--bdr)';
   const vknob=document.getElementById('vatToggleKnob');if(vknob)vknob.style.transform='translateX(0)';
+  _submittingExp=false;
   toast('Expense added!','s');renderExpenses();
 }
 function renderExpenses(){
@@ -1416,6 +1422,11 @@ async function editAndResendExp(id){
   document.getElementById('expNotes').value=e.notes||'';
   document.getElementById('expDate').value=e.date||dk(new Date());
   document.getElementById('expCat').value=e.category||'';
+  // Restore VAT toggle state (checkbox + visual)
+  const hasVAT=(e.tags||[]).includes('VAT');
+  const vcb=document.getElementById('expVAT');if(vcb)vcb.checked=hasVAT;
+  const vvis=document.getElementById('vatToggleVis');if(vvis)vvis.style.background=hasVAT?'var(--grn)':'var(--bdr)';
+  const vknob=document.getElementById('vatToggleKnob');if(vknob)vknob.style.transform=hasVAT?'translateX(22px)':'translateX(0)';
   // Show edit mode notice
   showPg('exp');
   // Scroll to form
@@ -1428,12 +1439,15 @@ async function editAndResendExp(id){
       const merchant=document.getElementById('expMerchant').value.trim();
       const amt=parseFloat(document.getElementById('expAmt').value);
       if(!merchant||!amt){toast('Fill in description and amount','e');return;}
-      const r=await SB.from('expenses').update({merchant,amount:amt,category:document.getElementById('expCat').value||null,notes:document.getElementById('expNotes').value||null,status:'pending',flagged:false,flag_note:null,date:document.getElementById('expDate').value}).eq('id',id);
+      const r=await SB.from('expenses').update({merchant,amount:amt,category:document.getElementById('expCat').value||null,notes:document.getElementById('expNotes').value||null,status:'pending',flagged:false,flag_note:null,date:document.getElementById('expDate').value,tags:document.getElementById('expVAT')&&document.getElementById('expVAT').checked?['VAT']:[]}).eq('id',id);
       if(r.error){toast(r.error.message,'e');return;}
-      const idx=myExp.findIndex(x=>x.id===id);if(idx>=0){myExp[idx]={...myExp[idx],merchant,amount:amt,status:'pending',flagged:false,flag_note:null};}
+      const idx=myExp.findIndex(x=>x.id===id);if(idx>=0){myExp[idx]={...myExp[idx],merchant,amount:amt,status:'pending',flagged:false,flag_note:null,tags:document.getElementById('expVAT')&&document.getElementById('expVAT').checked?['VAT']:[]};}
       // Reset button
       btn.innerHTML='<i class="fa-solid fa-paper-plane"></i>Submit Expense';btn.onclick=submitExp;
       ['expMerchant','expAmt','expNotes'].forEach(x=>{document.getElementById(x).value='';});
+      const vcb2=document.getElementById('expVAT');if(vcb2)vcb2.checked=false;
+      const vvis2=document.getElementById('vatToggleVis');if(vvis2)vvis2.style.background='var(--bdr)';
+      const vknob2=document.getElementById('vatToggleKnob');if(vknob2)vknob2.style.transform='translateX(0)';
       toast('Expense updated and resubmitted!','s');renderExpenses();
     };
   }
@@ -1810,7 +1824,11 @@ function closeMarkModal(){
   modal.style.display='none';
 }
 
+let _submittingAtt=false;
 async function submitAttRequest(){
+  if(_submittingAtt)return;
+  _submittingAtt=true;
+  setTimeout(function(){_submittingAtt=false;},3000);
   const modal=document.getElementById('markModal');
   const date=modal.dataset.date;
   const startStr=`${markSt.h}:${markSt.m}`;
