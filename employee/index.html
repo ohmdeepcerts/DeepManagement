@@ -485,8 +485,8 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
     </div>
 
     <!-- MARK ATTENDANCE MODAL -->
-    <div id="markModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;display:none;align-items:flex-end;justify-content:center;">
-      <div style="background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:20px 18px 32px;max-height:92vh;overflow-y:auto;">
+    <div id="markModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:flex-end;justify-content:center;">
+      <div style="background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:20px 18px calc(90px + max(env(safe-area-inset-bottom),10px));max-height:88vh;overflow-y:auto;">
         <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr);margin:0 auto 18px;"></div>
         <div style="font-size:17px;font-weight:800;margin-bottom:4px;" id="markModalTitle">Mark Attendance</div>
         <div style="font-size:12px;color:var(--txtm);margin-bottom:20px;" id="markModalDate"></div>
@@ -889,10 +889,17 @@ async function silentSync(){
   setSyncUI('live');
   // Refresh current page silently
   const cur=document.querySelector('.pg.on')?.id?.replace('pg-','');
-  if(cur==='home')renderHome();
-  else if(cur==='pay')renderPay();
-  else if(cur==='exp')renderExpenses();
-  else if(cur==='msg'&&hadNewMsg)renderMsgs();
+  // Don't re-render if user is actively typing in a form field
+  const activeEl=document.activeElement;
+  const userTyping=activeEl&&(activeEl.tagName==='INPUT'||activeEl.tagName==='TEXTAREA'||activeEl.tagName==='SELECT');
+  // Don't re-render if mark modal is open
+  const markOpen=document.getElementById('markModal')&&document.getElementById('markModal').style.display==='flex';
+  if(!userTyping&&!markOpen){
+    if(cur==='home')renderHome();
+    else if(cur==='pay')renderPay();
+    else if(cur==='exp')renderExpenses();
+    else if(cur==='msg'&&hadNewMsg)renderMsgs();
+  }
 }
 
 // ── DATA LOADING ──
@@ -1828,14 +1835,13 @@ let _submittingAtt=false;
 async function submitAttRequest(){
   if(_submittingAtt)return;
   _submittingAtt=true;
-  setTimeout(function(){_submittingAtt=false;},3000);
   const modal=document.getElementById('markModal');
   const date=modal.dataset.date;
   const startStr=`${markSt.h}:${markSt.m}`;
   const endStr=`${markEn.h}:${markEn.m}`;
   const startMins=parseInt(markSt.h)*60+parseInt(markSt.m);
   const endMins=parseInt(markEn.h)*60+parseInt(markEn.m);
-  if(endMins<=startMins){toast('End time must be after start time','e');return;}
+  if(endMins<=startMins){toast('End time must be after start time','e');_submittingAtt=false;return;}
   const hours=parseFloat(((endMins-startMins)/60).toFixed(1));
   const stdStart=9*60,stdEnd=17*60;
   const lateBy=startMins-stdStart;
@@ -1856,8 +1862,8 @@ async function submitAttRequest(){
     r=await SB.from('attendance_requests').insert({employee_id:emp.id,date,sign_in:startStr,sign_out:endStr,hours,employee_note:note,status:'pending'}).select().single();
     if(!r.error)myAttReqs.unshift(r.data);
   }
-  if(r.error){toast('Could not send request: '+r.error.message,'e');return;}
-  closeMarkModal();
+  if(r.error){toast('Could not send request: '+r.error.message,'e');_submittingAtt=false;return;}
+  closeMarkModal();_submittingAtt=false;
   toast('Attendance request sent ✓','s');
   renderAtt();
   // Also show on home
