@@ -494,7 +494,6 @@ tr.rsun td{background:var(--sut)!important;}
 .toast.s{border-left:4px solid var(--grn);}.toast.e{border-left:4px solid var(--red);}.toast.i{border-left:4px solid var(--blu);}
 .toast.s i{color:var(--grn);}.toast.e i{color:var(--red);}.toast.i i{color:var(--blu);}
 @keyframes slideIn{from{opacity:0;transform:translateX(18px);}to{opacity:1;transform:translateX(0);}
-@keyframes confettiBurst{0%{transform:translate(0,0) rotate(0);opacity:1;}100%{transform:translate(var(--tx),var(--ty)) rotate(var(--rot));opacity:0;}}
 .btn:active,.btn-p:active,.btn-s:active,.btn-d:active{transform:scale(0.96)!important;filter:brightness(0.93);}
 }
 @media(max-width:768px){.led-split{flex-direction:column!important;}.led-right{width:100%!important;border-right:none!important;border-top:1px solid var(--bdr);}}
@@ -560,7 +559,6 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <div class="nav-item" data-page="emp-report"><i class="fa-solid fa-user-clock"></i><span>Employee Report</span></div>
     <div class="nav-item" data-page="yearly"><i class="fa-solid fa-chart-bar"></i><span>Yearly Summary</span></div>
     <div class="nav-item" data-page="search"><i class="fa-solid fa-magnifying-glass"></i><span>Global Search</span></div>
-    <div class="nav-item" data-page="timeline"><i class="fa-solid fa-timeline"></i><span>Activity Timeline</span></div>
     <div class="sb-sec">Pay</div>
     <div class="nav-item" data-page="payroll"><i class="fa-solid fa-sterling-sign"></i><span>Payroll</span></div>
     <div class="sb-sec">People</div>
@@ -569,7 +567,6 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <div class="nav-item" data-page="flags"><i class="fa-solid fa-flag"></i><span>Flagged Items</span><span class="nb" id="flagBadge" style="display:none">0</span></div>
   </div>
   <div class="sb-bot">
-    <div id="recentlyViewedRail"></div>
     <div class="ver" style="padding:10px 12px;font-size:10px;color:#475569;">DAM Pro v2.0 · Supabase</div>
   </div>
 </nav>
@@ -598,8 +595,6 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div id="adminMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--bdr);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.15);min-width:200px;overflow:hidden;z-index:500;">
           <div id="adminMenuEmail" style="padding:12px 14px;border-bottom:1px solid var(--bdr);font-size:11px;color:var(--txtm);font-weight:500;"></div>
           <div onclick="navigate('settings');closeAdminMenu()" style="display:flex;align-items:center;gap:9px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-gear" style="width:14px;color:var(--txtm);"></i>Settings & Tools</div>
-          <div onclick="navigate('audit');closeAdminMenu()" style="display:flex;align-items:center;gap:9px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-shield" style="width:14px;color:var(--txtm);"></i>Audit Trail</div>
-          <div onclick="navigate('recovery');closeAdminMenu()" style="display:flex;align-items:center;gap:9px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-trash-can-arrow-up" style="width:14px;color:var(--txtm);"></i>Recovery Bin</div>
           <div style="border-top:1px solid var(--bdr);"></div>
           <div onclick="confirmAction({title:'Sign Out',message:'You will be signed out. Sign back in with your password.',confirmText:'Sign Out',danger:true,onConfirm:doSignOut})" style="display:flex;align-items:center;gap:9px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--red);" onmouseover="this.style.background='var(--redl)'" onmouseout="this.style.background=''"><i class="fa-solid fa-right-from-bracket" style="width:14px;"></i>Sign Out</div>
         </div>
@@ -1018,26 +1013,11 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
   </div><!-- end content -->
 </div><!-- end main -->
 
-    <!-- TIMELINE PAGE -->
-    <div class="page" id="page-timeline">
-      <div class="ph"><div><h1>Activity Timeline</h1><p class="ph-sub">Your recent actions in this session</p></div></div>
-      <div id="timelineFeed" style="padding:4px;"></div>
-    </div>
+    
 
-    <!-- AUDIT TRAIL PAGE -->
-    <div class="page" id="page-audit">
-      <div class="ph"><div><h1>Audit Trail</h1><p class="ph-sub">All changes recorded in this session</p></div>
-      <button class="btn btn-o btn-sm" onclick="exportAuditLog()"><i class="fa-solid fa-download"></i>Export</button></div>
-      <div class="card"><div class="card-b" id="auditLogTable">
-        <div style="text-align:center;padding:40px;color:var(--txtm);"><i class="fa-solid fa-shield" style="font-size:32px;display:block;margin-bottom:12px;"></i>Audit log records changes made during your current session.</div>
-      </div></div>
-    </div>
+    
 
-    <!-- RECOVERY BIN PAGE -->
-    <div class="page" id="page-recovery">
-      <div class="ph"><div><h1>Recovery Bin</h1><p class="ph-sub">Deleted items restored within 30 days</p></div></div>
-      <div class="card"><div id="recoveryPageContent" style="min-height:120px;"></div></div>
-    </div>
+    
 
 <!-- EMPLOYEE MODAL -->
 <div class="mo" id="empModal">
@@ -1243,13 +1223,6 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       </div>
     </div>
   </div>
-</div>
-<div id="activityPanel" class="act-panel">
-  <div class="act-panel-hd" style="padding:12px 14px;">
-    <div style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;"><i class="fa-solid fa-clock-rotate-left" style="color:var(--acc);"></i>Activity Log</div>
-    <button onclick="closeActivityPanel()" style="background:none;border:none;cursor:pointer;color:var(--txtm);font-size:20px;line-height:1;padding:2px 6px;border-radius:6px;">×</button>
-  </div>
-  <div class="act-panel-body" id="activityLogList" style="padding:8px;flex:1;overflow-y:auto;"></div>
 </div>
 <div class="toast-wrap" id="toasts"></div>
 <script>
@@ -1858,7 +1831,7 @@ async function sbUpsertSettings(data){
 // ═══════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════
-const PG_TITLES={dashboard:'DASHBOARD',mark:'MARK ATTENDANCE',ledger:'EXPENSE LEDGER',approvals:'APPROVALS',tags:'TAGS & ANALYTICS',monthly:'MONTHLY VIEW',daily:'DAILY VIEW','emp-report':'EMPLOYEE REPORT',yearly:'YEARLY SUMMARY',search:'GLOBAL SEARCH',payroll:'PAYROLL',employees:'EMPLOYEES',messages:'MESSAGES',flags:'FLAGGED ITEMS',settings:'SETTINGS & TOOLS',timeline:'ACTIVITY TIMELINE',audit:'AUDIT TRAIL',recovery:'RECOVERY BIN'};
+const PG_TITLES={dashboard:'DASHBOARD',mark:'MARK ATTENDANCE',ledger:'EXPENSE LEDGER',approvals:'APPROVALS',tags:'TAGS & ANALYTICS',monthly:'MONTHLY VIEW',daily:'DAILY VIEW','emp-report':'EMPLOYEE REPORT',yearly:'YEARLY SUMMARY',search:'GLOBAL SEARCH',payroll:'PAYROLL',employees:'EMPLOYEES',messages:'MESSAGES',flags:'FLAGGED ITEMS',settings:'SETTINGS & TOOLS'};
 
 function navigate(page){
   if(page!=="ledger")document.getElementById("mainContent")?.classList.remove("ledger-mode");
@@ -1891,9 +1864,6 @@ function navigate(page){
   else if(page==='flags')renderFlags();
   else if(page==='settings')loadSettings();
   else if(page==='att-requests')renderAttRequests();
-  else if(page==='timeline')renderTimeline();
-  else if(page==='audit')renderAuditLog();
-  else if(page==='recovery')renderRecoveryPage();
 }
 document.querySelectorAll('.nav-item[data-page]').forEach(el=>el.addEventListener('click',()=>navigate(el.dataset.page)));
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('col');}
@@ -3593,7 +3563,6 @@ async function updateBankAmt(el,rowTotal){
   const y=parseInt(document.getElementById('prYear').value);
   recalcEmployeeMonth(empId,m,y);
 }
-// showMonthClosedStamp (duplicate removed)
 
 async function togglePayrollLock(){
   const m=parseInt(document.getElementById('prMonth').value);
@@ -3805,7 +3774,7 @@ async function _doDeleteEmployee(id,empName){
   employees=employees.filter(e=>e.id!==id);
   attendance=attendance.filter(a=>a.employee_id!==id);
   expenses=expenses.filter(e=>e.employee_id!==id);
-  closeEmpModal();renderEmployees();addToRecovery('employee',empName,{id:id});toast(empName+' deleted','i');logActivity('fa-user-minus',empName+' removed from employees','employees');
+  closeEmpModal();renderEmployees();toast(empName+' deleted','i');
 }
 function sanitizeEmployee(data){return {...data,name:(data.name||"").trim().toUpperCase(),salary:Math.max(0,parseFloat(data.salary)||0),hourly_rate:Math.max(0,parseFloat(data.hourly_rate)||0),status:["Active","ex"].includes(data.status)?data.status:"Active"};}
 async function saveEmployee(){
@@ -4645,7 +4614,7 @@ async function exportAllData(format='json'){
   statusEl.innerHTML='<i class="fa-solid fa-rotate fa-spin"></i> Fetching all data...';
   try {
     // Fetch all tables
-    const [empR,attR,expR,batR,msgR,payR,salR,docR,attReqR,settR]=await Promise.all([
+    const [empR,attR,expR,batR,msgR,payR,salR,docR,attReqR,settR,prSumR]=await Promise.all([
       sb.from('employees').select('*').order('name'),
       sb.from('attendance').select('*').order('date'),
       sb.from('expenses').select('*').order('date'),
@@ -4655,10 +4624,11 @@ async function exportAllData(format='json'){
       sb.from('salary_history').select('*').order('effective_from'),
       sb.from('employee_documents').select('*').order('uploaded_at'),
       sb.from('attendance_requests').select('*').order('created_at'),
-      sb.from('settings').select('*')
+      sb.from('settings').select('*'),
+      sb.from('payroll_summary').select('*')
     ]);
 
-    const errors=[empR,attR,expR,batR,msgR,payR,salR,docR,attReqR,settR]
+    const errors=[empR,attR,expR,batR,msgR,payR,salR,docR,attReqR,settR,prSumR]
       .filter(r=>r.error).map(r=>r.error.message);
     if(errors.length){statusEl.innerHTML=`<span style="color:var(--red);">Error: ${errors[0]}</span>`;return;}
 
@@ -4676,7 +4646,8 @@ async function exportAllData(format='json'){
             payment_status:payR.data.length,
             salary_history:salR.data.length,
             employee_documents:docR.data.length,
-            attendance_requests:attReqR.data.length
+            attendance_requests:attReqR.data.length,
+            payroll_summary:prSumR.data.length
           }
         },
         employees:empR.data,
@@ -4688,7 +4659,8 @@ async function exportAllData(format='json'){
         salary_history:salR.data,
         employee_documents:docR.data,
         attendance_requests:attReqR.data,
-        settings:settR.data
+        settings:settR.data,
+        payroll_summary:prSumR.data
       };
       const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
       const url=URL.createObjectURL(blob);
@@ -4770,6 +4742,7 @@ async function importAllData(){
     {key:'salary_history', table:'salary_history'},
     {key:'employee_documents', table:'employee_documents'},
     {key:'attendance_requests', table:'attendance_requests'},
+    {key:'payroll_summary', table:'payroll_summary'},
   ];
 
   let imported=0,errors=[];
@@ -4804,30 +4777,7 @@ async function importAllData(){
 // ═══════════════════════════════════════════════════
 
 // ═══ CONFETTI (Web Animations API - works in all browsers) ═══
-function confettiBurst(){
-  var colors=['#2563eb','#16a34a','#f59e0b','#ec4899','#8b5cf6','#06b6d4'];
-  var cx=window.innerWidth/2,cy=window.innerHeight*0.4;
-  for(var i=0;i<60;i++){
-    var p=document.createElement('div');
-    var col=colors[Math.floor(Math.random()*colors.length)];
-    var size=4+Math.random()*8;
-    var angle=(Math.PI*2*i)/60;
-    var vel=120+Math.random()*180;
-    var tx=Math.cos(angle)*vel,ty=Math.sin(angle)*vel-150;
-    var rot=Math.random()*720;
-    p.style.position='fixed';p.style.left=cx+'px';p.style.top=cy+'px';
-    p.style.width=size+'px';p.style.height=size+'px';p.style.background=col;
-    p.style.borderRadius=Math.random()>0.5?'50%':'3px';
-    p.style.pointerEvents='none';p.style.zIndex='9999';
-    document.body.appendChild(p);
-    if(p.animate){p.animate(
-      [{transform:'translate(0,0) rotate(0deg)',opacity:1},
-       {transform:'translate('+tx+'px,'+ty+'px) rotate('+rot+'deg)',opacity:0}],
-      {duration:1400,easing:'ease-out',fill:'forwards'}
-    );}
-    setTimeout(function(el){el.remove();},1400,p);
-  }
-}
+
 
 // ═══ ATTENDANCE STREAKS ═══
 function getStreak(empId){
@@ -4853,93 +4803,10 @@ function getStreakBadge(empId){
 }
 
 // ═══ ALL EMPLOYEES PAID CELEBRATION ═══
-function checkAllPaid(){
-  var m=parseInt(document.getElementById('prMonth')?document.getElementById('prMonth').value:new Date().getMonth());
-  var y=parseInt(document.getElementById('prYear')?document.getElementById('prYear').value:new Date().getFullYear());
-  var active=employees.filter(function(e){return e.status==='Active';});
-  var paid=paymentStatuses.filter(function(p){return p.month===m&&p.year===y&&(p.bank_paid||p.cash_paid);});
-  if(active.length>0&&paid.length>=active.length){
-    confettiBurst();
-    toast('🎉 All '+active.length+' employees paid for '+MONTHS[m]+'!','s');
-  }
-}
 
 // ═══ MONTH CLOSED STAMP ═══
-function showMonthClosedStamp(monthName){
-  var stamp=document.createElement('div');
-  stamp.style.cssText='position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;pointer-events:none;';
-  stamp.innerHTML='<div style="border:6px solid var(--grn);border-radius:12px;padding:18px 36px;transform:rotate(-8deg) scale(0);transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1);"><div style="font-size:28px;font-weight:900;color:var(--grn);letter-spacing:2px;text-transform:uppercase;">'+monthName+'</div><div style="font-size:13px;font-weight:700;color:var(--grn);text-align:center;letter-spacing:4px;">CLOSED</div></div>';
-  document.body.appendChild(stamp);
-  setTimeout(function(){stamp.firstElementChild.style.transform='rotate(-8deg) scale(1)';},50);
-  setTimeout(function(){stamp.firstElementChild.style.opacity='0';stamp.firstElementChild.style.transform='rotate(-8deg) scale(0.8)';},1600);
-  setTimeout(function(){stamp.remove();},2100);
-}
 
 // ═══ COMMAND PALETTE ═══
-function openCommandPalette(){
-  if(document.getElementById('cmdPalette'))return;
-  var pages=[
-    ['Dashboard','fa-gauge','dashboard'],['Mark Attendance','fa-calendar-check','mark'],
-    ['Expense Ledger','fa-receipt','ledger'],['Payroll','fa-sterling-sign','payroll'],
-    ['Monthly View','fa-calendar','monthly'],['Daily View','fa-calendar-day','daily'],
-    ['Employee Report','fa-chart-bar','emp-report'],['Employees','fa-users','employees'],
-    ['Messages','fa-comments','messages'],['Approvals','fa-circle-check','approvals'],
-    ['Tags & Analytics','fa-tags','tags'],['Settings','fa-gear','settings'],
-  ];
-  var overlay=document.createElement('div');
-  overlay.id='cmdPalette';
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);z-index:8000;display:flex;align-items:flex-start;justify-content:center;padding-top:80px;';
-  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
-  overlay.innerHTML='<div style="background:var(--card);border-radius:18px;width:90%;max-width:540px;box-shadow:0 24px 60px rgba(0,0,0,0.3);overflow:hidden;"><div style="padding:14px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;"><i class="fa-solid fa-magnifying-glass" style="color:var(--txtm);font-size:15px;"></i><input id="cmdInput" placeholder="Go to page or action..." style="flex:1;border:none;outline:none;font-size:15px;background:none;color:var(--txt);font-family:inherit;" autofocus><kbd style="background:var(--card2);padding:2px 7px;border-radius:5px;font-size:11px;color:var(--txtm);border:1px solid var(--bdr);">esc</kbd></div><div id="cmdList" style="max-height:320px;overflow-y:auto;padding:6px;"></div></div>';
-  document.body.appendChild(overlay);
-  var input=document.getElementById('cmdInput');
-  var list=document.getElementById('cmdList');
-  var sel=0;
-  function render(q){
-    var f=pages.filter(function(c){return !q||c[0].toLowerCase().includes(q.toLowerCase());});
-    list.innerHTML=f.map(function(c,i){
-      return'<div data-page="'+c[2]+'" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:500;background:'+(i===sel?'var(--accl)':'none')+';color:'+(i===sel?'var(--acc)':'var(--txt)')+'"><i class="fa-solid '+c[1]+'" style="width:16px;color:var(--txtm);"></i>'+c[0]+'</div>';
-    }).join('');
-    Array.from(list.children).forEach(function(item){item.onclick=function(){var pg=item.getAttribute('data-page');overlay.remove();navigate(pg);};});
-  }
-  render('');
-  input.addEventListener('input',function(){sel=0;render(input.value);});
-  input.addEventListener('keydown',function(e){
-    var items=list.children;
-    if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(sel+1,items.length-1);render(input.value);}
-    else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(sel-1,0);render(input.value);}
-    else if(e.key==='Enter'){if(items[sel])items[sel].click();}
-    else if(e.key==='Escape'){overlay.remove();}
-  });
-}
-
-// ═══ KONAMI CODE EASTER EGG ═══
-(function(){
-  var k=[];
-  var seq=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
-  document.addEventListener('keydown',function(e){
-    k.push(e.key);if(k.length>10)k.shift();
-    if(k.join(',')===seq.join(',')){
-      toast('🎮 Easter egg! Try Cmd+K for command palette and ? for shortcuts','s');
-      confettiBurst();
-    }
-    if(e.key==='?'&&!e.target.matches('input,textarea,select')){
-      var m=document.createElement('div');
-      m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-      m.onclick=function(ev){if(ev.target===m||ev.target.tagName==='BUTTON')m.remove();};
-      m.innerHTML='<div style="background:var(--card);border-radius:20px;padding:28px 32px;max-width:460px;width:90%;box-shadow:var(--shm);cursor:default;" onclick="event.stopPropagation()"><div style="font-size:17px;font-weight:800;margin-bottom:16px;">⌨️ Keyboard Shortcuts</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">'
-        +'<div style="background:var(--card2);border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;"><kbd style="background:var(--bdr);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:11px;">Ctrl+S</kbd><span style="color:var(--txtm)">Save</span></div>'
-        +'<div style="background:var(--card2);border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;"><kbd style="background:var(--bdr);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:11px;">Cmd+K</kbd><span style="color:var(--txtm)">Command palette</span></div>'
-        +'<div style="background:var(--card2);border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;"><kbd style="background:var(--bdr);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:11px;">Ctrl+M</kbd><span style="color:var(--txtm)">Mark attendance</span></div>'
-        +'<div style="background:var(--card2);border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;"><kbd style="background:var(--bdr);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:11px;">Esc</kbd><span style="color:var(--txtm)">Close modal</span></div>'
-        +'<div style="background:var(--card2);border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;"><kbd style="background:var(--bdr);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:11px;">?</kbd><span style="color:var(--txtm)">This screen</span></div>'
-        +'<div style="background:var(--card2);border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;"><kbd style="background:var(--bdr);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:11px;">↑↑↓↓←→←→BA</kbd><span style="color:var(--txtm)">🎮 Easter egg</span></div>'
-        +'</div><button style="margin-top:16px;width:100%;padding:10px;border-radius:10px;border:1.5px solid var(--bdr);background:none;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit;">Close</button></div>';
-      document.body.appendChild(m);
-    }
-  });
-})();
-
 // ═══ DUPLICATE EXPENSE DETECTION ═══
 function findSimilarExpense(merchant,amount,date){
   return(expenses||[]).filter(function(e){
@@ -4950,7 +4817,6 @@ function findSimilarExpense(merchant,amount,date){
 // KEYBOARD SHORTCUTS
 // ═══════════════════════════════════════════════════
 document.addEventListener('keydown',e=>{
-  if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();if(typeof openCommandPalette==='function')openCommandPalette();return;}
   if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();if(currentPage==='mark')saveAllAttendance();else if(currentPage==='settings')saveSettings();}
   if(e.key==='Escape'){document.querySelectorAll('.mo.open').forEach(m=>m.classList.remove('open'));}
 });
@@ -5001,134 +4867,21 @@ function confirmAction(opts){
 // ══════════════════════════════════════════════════════
 // UNDO SYSTEM
 // ══════════════════════════════════════════════════════
-var _undoStack=[];
-function recordUndo(description,undoFn){
-  _undoStack.push({description:description,undoFn:undoFn,ts:Date.now()});
-  if(_undoStack.length>20)_undoStack.shift();
-  var t=document.createElement('div');
-  t.className='toast s';
-  t.innerHTML='<i class="fa-solid fa-circle-check"></i><span style="flex:1;">'+description+'</span><button class="ubtn" style="background:var(--acc);color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;cursor:pointer;margin-left:4px;">Undo</button><button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--txtm);cursor:pointer;font-size:16px;padding:0 0 0 6px;">×</button>';
-  document.getElementById('toasts').appendChild(t);
-  var idx=_undoStack.length-1;
-  t.querySelector('.ubtn').onclick=function(){
-    if(_undoStack[idx]){try{_undoStack[idx].undoFn();}catch(e){console.error(e);}t.remove();}
-  };
-  setTimeout(function(){if(t.parentElement)t.remove();},6000);
-}
-document.addEventListener('keydown',function(e){
-  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!e.target.matches('input,textarea,select')){
-    e.preventDefault();
-    var last=_undoStack.pop();
-    if(last){try{last.undoFn();toast('Undone: '+last.description,'i');}catch(err){toast('Could not undo','e');}}
-    else toast('Nothing to undo','i');
-  }
-});
+
 
 // ══════════════════════════════════════════════════════
 // RECOVERY BIN
 // ══════════════════════════════════════════════════════
-function getRecoveryBin(){try{return JSON.parse(localStorage.getItem('dam_recovery')||'[]');}catch(e){return[];}}
-function addToRecovery(type,label,data){
-  var bin=getRecoveryBin();
-  bin.unshift({id:Date.now(),type:type,label:label,data:data,deletedAt:Date.now()});
-  var filtered=bin.filter(function(i){return Date.now()-i.deletedAt<30*86400000;});
-  localStorage.setItem('dam_recovery',JSON.stringify(filtered.slice(0,50)));
-}
-// renderRecoveryBin (duplicate removed)
 
-function restoreFromBin(id){
-  var bin=getRecoveryBin();
-  var item=bin.find(function(i){return i.id===id;});
-  if(!item){toast('Item not found','e');return;}
-  var tbl=item.type==='expense'?'expenses':item.type==='employee'?'employees':'attendance';
-  sb.from(tbl).insert(item.data).then(function(r){
-    if(r.error){toast('Restore failed: '+r.error.message,'e');return;}
-    var newBin=bin.filter(function(i){return i.id!==id;});
-    localStorage.setItem('dam_recovery',JSON.stringify(newBin));
-    loadAllData().then(function(){
-      renderRecoveryPage();
-      toast('Restored: '+item.label,'s');
-    });
-  });
-}
 
 // ══════════════════════════════════════════════════════
 // RECENTLY VIEWED RAIL
 // ══════════════════════════════════════════════════════
-var _recentlyViewed=JSON.parse(sessionStorage.getItem('dam_recent')||'[]');
-function addRecentlyViewed(type,label,icon,action){
-  _recentlyViewed=_recentlyViewed.filter(function(r){return r.label!==label;});
-  _recentlyViewed.unshift({type:type,label:label,icon:icon,action:action,ts:Date.now()});
-  _recentlyViewed=_recentlyViewed.slice(0,10);
-  sessionStorage.setItem('dam_recent',JSON.stringify(_recentlyViewed));
-  renderRecentlyViewed();
-}
-function renderRecentlyViewed(){
-  var el=document.getElementById('recentlyViewedRail');
-  if(!el)return;
-  if(!_recentlyViewed.length){el.style.display='none';return;}
-  el.style.display='block';
-  function ago(ts){var d=Math.floor((Date.now()-ts)/60000);return d<1?'just now':d<60?d+'m ago':Math.floor(d/60)+'h ago';}
-  el.innerHTML='<div style="font-size:10px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:0.08em;padding:10px 14px 4px;">Recent</div>';
-  _recentlyViewed.forEach(function(r){
-    var div=document.createElement('div');
-    div.style.cssText='display:flex;align-items:center;gap:9px;padding:7px 14px;cursor:pointer;border-radius:8px;margin:0 4px;transition:background 0.15s;';
-    div.addEventListener('mouseover',function(){div.style.background='var(--card2)';});
-    div.addEventListener('mouseout',function(){div.style.background='';});
-    if(r.action)div.addEventListener('click',function(){try{eval(r.action);}catch(e){}});
-    div.innerHTML='<i class="fa-solid '+r.icon+'" style="width:14px;font-size:12px;color:var(--txtm);flex-shrink:0;"></i>'+
-      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+r.label+'</div></div>'+
-      '<div style="font-size:10px;color:var(--txtm);flex-shrink:0;">'+ago(r.ts)+'</div>';
-    el.appendChild(div);
-  });
-}
 
 
 // ══════════════════════════════════════════════════════
 // ACTIVITY LOG
 // ══════════════════════════════════════════════════════
-var _activityLog=JSON.parse(sessionStorage.getItem('dam_activity')||'[]');
-function logActivity(icon,message,page){
-  _activityLog.unshift({icon:icon,message:message,page:page||'',ts:Date.now()});
-  _activityLog=_activityLog.slice(0,50);
-  sessionStorage.setItem('dam_activity',JSON.stringify(_activityLog));
-  renderActivityLog();
-}
-function renderActivityLog(){
-  var el=document.getElementById('activityLogList');
-  if(!el)return;
-  var now=Date.now();
-  function ago(ts){var d=Math.floor((now-ts)/60000);return d<1?'just now':d<60?d+'m ago':d<1440?Math.floor(d/60)+'h ago':Math.floor(d/1440)+'d ago';}
-  if(!_activityLog.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txtm);font-size:12px;">No activity yet</div>';return;}
-  el.innerHTML='';
-  _activityLog.forEach(function(item){
-    var div=document.createElement('div');
-    div.className='act-item';
-    if(item.page){div.addEventListener('click',function(){navigate(item.page);closeActivityPanel();});}
-    else{div.addEventListener('click',function(){closeActivityPanel();});}
-    div.innerHTML='<div style="display:flex;align-items:flex-start;gap:8px;"><i class="fa-solid '+item.icon+'" style="color:var(--acc);font-size:12px;margin-top:2px;flex-shrink:0;width:14px;"></i><div style="flex:1;"><div style="font-size:12px;font-weight:500;line-height:1.4;">'+item.message+'</div><div class="act-time">'+ago(item.ts)+'</div></div></div>';
-    el.appendChild(div);
-  });
-}
-function openActivityPanel(){
-  var panel=document.getElementById('activityPanel');
-  if(!panel)return;
-  panel.classList.add('open');
-  renderActivityLog();
-  // Click outside to close
-  setTimeout(function(){
-    document.addEventListener('click',_actPanelOutside);
-  },100);
-}
-function _actPanelOutside(e){
-  var panel=document.getElementById('activityPanel');
-  if(panel&&!panel.contains(e.target)){closeActivityPanel();}
-}
-function closeActivityPanel(){
-  var panel=document.getElementById('activityPanel');
-  if(panel)panel.classList.remove('open');
-  document.removeEventListener('click',_actPanelOutside);
-}
 
 // ══════════════════════════════════════════════════════
 // SPARKLINES (inline SVG mini charts)
@@ -5276,8 +5029,6 @@ async function sendBroadcast(){
   var bcMsg=document.getElementById('bcMessage');
   if(bcMsg)bcMsg.value='';
   toast('Broadcast sent to '+emps.length+' employees','s');
-  logActivity('fa-bullhorn','Broadcast sent to '+emps.length+' employees','messages');
-  logActivity('fa-bullhorn','Broadcast sent to '+emps.length+' employees','messages');
 }
 
 // ══════════════════════════════════════════════════════
@@ -5309,66 +5060,8 @@ function getTeamPulse(){
 }
 
 // ══════════════════════════════════════════════════════
-// TIMELINE + AUDIT TRAIL PAGE
-// ══════════════════════════════════════════════════════
-function renderTimeline(){
-  var el=document.getElementById('timelineFeed');
-  if(!el)return;
-  var items=_activityLog.slice(0,30);
-  if(!items.length){el.innerHTML='<div style="padding:40px;text-align:center;color:var(--txtm);"><i class="fa-solid fa-timeline" style="font-size:32px;display:block;margin-bottom:12px;"></i>No activity yet. Start using the app!</div>';return;}
-  var grouped={};
-  items.forEach(function(item){
-    var d=new Date(item.ts);
-    var key=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-    if(!grouped[key])grouped[key]=[];
-    grouped[key].push(item);
-  });
-  el.innerHTML=Object.entries(grouped).map(function(entry){
-    var date=entry[0],list=entry[1];
-    return'<div style="margin-bottom:20px;"><div style="font-size:11px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:0.08em;padding:0 0 8px;border-bottom:1px solid var(--bdr);margin-bottom:10px;">'+date+'</div>'+
-      list.map(function(item){
-        var t=new Date(item.ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-        return'<div style="display:flex;align-items:flex-start;gap:12px;padding:8px 0;border-bottom:0.5px solid var(--bdr);">'+
-          '<div style="width:50px;font-size:11px;color:var(--txtm);flex-shrink:0;padding-top:2px;">'+t+'</div>'+
-          '<div style="width:28px;height:28px;border-radius:8px;background:var(--accl);display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+
-            '<i class="fa-solid '+item.icon+'" style="color:var(--acc);font-size:12px;"></i></div>'+
-          '<div style="flex:1;"><div style="font-size:13px;font-weight:500;">'+item.message+'</div></div>'+
-        '</div>';
-      }).join('')+'</div>';
-  }).join('');
-}
-
-
-// ══════════════════════════════════════════════════════
 // AUDIT LOG
 // ══════════════════════════════════════════════════════
-var _auditLog=[];
-function auditLog(action,table,record,oldVal,newVal){
-  _auditLog.unshift({ts:Date.now(),action:action,table:table,record:record,oldVal:oldVal,newVal:newVal});
-  _auditLog=_auditLog.slice(0,200);
-}
-function renderAuditLog(){
-  var el=document.getElementById('auditLogTable');
-  if(!el)return;
-  if(!_auditLog.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txtm);"><i class="fa-solid fa-shield" style="font-size:32px;display:block;margin-bottom:12px;"></i>No changes recorded yet.</div>';return;}
-  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:2px solid var(--bdr);"><th style="text-align:left;padding:8px;color:var(--txtm);font-weight:600;">Time</th><th style="text-align:left;padding:8px;color:var(--txtm);font-weight:600;">Action</th><th style="text-align:left;padding:8px;color:var(--txtm);font-weight:600;">Table</th><th style="text-align:left;padding:8px;color:var(--txtm);font-weight:600;">Record</th></tr></thead><tbody>'+
-  _auditLog.map(function(item){
-    var t=new Date(item.ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    var actionCol=item.action==='CREATE'?'var(--grn)':item.action==='DELETE'?'var(--red)':'var(--amb)';
-    return'<tr style="border-bottom:0.5px solid var(--bdr);"><td style="padding:8px;color:var(--txtm);">'+t+'</td><td style="padding:8px;"><span style="background:'+(item.action==='CREATE'?'var(--grnl)':item.action==='DELETE'?'var(--redl)':'var(--ambl)')+';color:'+actionCol+';padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">'+item.action+'</span></td><td style="padding:8px;color:var(--txtm);">'+item.table+'</td><td style="padding:8px;font-weight:500;">'+item.record+'</td></tr>';
-  }).join('')+'</tbody></table>';
-}
-function exportAuditLog(){
-  var rows=[['Time','Action','Table','Record','Old Value','New Value']].concat(
-    _auditLog.map(function(i){return[new Date(i.ts).toISOString(),i.action,i.table,i.record,JSON.stringify(i.oldVal||''),JSON.stringify(i.newVal||'')];})
-  );
-  var csv=rows.map(function(r){return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
-  var blob=new Blob([csv],{type:'text/csv'});
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  a.href=url;a.download='audit_log_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
-  URL.revokeObjectURL(url);
-}
 
 // ══════════════════════════════════════════════════════
 // ADMIN TOPBAR MENU
@@ -5410,28 +5103,7 @@ function updateAdminPill(email){
 }
 
 
-function renderRecoveryPage(){
-  var el=document.getElementById('recoveryPageContent');
-  if(!el)return;
-  var bin=getRecoveryBin();
-  if(!bin.length){
-    el.innerHTML='<div style="padding:40px;text-align:center;color:var(--txtm);"><i class="fa-solid fa-trash-can" style="font-size:36px;display:block;margin-bottom:12px;opacity:0.3;"></i><div style="font-size:15px;font-weight:600;">Recovery bin is empty</div><div style="font-size:13px;margin-top:6px;">Deleted items appear here for 30 days.</div></div>';
-    return;
-  }
-  var rows=bin.map(function(item){
-    var days=Math.floor((Date.now()-item.deletedAt)/86400000);
-    var remaining=30-days;
-    return'<tr style="border-bottom:0.5px solid var(--bdr);">'+
-      '<td style="padding:10px 12px;font-size:13px;font-weight:600;">'+item.label+'</td>'+
-      '<td style="padding:10px 12px;"><span style="background:var(--card2);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;text-transform:capitalize;">'+item.type+'</span></td>'+
-      '<td style="padding:10px 12px;font-size:12px;color:var(--txtm);">'+new Date(item.deletedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+'<br><span style="color:'+(remaining<=3?'var(--red)':'var(--txtm)')+';">'+remaining+' days left</span></td>'+
-      '<td style="padding:10px 12px;text-align:right;"><button onclick="restoreFromBin('+item.id+')" style="background:var(--grnl);color:var(--grn);border:1px solid var(--grn);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;">Restore</button></td>'+
-    '</tr>';
-  }).join('');
-  el.innerHTML='<table style="width:100%;border-collapse:collapse;"><thead><tr style="border-bottom:2px solid var(--bdr);"><th style="text-align:left;padding:10px 12px;font-size:12px;color:var(--txtm);font-weight:600;">Item</th><th style="text-align:left;padding:10px 12px;font-size:12px;color:var(--txtm);font-weight:600;">Type</th><th style="text-align:left;padding:10px 12px;font-size:12px;color:var(--txtm);font-weight:600;">Deleted</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
-}
 
-function renderRecoveryBin(){navigate('recovery');}
 
 
 // ══════════════════════════════════════════════
@@ -5554,7 +5226,6 @@ async function uploadLedReceipt(expId, input){
   if(idx>=0)expenses[idx].receipt_url=url;
   renderLedger();
   toast('Receipt attached','s');
-  logActivity('fa-paperclip','Receipt attached to expense','ledger');
 }
 
 window.onerror=function(msg,url,line,col,err){
