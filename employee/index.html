@@ -672,6 +672,10 @@ function dk(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return`${dt.
 function fmtD(d){if(!d)return'—';const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}
 function fmtDS(d){if(!d)return'—';const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});}
 function isSun(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt.getDay()===0;}
+function isSat(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt.getDay()===6;}
+function empWorkDays(e){var w=e&&e.work_days;return(Array.isArray(w)&&w.length)?w:[1,2,3,4,5,6];}
+function isWDFor(e,d){return empWorkDays(e).indexOf(d.getDay())>=0;}
+function workDaysInMonth(e,y,m){var dIn=dim(y,m),wd=empWorkDays(e),c=0;for(var d=1;d<=dIn;d++){if(wd.indexOf(new Date(y,m,d).getDay())>=0)c++;}return c;}
 function isP(s){return s==='P'||s==='HD'||s==='LA';}
 function dim(y,m){return new Date(y,m+1,0).getDate();}
 function C(){return cfg.currency||'£';}
@@ -685,20 +689,75 @@ function toast(msg,type='i',duration=3200){
   document.getElementById('toasts').appendChild(t);
   if(duration>0)setTimeout(()=>{if(t.parentElement)t.remove();},duration);
 }
+function getRateForDate(e,pt,dateStr){
+  var current=pt==='fixed'?parseFloat(e.salary)||0:pt==='daily'?parseFloat(e.daily_rate)||0:parseFloat(e.hourly_rate)||0;
+  if(typeof mySalHist==='undefined'||!mySalHist||!mySalHist.length)return current;
+  var empHist=mySalHist.filter(function(h){return h.pay_type===pt&&h.effective_from;});
+  if(!empHist.length)return current;
+  empHist.sort(function(a,b){return (a.effective_from||'').localeCompare(b.effective_from||'');});
+  var applicable=null;
+  for(var i=0;i<empHist.length;i++){
+    if(empHist[i].effective_from<=dateStr)applicable=empHist[i];
+    else break;
+  }
+  if(applicable)return parseFloat(applicable.new_rate)||0;
+  var earliest=empHist[0];
+  if(earliest.old_rate!=null&&earliest.old_rate>0)return parseFloat(earliest.old_rate)||0;
+  return current;
+}
 function calcPay(e,rec){
   const pt=e.pay_type||'hourly';
   const dt=new Date(rec.date+'T00:00:00');
-  const wkM=isSun(dt)?(parseFloat(e.sun_mult)||1):(dt.getDay()===6?(parseFloat(e.sat_mult)||1):1);
+  const histRate=getRateForDate(e,pt,rec.date);
+  const wkM=isSun(dt)?(parseFloat(e.sun_mult)||1):(isSat(dt)?(parseFloat(e.sat_mult)||1):1);
   const ot=parseFloat(rec.overtime)||0;
   let otR=0;
   if(e.ot_type==='flat'){otR=parseFloat(e.ot_flat)||0;}
   else{const otM=e.ot_mult!=null&&e.ot_mult!==''?parseFloat(e.ot_mult):(pt==='daily'?0:1.5);
-    if(otM>0){let bh=0;if(pt==='hourly')bh=parseFloat(e.hourly_rate)||0;else if(pt==='daily'){const ch=parseFloat(e.contracted_hours)||8;bh=ch>0?(parseFloat(e.daily_rate)||0)/ch:0;}else if(pt==='fixed'){const ch=parseFloat(e.contracted_hours)||8;bh=ch>0?((parseFloat(e.salary)||0)/30)/ch:0;}otR=bh*otM;}}
+    if(otM>0){let bh=0;
+      if(pt==='hourly')bh=histRate;
+      else if(pt==='daily'){const ch=parseFloat(e.contracted_hours)||8;bh=ch>0?histRate/ch:0;}
+      else if(pt==='fixed'){const ch=parseFloat(e.contracted_hours)||8;const wDays=workDaysInMonth(e,dt.getFullYear(),dt.getMonth());bh=(ch>0&&wDays>0)?(histRate/wDays)/ch:0;}
+      otR=bh*otM;}}
   const otPay=ot*otR;
   let base=0;
-  if(pt==='hourly'){const r=parseFloat(e.hourly_rate)||0;const h=parseFloat(rec.hours)||0;base=Math.max(0,h-ot)*r*wkM;}
-  else if(pt==='daily'){const r=parseFloat(e.daily_rate)||0;base=(rec.status==='HD'?r*0.5:r)*wkM;}
-  return{base,ot:otPay,total:base+otPay};
+  if(pt==='hourly'){
+    const r=histRate;const h=parseFloat(rec.hours)||0;
+    base=Math.max(0,h-ot)*r*wkM;
+  } else if(pt==='daily'){
+    const r=histRate;
+    const ch=parseFloat(e.contracted_hours)||8;
+    const workedH=parseFloat(rec.hours)||0;
+    const hourlyEquiv=ch>0?r/ch:0;
+    if(rec.status==='HD'){
+      base=r*0.5*wkM;
+    } else if(workedH>0&&workedH<ch){
+      const shortfall=ch-workedH;
+      const deduction=shortfall*hourlyEquiv;
+      base=(r-deduction)*wkM;
+    } else {
+      base=r*wkM;
+    }
+  } else if(pt==='fixed'){
+    const monthlySalary=histRate;
+    const ch=parseFloat(e.contracted_hours)||8;
+    const workDays=workDaysInMonth(e,dt.getFullYear(),dt.getMonth());
+    const dailyEquiv=workDays>0?monthlySalary/workDays:0;
+    const hrlyEquiv=ch>0?dailyEquiv/ch:0;
+    const workedH=parseFloat(rec.hours)||0;
+    if(rec.status==='HD'){
+      base=dailyEquiv*0.5*wkM;
+    } else if(workedH>0&&workedH<ch){
+      const shortfall=ch-workedH;
+      const deduction=shortfall*hrlyEquiv;
+      base=(dailyEquiv-deduction)*wkM;
+    } else if(workedH>0){
+      base=dailyEquiv*wkM;
+    } else {
+      base=0;
+    }
+  }
+  return{base:parseFloat(base.toFixed(2)),ot:parseFloat(otPay.toFixed(2)),total:parseFloat((base+otPay).toFixed(2))};
 }
 function togglePillMenu(){
   const m=document.getElementById('pillMenu');
@@ -1017,8 +1076,7 @@ function renderHome(){
   const mRecs=myAtt.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;});
   const activeR=mRecs.filter(r=>isP(r.status));
   let base=0,ot=0;
-  if(emp.pay_type==='fixed')base=parseFloat(emp.salary)||0;
-  else activeR.forEach(r=>{const p=calcPay(emp,r);base+=p.base;ot+=p.ot;});
+  activeR.forEach(r=>{const p=calcPay(emp,r);base+=p.base;ot+=p.ot;});
   const bonus=mRecs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
   // Add expenses to total
   const mExpAll=myExp.filter(function(e){
@@ -1484,8 +1542,7 @@ function renderPay(){
   });
   const activeR=mRecs.filter(r=>isP(r.status));
   let base=0,ot=0;
-  if(emp.pay_type==='fixed')base=parseFloat(emp.salary)||0;
-  else activeR.forEach(r=>{const p=calcPay(emp,r);base+=p.base;ot+=p.ot;});
+  activeR.forEach(r=>{const p=calcPay(emp,r);base+=p.base;ot+=p.ot;});
   const bonus=mRecs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
   const expTotal=mExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
   // Add expenses to total
@@ -1615,7 +1672,7 @@ function renderPay(){
 
   // Lifetime
   let lt={days:0,hrs:0,ot:0,bonus:0,total:0};
-  myAtt.forEach(r=>{if(isP(r.status)){lt.days++;lt.hrs+=parseFloat(r.hours)||0;const p=emp.pay_type==='fixed'?(parseFloat(emp.salary)||0)/30:calcPay(emp,r).base;lt.total+=p+(calcPay(emp,r).ot||0);}lt.ot+=parseFloat(r.overtime)||0;lt.bonus+=parseFloat(r.bonus)||0;});
+  myAtt.forEach(r=>{if(isP(r.status)){lt.days++;lt.hrs+=parseFloat(r.hours)||0;const cp=calcPay(emp,r);lt.total+=cp.base+cp.ot;}lt.ot+=parseFloat(r.overtime)||0;lt.bonus+=parseFloat(r.bonus)||0;});
   document.getElementById('lifetimeStats').innerHTML=`
     <div class="row-div"><span>Total Days Worked</span><strong>${lt.days}</strong></div>
     <div class="row-div"><span>Total Hours</span><strong>${lt.hrs.toFixed(0)}h</strong></div>
