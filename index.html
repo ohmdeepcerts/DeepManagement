@@ -1063,17 +1063,31 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         </div>
       </div>
 
+      <div style="margin-bottom:11px;">
+        <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:7px;">Work Days / Week <span style="font-weight:400;color:var(--txtm);">(used to calculate daily/hourly rate from salary)</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--bdr);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;"><input type="checkbox" class="eWorkDay" value="1" checked onchange="updateRateDisplay()" style="margin:0;"> Mon</label>
+          <label style="display:flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--bdr);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;"><input type="checkbox" class="eWorkDay" value="2" checked onchange="updateRateDisplay()" style="margin:0;"> Tue</label>
+          <label style="display:flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--bdr);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;"><input type="checkbox" class="eWorkDay" value="3" checked onchange="updateRateDisplay()" style="margin:0;"> Wed</label>
+          <label style="display:flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--bdr);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;"><input type="checkbox" class="eWorkDay" value="4" checked onchange="updateRateDisplay()" style="margin:0;"> Thu</label>
+          <label style="display:flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--bdr);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;"><input type="checkbox" class="eWorkDay" value="5" checked onchange="updateRateDisplay()" style="margin:0;"> Fri</label>
+          <label style="display:flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--bdr);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;"><input type="checkbox" class="eWorkDay" value="6" checked onchange="updateRateDisplay()" style="margin:0;"> Sat</label>
+          <label style="display:flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--bdr);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;"><input type="checkbox" class="eWorkDay" value="0" onchange="updateRateDisplay()" style="margin:0;"> Sun</label>
+        </div>
+        <div id="eRateDisplay" style="margin-top:9px;padding:9px 13px;background:var(--purl);border-radius:8px;font-size:13px;color:var(--pur);font-weight:700;display:none;"></div>
+      </div>
+
       <div id="pf-fixed">
         <div class="ibox"><i class="fa-solid fa-circle-info"></i>Monthly salary paid regardless of hours. OT hours above contracted hours paid at OT rate.</div>
-        <div class="fg fg2"><div class="fgl"><label>Monthly Salary (£)</label><input type="number" id="eSalary" min="0" step="50" placeholder="e.g. 2500"></div><div class="fgl"><label>Contracted Hours/Day</label><input type="number" id="eContHrs" min="1" max="16" step="0.5" placeholder="e.g. 8" oninput="var d=document.getElementById('eContHrsD');if(d)d.value=this.value;"></div></div>
+        <div class="fg fg2"><div class="fgl"><label>Monthly Salary (£)</label><input type="number" id="eSalary" min="0" step="50" placeholder="e.g. 2500" oninput="updateRateDisplay()"></div><div class="fgl"><label>Contracted Hours/Day</label><input type="number" id="eContHrs" min="1" max="16" step="0.5" placeholder="e.g. 8" oninput="var d=document.getElementById('eContHrsD');if(d)d.value=this.value;updateRateDisplay();"></div></div>
       </div>
       <div id="pf-daily" style="display:none;">
         <div class="ibox"><i class="fa-solid fa-circle-info"></i>Fixed daily rate per day present. OT hours at agreed rate.</div>
-        <div class="fg fg2"><div class="fgl"><label>Daily Rate (£)</label><input type="number" id="eDailyRate" min="0" step="5" placeholder="e.g. 120"></div><div class="fgl"><label>Contracted Hours/Day</label><input type="number" id="eContHrsD" min="1" max="16" step="0.5" placeholder="e.g. 8" oninput="var f=document.getElementById('eContHrs');if(f)f.value=this.value;"></div></div>
+        <div class="fg fg2"><div class="fgl"><label>Daily Rate (£)</label><input type="number" id="eDailyRate" min="0" step="5" placeholder="e.g. 120" oninput="updateRateDisplay()"></div><div class="fgl"><label>Contracted Hours/Day</label><input type="number" id="eContHrsD" min="1" max="16" step="0.5" placeholder="e.g. 8" oninput="var f=document.getElementById('eContHrs');if(f)f.value=this.value;updateRateDisplay();"></div></div>
       </div>
       <div id="pf-hourly" style="display:none;">
         <div class="ibox"><i class="fa-solid fa-circle-info"></i>Paid per hour. OT hours at OT rate.</div>
-        <div class="fg fg2"><div class="fgl"><label>Hourly Rate (£/h)</label><input type="number" id="eHrRate" min="0" step="0.5" placeholder="e.g. 15"></div><div class="fgl"><label>OT Threshold (hrs/day)</label><input type="number" id="eOTThr" min="0" max="16" step="0.5" placeholder="Uses global if blank"></div></div>
+        <div class="fg fg2"><div class="fgl"><label>Hourly Rate (£/h)</label><input type="number" id="eHrRate" min="0" step="0.5" placeholder="e.g. 15" oninput="updateRateDisplay()"></div><div class="fgl"><label>OT Threshold (hrs/day)</label><input type="number" id="eOTThr" min="0" max="16" step="0.5" placeholder="Uses global if blank"></div></div>
       </div>
       <div style="border-top:1px solid var(--bdr);padding-top:13px;margin-top:13px;">
         <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-hourglass-half" style="color:var(--amb);margin-right:5px;"></i>Overtime Rate</div>
@@ -1308,6 +1322,28 @@ function dayName(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return 
 function isSun(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt.getDay()===0;}
 function isSat(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt.getDay()===6;}
 function isWD(d){return!isSun(d);}
+function empWorkDays(emp){var w=emp&&emp.work_days;return(Array.isArray(w)&&w.length)?w:[1,2,3,4,5,6];}
+function getRateForDate(emp,pt,dateStr){
+  // Find the rate that was effective on dateStr from salary_history; fallback to current emp rate field
+  var current=pt==='fixed'?parseFloat(emp.salary)||0:pt==='daily'?parseFloat(emp.daily_rate)||0:parseFloat(emp.hourly_rate)||0;
+  if(typeof salaryHistory==='undefined'||!salaryHistory.length)return current;
+  var empHist=salaryHistory.filter(function(h){return h.employee_id===emp.id&&h.pay_type===pt&&h.effective_from;});
+  if(!empHist.length)return current;
+  empHist.sort(function(a,b){return (a.effective_from||'').localeCompare(b.effective_from||'');}); // ascending
+  // Find the latest change that took effect on or before dateStr
+  var applicable=null;
+  for(var i=0;i<empHist.length;i++){
+    if(empHist[i].effective_from<=dateStr)applicable=empHist[i];
+    else break;
+  }
+  if(applicable)return parseFloat(applicable.new_rate)||0;
+  // dateStr is before ANY recorded change — use the old_rate from the earliest entry
+  var earliest=empHist[0];
+  if(earliest.old_rate!=null&&earliest.old_rate>0)return parseFloat(earliest.old_rate)||0;
+  return current;
+}
+function isWDFor(emp,d){return empWorkDays(emp).indexOf(d.getDay())>=0;}
+function workDaysInMonth(emp,y,m){var dIn=dim(y,m),wd=empWorkDays(emp),c=0;for(var d=1;d<=dIn;d++){if(wd.indexOf(new Date(y,m,d).getDay())>=0)c++;}return c;}
 function isP(s){return s==='P'||s==='HD'||s==='LA';}
 function inits(n){return(n||'').split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
@@ -1366,6 +1402,8 @@ function calcOT(h,emp){
 function calcPay(emp,rec){
   const pt=emp.pay_type||'hourly';
   const dt=new Date(rec.date+'T00:00:00');
+  // Use the rate that was effective ON THIS RECORD'S DATE (from salary_history), not today's rate
+  const histRate=getRateForDate(emp,pt,rec.date);
   // Weekend multipliers: use sat/sun mult if set, default 1.0
   const satM=isSat(dt)?(emp.sat_mult!=null&&emp.sat_mult!==''?parseFloat(emp.sat_mult):1):1;
   const sunM=isSun(dt)?(emp.sun_mult!=null&&emp.sun_mult!==''?parseFloat(emp.sun_mult):1):1;
@@ -1390,9 +1428,9 @@ function calcPay(emp,rec){
     }
     if(otM>0){
       let bh=0;
-      if(pt==='hourly')bh=parseFloat(emp.hourly_rate)||0;
-      else if(pt==='daily'){const ch=parseFloat(emp.contracted_hours)||8;bh=ch>0?(parseFloat(emp.daily_rate)||0)/ch:0;}
-      else if(pt==='fixed'){const ch=parseFloat(emp.contracted_hours)||8;bh=ch>0?((parseFloat(emp.salary)||0)/30)/ch:0;}
+      if(pt==='hourly')bh=histRate;
+      else if(pt==='daily'){const ch=parseFloat(emp.contracted_hours)||8;bh=ch>0?histRate/ch:0;}
+      else if(pt==='fixed'){const ch=parseFloat(emp.contracted_hours)||8;const wDays=workDaysInMonth(emp,dt.getFullYear(),dt.getMonth());bh=(ch>0&&wDays>0)?(histRate/wDays)/ch:0;}
       otRate=bh*otM;
     }
   }
@@ -1401,12 +1439,12 @@ function calcPay(emp,rec){
   // Base pay
   let basePay=0;
   if(pt==='hourly'){
-    const r=parseFloat(emp.hourly_rate)||0;
+    const r=histRate;
     const h=parseFloat(rec.hours)||0;
     const regularH=Math.max(0,h-ot); // hours not counting OT
     basePay=parseFloat((regularH*r*wkM).toFixed(2));
   } else if(pt==='daily'){
-    const r=parseFloat(emp.daily_rate)||0;
+    const r=histRate;
     const ch=parseFloat(emp.contracted_hours)||8; // contracted hours per day
     const workedH=parseFloat(rec.hours)||0;
     const hourlyEquiv=ch>0?r/ch:0; // £/hr equivalent
@@ -1421,8 +1459,28 @@ function calcPay(emp,rec){
       basePay=parseFloat((r*wkM).toFixed(2));
     }
   } else if(pt==='fixed'){
-    // Fixed salary: base pay is 0 per-record (shown as monthly lump)
-    basePay=0;
+    const monthlySalary=histRate;
+    const ch=parseFloat(emp.contracted_hours)||8;
+    // Calculate how many working days are in this month
+    const dt2=new Date(rec.date+'T00:00:00');
+    const yr=dt2.getFullYear(), mo=dt2.getMonth();
+    const workDays=workDaysInMonth(emp,yr,mo);
+    const dailyEquiv=workDays>0?monthlySalary/workDays:0;
+    const hrlyEquiv=ch>0?dailyEquiv/ch:0;
+    const workedH=parseFloat(rec.hours)||0;
+    if(rec.status==='HD'){
+      basePay=parseFloat((dailyEquiv*0.5*wkM).toFixed(2));
+    } else if(workedH>0&&workedH<ch){
+      // Short hours: deduct proportionally
+      const shortfall=ch-workedH;
+      const deduction=parseFloat((shortfall*hrlyEquiv).toFixed(2));
+      basePay=parseFloat(((dailyEquiv-deduction)*wkM).toFixed(2));
+    } else if(workedH>0){
+      basePay=parseFloat((dailyEquiv*wkM).toFixed(2));
+    } else {
+      // Not present — no pay for this day
+      basePay=0;
+    }
   }
 
   return{base:basePay,ot:otPay,total:basePay+otPay};
@@ -1750,8 +1808,7 @@ function renderDashboard(){
   let payrollEst=0,baseTotal=0,otTotal=0,bonusTotal=0;
   emps.forEach(emp=>{
     const recs=mRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
-    if(emp.pay_type==='fixed'){baseTotal+=parseFloat(emp.salary)||0;payrollEst+=parseFloat(emp.salary)||0;}
-    else recs.forEach(r=>{const p=calcPay(emp,r);baseTotal+=p.base;otTotal+=p.ot;payrollEst+=p.total;});
+    recs.forEach(r=>{const p=calcPay(emp,r);baseTotal+=p.base;otTotal+=p.ot;payrollEst+=p.total;});
     bonusTotal+=mRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
     const empExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===emp.id&&d.getMonth()===month&&d.getFullYear()===year;});
     payrollEst+=empExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
@@ -1813,8 +1870,7 @@ function renderDashboard(){
   months6.forEach(({m:m2,y:y2})=>{let b=0,o=0,e=0,bn=0;
     const mR=attendance.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===m2&&d.getFullYear()===y2;});
     emps.forEach(emp=>{
-      if(emp.pay_type==='fixed')b+=parseFloat(emp.salary)||0;
-      else mR.filter(r=>r.employee_id===emp.id&&isP(r.status)).forEach(r=>{const p=calcPay(emp,r);b+=p.base;o+=p.ot;});
+      mR.filter(r=>r.employee_id===emp.id&&isP(r.status)).forEach(r=>{const p=calcPay(emp,r);b+=p.base;o+=p.ot;});
       bn+=mR.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
       const eR=expenses.filter(ex=>{const d=new Date(ex.date+'T00:00:00');return ex.employee_id===emp.id&&d.getMonth()===m2&&d.getFullYear()===y2;});
       e+=eR.reduce((s,ex)=>s+(parseFloat(ex.amount)||0),0);
@@ -1925,8 +1981,8 @@ function renderDashboard(){
   // ── 8. TOP EARNERS ─────────────────────────────────────
   const earnerData=emps.map(emp=>{
     const recs=mRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
-    let pay=emp.pay_type==='fixed'?parseFloat(emp.salary)||0:0;
-    recs.forEach(r=>{const p=calcPay(emp,r);if(emp.pay_type!=='fixed'){pay+=p.base;}pay+=p.ot;});
+    let pay=0;
+    recs.forEach(r=>{const p=calcPay(emp,r);pay+=p.base+p.ot;});
     const bn=mRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
     const ex=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===emp.id&&d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
     return{emp,pay:pay+bn+ex,base:pay,bonus:bn,expenses:ex};
@@ -2714,8 +2770,8 @@ function renderEmpReport(){
   const days=dim(year,month);
   const att=attendance.filter(r=>r.employee_id===empId);
   const mRecs=att.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===month&&d.getFullYear()===year;});
-  const wD=Array.from({length:days},(_,i)=>isWD(new Date(year,month,i+1))).filter(Boolean).length;
-  const present=mRecs.filter(r=>isP(r.status)&&isWD(new Date(r.date+'T00:00:00'))).length;
+  const wD=Array.from({length:days},(_,i)=>isWDFor(emp,new Date(year,month,i+1))).filter(Boolean).length;
+  const present=mRecs.filter(r=>isP(r.status)&&isWDFor(emp,new Date(r.date+'T00:00:00'))).length;
   const absent=mRecs.filter(r=>r.status==='A').length;
   const totalH=mRecs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
   const totalOT=mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
@@ -2726,19 +2782,28 @@ function renderEmpReport(){
   const suns=mRecs.filter(r=>isSun(new Date(r.date+'T00:00:00'))&&isP(r.status));
   const C=cur();
   const recOT=mRecs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).ot,0);
-  const totalPay=(emp.pay_type==='fixed'?parseFloat(emp.salary||0):mRecs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).base,0))+recOT+totalBonus;
+  const totalPay=mRecs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).base,0)+recOT+totalBonus;
   // Gross pay = what they'd earn if all days were full contracted hours (no deductions)
   var grossPay=totalPay;
   var totalHoursDeduction=0;
   if(emp.pay_type==='daily'&&emp.contracted_hours&&emp.daily_rate){
     var ch=parseFloat(emp.contracted_hours)||8;
     var dr=parseFloat(emp.daily_rate)||0;
-    var hrlyRate=ch>0?dr/ch:0;
     var fullDayRecs=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';});
     grossPay=fullDayRecs.length*dr+recOT+totalBonus;
-    // Deduction = full pay minus actual calcPay base
     var actualBase=fullDayRecs.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
     totalHoursDeduction=Math.max(0,parseFloat((fullDayRecs.length*dr-actualBase).toFixed(2)));
+  } else if(emp.pay_type==='fixed'&&emp.salary&&emp.contracted_hours){
+    // Fixed salary: gross = what they'd earn if they worked all contracted hours for days present
+    var ch=parseFloat(emp.contracted_hours)||8;
+    var monthlySal=parseFloat(emp.salary)||0;
+    // Work out daily equivalent for this month
+    var wDays=workDaysInMonth(emp,year,month);
+    var dailyEq=wDays>0?monthlySal/wDays:0;
+    var fullDayRecs2=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';});
+    grossPay=fullDayRecs2.length*dailyEq+recOT+totalBonus;
+    var actualBase2=fullDayRecs2.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
+    totalHoursDeduction=Math.max(0,parseFloat((fullDayRecs2.length*dailyEq-actualBase2).toFixed(2)));
   } else if(emp.pay_type==='hourly'&&emp.hourly_rate&&emp.contracted_hours){
     var ch2=parseFloat(emp.contracted_hours)||8;
     var hr=parseFloat(emp.hourly_rate)||0;
@@ -2966,7 +3031,7 @@ function renderEmpReport(){
     const rowBg=sun?'background:var(--sut)':sat?'background:var(--wkt)':'';
     const dayLabel=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()];
     let payInfo='';
-    if(rec&&hasRate&&isP(rec.status)){const p=calcPay(emp,rec);const dayPay=emp.pay_type==='fixed'?(parseFloat(emp.salary||0)/30):p.base;const bonus=parseFloat(rec.bonus)||0;payInfo=`<span style="font-size:10px;color:var(--grn);font-weight:600;">${C}${(dayPay+p.ot+bonus).toFixed(2)}</span>`;}
+    if(rec&&hasRate&&isP(rec.status)){const p=calcPay(emp,rec);const dayPay=p.base;const bonus=parseFloat(rec.bonus)||0;payInfo=`<span style="font-size:10px;color:var(--grn);font-weight:600;">${C}${(dayPay+p.ot+bonus).toFixed(2)}</span>`;}
     const sc=rec?`<span class="bdg b${rec.status}">${rec.status} — ${STATUSES.find(s=>s.c===rec.status)?.l||''}</span>`:(sun?'<span style="color:#a5b4fc;font-size:11px;">☀</span>':sat?'<span style="color:#c4b5fd;font-size:11px;">📅</span>':'—');
     rows+=`<tr style="${rowBg}"><td>${d}</td><td>${fmtDate(dt)}</td><td style="${sun?'color:#4338ca;font-weight:700;':sat?'color:#7c3aed;':''}">${dayLabel}</td><td>${sc}</td><td>${rec?.sign_in||'—'}</td><td>${rec?.sign_out||'—'}</td><td>${rec?.hours||'—'}</td><td style="color:${rec?.overtime?'var(--amb)':'inherit'};font-weight:${rec?.overtime?'700':'400'};">${rec?.overtime||'—'}</td><td style="color:${rec?.bonus?'var(--grn)':'inherit'};font-weight:${rec?.bonus?'700':'400'};">${rec?.bonus?C+parseFloat(rec.bonus).toFixed(2):'—'}</td><td>${payInfo}</td></tr>`;
   }
@@ -3047,7 +3112,7 @@ function printTimesheet(){
   var expSection='';
   if(showExp&&mExp.length>0){
     const hasRate=(emp.pay_type==='fixed'&&emp.salary)||(emp.pay_type==='daily'&&emp.daily_rate)||emp.hourly_rate;
-    const totalPay2=(emp.pay_type==='fixed'?parseFloat(emp.salary||0):attendance.filter(function(r){var d=new Date(r.date+'T00:00:00');return r.employee_id===empId&&d.getMonth()===month&&d.getFullYear()===year&&(r.status==='P'||r.status==='HD'||r.status==='LA');}).reduce(function(s,r){return s+calcPay(emp,r).base;},0));
+    const totalPay2=attendance.filter(function(r){var d=new Date(r.date+'T00:00:00');return r.employee_id===empId&&d.getMonth()===month&&d.getFullYear()===year&&(r.status==='P'||r.status==='HD'||r.status==='LA');}).reduce(function(s,r){return s+calcPay(emp,r).base;},0);
     expSection='<div style="page-break-before:always;font-family:sans-serif;padding:20px;">'
       +'<div style="text-align:center;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:8px;">'
       +'<strong style="font-size:15px;">'+(cfg.company||'DAM Pro')+'</strong><br>'
@@ -3173,8 +3238,8 @@ function renderPayroll(){
     const bonusTotal=recs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
     const absent=recs.filter(r=>r.status==='A').length;
     let basePay=0;
-    if(pt==='fixed')basePay=parseFloat(emp.salary)||0;
-    else aR.forEach(r=>{basePay+=calcPay(emp,r).base;});
+    // Fixed salary: sum per-day calcPay (handles short hours/absent days)
+    aR.forEach(r=>{basePay+=calcPay(emp,r).base;});
     let otPay=0;aR.forEach(r=>{otPay+=calcPay(emp,r).ot;});
     // Expenses from Supabase
     const empExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===emp.id&&d.getMonth()===m&&d.getFullYear()===y;});
@@ -3190,7 +3255,11 @@ function renderPayroll(){
     var fullDays=aR.filter(function(r){return r.status==='P'||r.status==='LA';}).length;
     var shortfallH=pt==='daily'?Math.max(0,contrH*fullDays-totalH):0;
     var shortfallAmt=shortfallH>0?parseFloat(((shortfallH*(parseFloat(emp.daily_rate)||0)/contrH)).toFixed(2)):0;
-    if(pt==='fixed')return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">monthly salary</span>';
+    if(pt==='fixed'){
+      var monthlySal2=parseFloat(emp.salary)||0;
+      var fixedShortAmt=Math.max(0,parseFloat((monthlySal2-basePay).toFixed(2)));
+      return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+(fixedShortAmt>0?'<span style=\'color:var(--red)\'>−'+C+fixedShortAmt.toFixed(2)+' deducted</span>':'monthly salary')+'</span>';
+    }
     if(pt==='daily')return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+aR.length+' days</span>'+(shortfallAmt>0?'<br><span style="font-size:10px;color:var(--red);font-weight:600;">-'+C+shortfallAmt.toFixed(2)+' ('+shortfallH.toFixed(1)+'h short)</span>':'');
     return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+totalH.toFixed(1)+'h</span>';
   })();
@@ -3261,7 +3330,7 @@ function exportPayrollCSV(){
   emps.forEach(emp=>{
     const recs=mRecs.filter(r=>r.employee_id===emp.id);const aR=recs.filter(r=>isP(r.status));
     const pt=emp.pay_type||'hourly';
-    let base=0;if(pt==='fixed')base=parseFloat(emp.salary)||0;else aR.forEach(r=>{base+=calcPay(emp,r).base;});
+    let base=0;aR.forEach(r=>{base+=calcPay(emp,r).base;});
     let otP=0;aR.forEach(r=>{otP+=calcPay(emp,r).ot;});
     const bonus=recs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
     const empExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===emp.id&&d.getMonth()===m&&d.getFullYear()===y;});
@@ -3286,7 +3355,7 @@ function renderEmployees(){
   const C=cur();
   grid.innerHTML=emps.map(emp=>{
     const att=attendance.filter(r=>r.employee_id===emp.id);
-    const wdR=att.filter(r=>isWD(new Date(r.date+'T00:00:00')));
+    const wdR=att.filter(r=>isWDFor(emp,new Date(r.date+'T00:00:00')));
     const pWD=wdR.filter(r=>isP(r.status)).length;
     const mHrsThisMonth=wdR.reduce(function(s,r){return s+(parseFloat(r.hours)||0);},0);
     const pct=wdR.length>0?Math.round(pWD/wdR.length*100):0;
@@ -3295,13 +3364,25 @@ function renderEmployees(){
     const pt=emp.pay_type||'hourly';
     const payLabel=pt==='fixed'?`${C}${parseFloat(emp.salary||0).toFixed(0)}/mo`:pt==='daily'?`${C}${parseFloat(emp.daily_rate||0).toFixed(0)}/day`:`${C}${parseFloat(emp.hourly_rate||0).toFixed(2)}/h`;
     const hasRate=(pt==='fixed'&&emp.salary)||(pt==='daily'&&emp.daily_rate)||emp.hourly_rate;
+    const ch0=parseFloat(emp.contracted_hours)||8;
+    const wdc=empWorkDays(emp).length||6;
+    let hrEquiv=0;
+    if(pt==='fixed'&&emp.salary){
+      const avgWD=(wdc/7)*(365/12);
+      hrEquiv=ch0>0?(parseFloat(emp.salary)/avgWD)/ch0:0;
+    } else if(pt==='daily'&&emp.daily_rate){
+      hrEquiv=ch0>0?parseFloat(emp.daily_rate)/ch0:0;
+    } else if(pt==='hourly'&&emp.hourly_rate){
+      hrEquiv=parseFloat(emp.hourly_rate);
+    }
+    const hrEquivLabel=hrEquiv>0?`${C}${hrEquiv.toFixed(2)}/h`:'';
     return`<div class="ec${isEx?' ex':''}" onclick="editEmpModal('${emp.id}')">
       <div class="ec-ava" style="background:${isEx?'linear-gradient(135deg,#7c3aed,#4c1d95)':avcol(emp.id)}">${inits(emp.name)}</div>
       <div class="ec-name">${emp.name}</div>
       <div class="ec-meta">${emp.role||'No role set'} ${emp.contract_type?`<span class="cp ${emp.contract_type==='PAYE'?'cp-p':'cp-s'}">${emp.contract_type}</span>`:''}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <span class="sp ${isEx?'sp-ex':'sp-a'}">${isEx?'● Ex':'● Active'}</span>
-        ${hasRate?`<span style="font-size:10px;color:var(--grn);font-weight:700;">${payLabel}</span>`:''}
+        ${hasRate?`<span style="font-size:10px;color:var(--grn);font-weight:700;">${payLabel}${hrEquivLabel?` <span style="color:var(--txtm);font-weight:500;">(≈${hrEquivLabel})</span>`:''}</span>`:''}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:7px;text-align:center;">
         <div style="font-size:10px;color:var(--txtm);">Present<br><strong style="font-size:14px;color:var(--grn);">${pWD}</strong></div>
@@ -3365,6 +3446,12 @@ function editEmpModal(id){
   if(document.getElementById('eSalaryAdj'))document.getElementById('eSalaryAdj').value='';
   document.getElementById('eContHrs').value=emp.contracted_hours||'';
   document.getElementById('eContHrsD').value=emp.contracted_hours||'';
+  // Prefill work days checkboxes
+  (function(){
+    var wd=(emp.work_days&&emp.work_days.length)?emp.work_days:[1,2,3,4,5,6];
+    document.querySelectorAll('.eWorkDay').forEach(function(c){c.checked=wd.indexOf(parseInt(c.value))>=0;});
+  })();
+  setTimeout(updateRateDisplay,50);
   document.getElementById('eDailyRate').value=emp.daily_rate||'';
   document.getElementById('eHrRate').value=emp.hourly_rate||'';
   document.getElementById('eOTThr').value=emp.ot_threshold||'';
@@ -3526,6 +3613,39 @@ function selPayType(type){
     if(document.getElementById('eContHrs'))document.getElementById('eContHrs').value=ch;
     if(document.getElementById('eContHrsD'))document.getElementById('eContHrsD').value=ch;
   }
+  updateRateDisplay();
+}
+function updateRateDisplay(){
+  var disp=document.getElementById('eRateDisplay');
+  if(!disp)return;
+  var sel=null;
+  ['fixed','daily','hourly'].forEach(function(t){if(document.getElementById('pt-'+t).classList.contains('sel'))sel=t;});
+  var ch=parseFloat(document.getElementById('eContHrsD').value||document.getElementById('eContHrs').value)||8;
+  var workDaysCount=document.querySelectorAll('.eWorkDay:checked').length||6;
+  var C=cur();
+  var rate=0,label='';
+  if(sel==='fixed'){
+    var sal=parseFloat(document.getElementById('eSalary').value)||0;
+    if(sal<=0){disp.style.display='none';return;}
+    // Average working days per month = (workDaysCount/7) × (365/12)
+    var avgWorkDaysPerMonth=(workDaysCount/7)*(365/12);
+    var dailyEq=sal/avgWorkDaysPerMonth;
+    rate=ch>0?dailyEq/ch:0;
+    label='≈ '+C+dailyEq.toFixed(2)+'/day · '+C+rate.toFixed(2)+'/hour <span style="opacity:0.7;font-weight:400;">(based on '+workDaysCount+' work days/week, '+ch+'h/day)</span>';
+  } else if(sel==='daily'){
+    var dr=parseFloat(document.getElementById('eDailyRate').value)||0;
+    if(dr<=0){disp.style.display='none';return;}
+    rate=ch>0?dr/ch:0;
+    label='≈ '+C+rate.toFixed(2)+'/hour <span style="opacity:0.7;font-weight:400;">(based on '+ch+'h/day)</span>';
+  } else if(sel==='hourly'){
+    var hr=parseFloat(document.getElementById('eHrRate').value)||0;
+    if(hr<=0){disp.style.display='none';return;}
+    var avgWorkDaysPerMonth2=(workDaysCount/7)*(365/12);
+    var monthlyEq=hr*ch*avgWorkDaysPerMonth2;
+    label='≈ '+C+monthlyEq.toFixed(2)+'/month <span style="opacity:0.7;font-weight:400;">(at '+ch+'h/day, '+workDaysCount+' days/week)</span>';
+  }
+  disp.innerHTML='<i class="fa-solid fa-calculator" style="margin-right:6px;"></i>'+label;
+  disp.style.display='block';
 }
 function toggleOTF(){const v=document.getElementById('eOTType').value;document.getElementById('otMF').style.display=v==='multiplier'?'block':'none';document.getElementById('otFF').style.display=v==='flat'?'block':'none';}
 function toggleCustomBank(val){document.getElementById('customBankG').style.display=val==='custom'?'grid':'none';}
@@ -3841,18 +3961,72 @@ async function deleteDoc(id){
 // ═══════════════════════════════════════════════════
 async function loadSalaryHistory(empId){
   const el=document.getElementById('salaryHistList');if(!el)return;
-  const hist=salaryHistory.filter(h=>h.employee_id===empId).sort((a,b)=>b.effective_from?.localeCompare(a.effective_from)||0);
+  const hist=salaryHistory.filter(h=>h.employee_id===empId).sort((a,b)=>(b.effective_from||'').localeCompare(a.effective_from||''));
   const C=cur();
   if(!hist.length){el.innerHTML='<div style="text-align:center;color:var(--txtm);padding:20px;font-size:13px;"><i class="fa-solid fa-clock-rotate-left" style="font-size:24px;display:block;margin-bottom:7px;"></i>No pay history yet.<br>History is recorded automatically when you change the rate.</div>';return;}
-  el.innerHTML=hist.map((h,i)=>`<div style="background:var(--card2);border:1px solid var(--bdr);border-radius:var(--r);padding:12px 14px;margin-bottom:9px;position:relative;">
-    var today=new Date().toISOString().slice(0,10);
-    var isFuture=h.effective_from>today;
-    var currentBadge=i===0&&!isFuture?'<span style="position:absolute;top:10px;right:10px;background:var(--grnl);color:var(--grn);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;">Current</span>':isFuture?'<span style="position:absolute;top:10px;right:10px;background:var(--ambl);color:var(--amb);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;">Future</span>':'';
-    <div style="font-size:13px;font-weight:700;margin-bottom:4px;">${h.pay_type==='fixed'?'Monthly Salary':h.pay_type==='daily'?'Daily Rate':'Hourly Rate'}: <span style="color:var(--grn);">${C}${parseFloat(h.new_rate).toFixed(2)}</span></div>
-    ${h.old_rate>0?`<div style="font-size:12px;color:var(--txtm);">Previously: ${C}${parseFloat(h.old_rate).toFixed(2)} · Increase: <span style="color:var(--grn);font-weight:600;">+${C}${(parseFloat(h.new_rate)-parseFloat(h.old_rate)).toFixed(2)}</span></div>`:'<div style="font-size:12px;color:var(--txtm);">Initial rate</div>'}
-    <div style="font-size:11px;color:var(--txtm);margin-top:4px;"><i class="fa-solid fa-calendar" style="margin-right:3px;"></i>Effective: ${fmtDate(h.effective_from)}${h.adjustment?` · <span style="color:var(--amb);">Bonus/Adj: ${C}${parseFloat(h.adjustment).toFixed(2)}</span>`:''}</div>
-    ${h.notes?`<div style="font-size:11px;color:var(--txtm);margin-top:2px;">${h.notes}</div>`:''}
-  </div>`).join('');
+  const today=dateKey(new Date());
+  el.innerHTML=hist.map((h,i)=>{
+    const isFuture=h.effective_from>today;
+    // "To" date = the day before the next (more recent) entry's effective_from, or "Present" if this is the current rate
+    let toLabel;
+    if(i===0){
+      toLabel=isFuture?'until superseded':'Present';
+    } else {
+      const nextFrom=hist[i-1].effective_from; // hist[i-1] is more recent (sorted desc)
+      const toDate=new Date(nextFrom+'T00:00:00');
+      toDate.setDate(toDate.getDate()-1);
+      toLabel=fmtDate(dateKey(toDate));
+    }
+    const badge=(i===0&&!isFuture)?'<span style="position:absolute;top:10px;right:10px;background:var(--grnl);color:var(--grn);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;">Current</span>'
+      :isFuture?'<span style="position:absolute;top:10px;right:10px;background:var(--ambl);color:var(--amb);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;">Future</span>'
+      :'<span style="position:absolute;top:10px;right:10px;background:var(--card2);color:var(--txtm);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;border:1px solid var(--bdr);">Past</span>';
+    const diff=h.old_rate>0?(parseFloat(h.new_rate)-parseFloat(h.old_rate)):0;
+    return `<div style="background:var(--card2);border:1px solid var(--bdr);border-radius:var(--r);padding:12px 14px;margin-bottom:9px;position:relative;">
+      ${badge}
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;padding-right:60px;">${h.pay_type==='fixed'?'Monthly Salary':h.pay_type==='daily'?'Daily Rate':'Hourly Rate'}: <span style="color:var(--grn);">${C}${parseFloat(h.new_rate).toFixed(2)}</span></div>
+      ${h.old_rate>0?`<div style="font-size:12px;color:var(--txtm);">Previously: ${C}${parseFloat(h.old_rate).toFixed(2)} · ${diff>=0?'Increase':'Decrease'}: <span style="color:${diff>=0?'var(--grn)':'var(--red)'};font-weight:600;">${diff>=0?'+':''}${C}${diff.toFixed(2)}</span></div>`:'<div style="font-size:12px;color:var(--txtm);">Initial rate</div>'}
+      <div style="font-size:11px;color:var(--txtm);margin-top:4px;"><i class="fa-solid fa-calendar" style="margin-right:3px;"></i>${fmtDate(h.effective_from)} → <strong>${toLabel}</strong>${h.adjustment?` · <span style="color:var(--amb);">Bonus/Adj: ${C}${parseFloat(h.adjustment).toFixed(2)}</span>`:''}</div>
+      ${h.notes?`<div style="font-size:11px;color:var(--txtm);margin-top:2px;">${h.notes}</div>`:''}
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button onclick="editSalaryHistEntry('${h.id}')" style="font-size:11px;padding:4px 10px;border:1px solid var(--bdr);border-radius:6px;background:var(--card);color:var(--txt2);cursor:pointer;"><i class="fa-solid fa-pen" style="margin-right:4px;"></i>Edit</button>
+        <button onclick="deleteSalaryHistEntry('${h.id}')" style="font-size:11px;padding:4px 10px;border:1px solid rgba(220,38,38,0.3);border-radius:6px;background:var(--card);color:var(--red);cursor:pointer;"><i class="fa-solid fa-trash" style="margin-right:4px;"></i>Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function editSalaryHistEntry(histId){
+  const h=salaryHistory.find(x=>x.id===histId);if(!h)return;
+  const newRateStr=prompt('New rate amount ('+cur()+'):',h.new_rate);
+  if(newRateStr===null)return;
+  const newRate=parseFloat(newRateStr);
+  if(isNaN(newRate)||newRate<0){toast('Invalid amount','e');return;}
+  const dateStr=prompt('Effective from date (YYYY-MM-DD):',h.effective_from);
+  if(dateStr===null)return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)){toast('Invalid date format — use YYYY-MM-DD','e');return;}
+  const r=await sb.from('salary_history').update({new_rate:newRate,effective_from:dateStr,notes:'Manually corrected'}).eq('id',histId).select().single();
+  if(r.error){toast(r.error.message,'e');return;}
+  const idx=salaryHistory.findIndex(x=>x.id===histId);
+  if(idx>=0)salaryHistory[idx]=r.data;
+  toast('History entry updated','s');
+  loadSalaryHistory(h.employee_id);
+}
+
+async function deleteSalaryHistEntry(histId){
+  const h=salaryHistory.find(x=>x.id===histId);if(!h)return;
+  confirmAction({
+    title:'Delete History Entry',
+    message:'Delete this pay history entry? This cannot be undone.',
+    confirmText:'Delete',
+    danger:true,
+    onConfirm:async function(){
+      const r=await sb.from('salary_history').delete().eq('id',histId);
+      if(r.error){toast(r.error.message,'e');return;}
+      salaryHistory=salaryHistory.filter(x=>x.id!==histId);
+      toast('History entry deleted','s');
+      loadSalaryHistory(h.employee_id);
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════
