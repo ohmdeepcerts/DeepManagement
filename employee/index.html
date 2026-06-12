@@ -376,8 +376,23 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
     <div class="auth-sub">Your personal work portal</div>
   </div>
   <div id="step1" style="width:100%;max-width:340px;">
-    <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.6);text-align:center;margin-bottom:13px;">Select your name</div>
-    <div id="empList" style="max-height:380px;overflow-y:auto;"></div>
+    <div class="pin-card">
+      <div class="pin-who">Enter your mobile number</div>
+      <input type="tel" id="phoneInput" placeholder="07xxx xxxxxx" autocomplete="tel" onkeydown="if(event.key==='Enter')submitPhone()" style="width:100%;text-align:center;font-size:18px;letter-spacing:1px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#fff;margin:10px 0 12px;box-sizing:border-box;">
+      <button class="btn btn-p" style="width:100%;" onclick="submitPhone()"><i class="fa-solid fa-arrow-right" style="margin-right:6px;"></i>Continue</button>
+      <div class="pin-err" id="phoneErr"></div>
+    </div>
+  </div>
+  <div id="stepSetPin" style="display:none;width:100%;max-width:340px;">
+    <div class="pin-card">
+      <div class="pin-who" id="setPinWho">Set up your PIN</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.6);text-align:center;margin-bottom:10px;">Choose a 4-6 digit PIN. You'll use this to sign in next time.</div>
+      <input type="password" id="newPinInput" inputmode="numeric" maxlength="6" placeholder="New PIN" style="width:100%;text-align:center;font-size:20px;letter-spacing:8px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#fff;margin:6px 0;box-sizing:border-box;">
+      <input type="password" id="confirmPinInput" inputmode="numeric" maxlength="6" placeholder="Confirm PIN" onkeydown="if(event.key==='Enter')submitNewPin()" style="width:100%;text-align:center;font-size:20px;letter-spacing:8px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#fff;margin:6px 0 12px;box-sizing:border-box;">
+      <button class="btn btn-p" style="width:100%;" onclick="submitNewPin()"><i class="fa-solid fa-check" style="margin-right:6px;"></i>Save & Continue</button>
+      <div class="pin-err" id="setPinErr"></div>
+      <div style="text-align:center;margin-top:10px;"><span style="font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;" onclick="backToPhone()"><i class="fa-solid fa-chevron-left" style="margin-right:4px;"></i>Back</span></div>
+    </div>
   </div>
   <div id="step2" style="display:none;width:100%;max-width:340px;">
     <div class="pin-card">
@@ -398,6 +413,32 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
         <div class="pk back" onclick="pdel()">⌫</div>
       </div>
       <div class="pin-err" id="pinErr"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CHANGE PIN MODAL -->
+<div id="changePinModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:flex-end;justify-content:center;">
+  <div style="background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:20px 18px calc(40px + max(env(safe-area-inset-bottom),10px));max-height:88vh;overflow-y:auto;">
+    <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr);margin:0 auto 18px;"></div>
+    <div style="font-size:17px;font-weight:800;margin-bottom:4px;">Change PIN</div>
+    <div style="font-size:12px;color:var(--txtm);margin-bottom:14px;">Enter your current PIN, then choose a new one.</div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:5px;">Current PIN</label>
+      <input type="password" id="cpCurrent" inputmode="numeric" maxlength="6" placeholder="Current PIN" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bdr);background:var(--card2);color:var(--txt);font-size:16px;letter-spacing:4px;text-align:center;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:5px;">New PIN (4-6 digits)</label>
+      <input type="password" id="cpNew" inputmode="numeric" maxlength="6" placeholder="New PIN" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bdr);background:var(--card2);color:var(--txt);font-size:16px;letter-spacing:4px;text-align:center;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:5px;">Confirm New PIN</label>
+      <input type="password" id="cpConfirm" inputmode="numeric" maxlength="6" placeholder="Confirm new PIN" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bdr);background:var(--card2);color:var(--txt);font-size:16px;letter-spacing:4px;text-align:center;box-sizing:border-box;">
+    </div>
+    <div id="cpErr" style="font-size:12px;color:var(--red);margin-bottom:10px;min-height:16px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-o" style="flex:1;" onclick="closeChangePin()">Cancel</button>
+      <button class="btn btn-p" style="flex:1;" onclick="submitChangePin()"><i class="fa-solid fa-check" style="margin-right:6px;"></i>Save</button>
     </div>
   </div>
 </div>
@@ -431,6 +472,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
     <!-- Pill dropdown -->
     <div id="pillMenu" style="display:none;position:absolute;top:62px;left:14px;z-index:300;background:var(--card);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.18);min-width:190px;overflow:hidden;">
       <div onclick="showPg('home');togglePillMenu()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-house" style="width:16px;color:var(--txtm);"></i>Home</div>
+      <div onclick="openChangePin()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-key" style="width:16px;color:var(--txtm);"></i>Change PIN</div>
       <div onclick="toggleTheme()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-circle-half-stroke" style="width:16px;color:var(--txtm);"></i>Toggle Theme</div>
       <div onclick="confirmLogout()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--red);cursor:pointer;" onmouseover="this.style.background='var(--redl)'" onmouseout="this.style.background=''"><i class="fa-solid fa-right-from-bracket" style="width:16px;"></i>Sign Out</div>
     </div>
@@ -763,6 +805,33 @@ function togglePillMenu(){
   const m=document.getElementById('pillMenu');
   if(m)m.style.display=m.style.display==='none'?'block':'none';
 }
+function openChangePin(){
+  const m=document.getElementById('pillMenu');if(m)m.style.display='none';
+  document.getElementById('cpCurrent').value='';
+  document.getElementById('cpNew').value='';
+  document.getElementById('cpConfirm').value='';
+  document.getElementById('cpErr').textContent='';
+  document.getElementById('changePinModal').style.display='flex';
+}
+function closeChangePin(){
+  document.getElementById('changePinModal').style.display='none';
+}
+async function submitChangePin(){
+  const cur=document.getElementById('cpCurrent').value;
+  const n1=document.getElementById('cpNew').value;
+  const n2=document.getElementById('cpConfirm').value;
+  const errEl=document.getElementById('cpErr');
+  errEl.textContent='';
+  if(cur!==emp.pin){errEl.textContent='Current PIN is incorrect';return;}
+  if(n1.length<4||n1.length>6||!/^\d+$/.test(n1)){errEl.textContent='New PIN must be 4-6 digits';return;}
+  if(n1!==n2){errEl.textContent='New PINs do not match';return;}
+  if(n1===cur){errEl.textContent='New PIN must be different from current PIN';return;}
+  const r=await SB.from('employees').update({pin:n1}).eq('id',emp.id).select().single();
+  if(r.error){errEl.textContent='Could not save. Check connection.';return;}
+  emp=r.data;
+  closeChangePin();
+  toast('PIN updated','s');
+}
 document.addEventListener('click',e=>{
   const pill=document.getElementById('idPill');
   const menu=document.getElementById('pillMenu');
@@ -820,7 +889,7 @@ function selEmp(id){
   document.getElementById('step2').style.display='block';
   renderPinDots();
 }
-function goBack(){document.getElementById('step2').style.display='none';document.getElementById('step1').style.display='block';pinEntry='';selEmpId='';renderPinDots();}
+function goBack(){document.getElementById('step2').style.display='none';document.getElementById('step1').style.display='block';document.getElementById('phoneInput').value='';pinEntry='';selEmpId='';allEmps=[];renderPinDots();}
 function pk(k){if(pinEntry.length>=6)return;pinEntry+=k;renderPinDots();const e=allEmps.find(x=>x.id===selEmpId);if(e?.pin&&pinEntry.length>=4&&pinEntry.length===e.pin.length)checkPin();}
 function pdel(){pinEntry=pinEntry.slice(0,-1);renderPinDots();document.getElementById('pinErr').textContent='';}
 function renderPinDots(){
@@ -2182,17 +2251,16 @@ document.addEventListener('keydown',e=>{
 
 // ── INIT ──
 async function tryAutoLogin(){
-  // Step 1: Sign into portal (always needed for RLS)
   const {data:{session}}=await SB.auth.getSession();
   if(!session){
     const {error:authErr}=await SB.auth.signInWithPassword({email:PORTAL_EMAIL,password:PORTAL_PASS});
     if(authErr){
       console.error('Portal login failed:',authErr.message);
-      document.getElementById('empList').innerHTML='<div style="color:#fca5a5;text-align:center;padding:14px;">Could not connect. Check internet.</div>';
+      document.getElementById('phoneErr').textContent='Could not connect. Check internet.';
       return;
     }
   }
-  // Step 2: Check for saved employee session (7-day auto-login)
+  // Check for saved employee session (7-day auto-login)
   const savedId=localStorage.getItem('dam_emp_id');
   const savedTs=parseInt(localStorage.getItem('dam_emp_ts')||'0');
   const sevenDays=7*24*60*60*1000;
@@ -2206,22 +2274,63 @@ async function tryAutoLogin(){
       return;
     }
   }
-  // Step 3: Show employee list (portal is already authenticated)
-  const r=await SB.from('employees').select('*').eq('status','Active').order('name');
-  if(r.error){
-    document.getElementById('empList').innerHTML='<div style="color:#fca5a5;text-align:center;padding:14px;">Could not load employees.</div>';
-    return;
-  }
-  allEmps=r.data||[];
+  // Load settings only — employee list NOT shown until phone is entered
   const cfgR=await SB.from('settings').select('*').eq('id',1).single();
   if(cfgR.data)cfg=cfgR.data;
-  document.getElementById('empList').innerHTML=allEmps.map((e,i)=>`
-    <div class="emp-card" onclick="selEmp('${e.id}')">
-      <div class="emp-av" style="background:${AVCOLS[i%AVCOLS.length]}">${ini(e.name)}</div>
-      <div><div class="emp-cn">${e.name}</div><div class="emp-cr">${e.role||'Employee'}</div></div>
-      <i class="fa-solid fa-chevron-right" style="margin-left:auto;color:rgba(255,255,255,0.35);font-size:13px;"></i>
-    </div>`).join('');
   document.getElementById('step1').style.display='block';
+}
+function normPhone(p){
+  var digits=(p||'').replace(/\D/g,'');
+  if(digits.length>10)digits=digits.slice(-10); // last 10 digits (drop country code)
+  return digits;
+}
+async function submitPhone(){
+  const raw=document.getElementById('phoneInput').value;
+  const norm=normPhone(raw);
+  const errEl=document.getElementById('phoneErr');
+  errEl.textContent='';
+  if(norm.length<10){errEl.textContent='Enter a valid mobile number';return;}
+  const r=await SB.from('employees').select('*').eq('status','Active');
+  if(r.error){errEl.textContent='Could not connect. Check internet.';return;}
+  const matches=(r.data||[]).filter(function(e){return normPhone(e.phone)===norm;});
+  if(!matches.length){errEl.textContent='Phone number not recognized. Contact your office.';return;}
+  if(matches.length>1){errEl.textContent='Multiple accounts found for this number. Contact your office.';return;}
+  allEmps=matches;
+  const e=matches[0];
+  selEmpId=e.id;
+  if(!e.pin){
+    // First login — set up PIN
+    document.getElementById('setPinWho').textContent='Welcome, '+e.name+'!';
+    document.getElementById('step1').style.display='none';
+    document.getElementById('stepSetPin').style.display='block';
+  } else {
+    document.getElementById('pinWho').textContent='Welcome back, '+e.name;
+    document.getElementById('step1').style.display='none';
+    document.getElementById('step2').style.display='block';
+    pinEntry='';
+    renderPinDots();
+  }
+}
+async function submitNewPin(){
+  const p1=document.getElementById('newPinInput').value;
+  const p2=document.getElementById('confirmPinInput').value;
+  const errEl=document.getElementById('setPinErr');
+  errEl.textContent='';
+  if(p1.length<4||p1.length>6||!/^\d+$/.test(p1)){errEl.textContent='PIN must be 4-6 digits';return;}
+  if(p1!==p2){errEl.textContent='PINs do not match';return;}
+  const e=allEmps.find(function(x){return x.id===selEmpId;});
+  const r=await SB.from('employees').update({pin:p1}).eq('id',selEmpId).select().single();
+  if(r.error){errEl.textContent='Could not save PIN. Try again.';return;}
+  allEmps=[r.data];
+  await enterApp(r.data);
+}
+function backToPhone(){
+  document.getElementById('stepSetPin').style.display='none';
+  document.getElementById('step1').style.display='block';
+  document.getElementById('newPinInput').value='';
+  document.getElementById('confirmPinInput').value='';
+  document.getElementById('setPinErr').textContent='';
+  selEmpId='';
 }
 tryAutoLogin();
 
