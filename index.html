@@ -1110,7 +1110,8 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       <div class="fg fg2"><div class="fgl"><label>Default Work Start</label><input type="time" id="eWStart" value="08:00"></div><div class="fgl"><label>Default Work End</label><input type="time" id="eWEnd" value="17:00"></div></div>
       <div style="border-top:1px solid var(--bdr);padding-top:13px;margin-top:13px;">
         <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-key" style="color:var(--amb);margin-right:5px;"></i>Employee PIN (for mobile portal)</div>
-        <div class="fg fg2"><div class="fgl"><label>PIN (4-6 digits)</label><input type="password" id="ePin" maxlength="6" placeholder="e.g. 1234"></div><div class="fgl"><label>Confirm Password</label><input type="password" id="ePinConfirm" maxlength="6" placeholder="Confirm PIN"></div></div>
+        <div class="fg fg2"><div class="fgl"><label>PIN (4-6 digits)</label><input type="text" inputmode="numeric" id="ePin" maxlength="6" placeholder="e.g. 1234"></div><div class="fgl"><label>Confirm PIN</label><input type="text" inputmode="numeric" id="ePinConfirm" maxlength="6" placeholder="Confirm PIN"></div></div>
+        <p style="font-size:11px;color:var(--txtm);margin-top:4px;"><i class="fa-solid fa-eye" style="margin-right:4px;"></i>Visible here for admin reference only — employee enters this PIN to log into the mobile app.</p>
         <p style="font-size:12px;color:var(--txtm);margin-top:7px;">Employee uses this PIN to log into the mobile portal and see their own data.</p>
       </div>
     </div>
