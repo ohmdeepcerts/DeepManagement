@@ -702,7 +702,7 @@ const STATUSES={P:'Present',A:'Absent',L:'Annual Leave',S:'Sick Leave',H:'Bank H
 
 // ── STATE ──
 let emp=null, allEmps=[], cfg={};
-let myAtt=[], myExp=[], myMsgs=[], myBatches=[], mySalHist=[], myPaySt=[], myAttReqs=[];
+let myAtt=[], myExp=[], myMsgs=[], myBatches=[], mySalHist=[], myPaySt=[], myAttReqs=[], myPayroll=[];
 let pinEntry='', selEmpId='';
 let attM=new Date().getMonth(), attY=new Date().getFullYear();
 let expM=new Date().getMonth(), expY=new Date().getFullYear();
@@ -714,10 +714,10 @@ function dk(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return`${dt.
 function fmtD(d){if(!d)return'—';const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}
 function fmtDS(d){if(!d)return'—';const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});}
 function isSun(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt.getDay()===0;}
-function isSat(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt.getDay()===6;}
-function empWorkDays(e){var w=e&&e.work_days;return(Array.isArray(w)&&w.length)?w:[1,2,3,4,5,6];}
-function isWDFor(e,d){return empWorkDays(e).indexOf(d.getDay())>=0;}
-function workDaysInMonth(e,y,m){var dIn=dim(y,m),wd=empWorkDays(e),c=0;for(var d=1;d<=dIn;d++){if(wd.indexOf(new Date(y,m,d).getDay())>=0)c++;}return c;}
+
+
+
+
 function isP(s){return s==='P'||s==='HD'||s==='LA';}
 function dim(y,m){return new Date(y,m+1,0).getDate();}
 function C(){return cfg.currency||'£';}
@@ -731,76 +731,8 @@ function toast(msg,type='i',duration=3200){
   document.getElementById('toasts').appendChild(t);
   if(duration>0)setTimeout(()=>{if(t.parentElement)t.remove();},duration);
 }
-function getRateForDate(e,pt,dateStr){
-  var current=pt==='fixed'?parseFloat(e.salary)||0:pt==='daily'?parseFloat(e.daily_rate)||0:parseFloat(e.hourly_rate)||0;
-  if(typeof mySalHist==='undefined'||!mySalHist||!mySalHist.length)return current;
-  var empHist=mySalHist.filter(function(h){return h.pay_type===pt&&h.effective_from;});
-  if(!empHist.length)return current;
-  empHist.sort(function(a,b){return (a.effective_from||'').localeCompare(b.effective_from||'');});
-  var applicable=null;
-  for(var i=0;i<empHist.length;i++){
-    if(empHist[i].effective_from<=dateStr)applicable=empHist[i];
-    else break;
-  }
-  if(applicable)return parseFloat(applicable.new_rate)||0;
-  var earliest=empHist[0];
-  if(earliest.old_rate!=null&&earliest.old_rate>0)return parseFloat(earliest.old_rate)||0;
-  return current;
-}
-function calcPay(e,rec){
-  const pt=e.pay_type||'hourly';
-  const dt=new Date(rec.date+'T00:00:00');
-  const histRate=getRateForDate(e,pt,rec.date);
-  const wkM=isSun(dt)?(parseFloat(e.sun_mult)||1):(isSat(dt)?(parseFloat(e.sat_mult)||1):1);
-  const ot=parseFloat(rec.overtime)||0;
-  let otR=0;
-  if(e.ot_type==='flat'){otR=parseFloat(e.ot_flat)||0;}
-  else{const otM=e.ot_mult!=null&&e.ot_mult!==''?parseFloat(e.ot_mult):(pt==='daily'?0:1.5);
-    if(otM>0){let bh=0;
-      if(pt==='hourly')bh=histRate;
-      else if(pt==='daily'){const ch=parseFloat(e.contracted_hours)||8;bh=ch>0?histRate/ch:0;}
-      else if(pt==='fixed'){const ch=parseFloat(e.contracted_hours)||8;const wDays=workDaysInMonth(e,dt.getFullYear(),dt.getMonth());bh=(ch>0&&wDays>0)?(histRate/wDays)/ch:0;}
-      otR=bh*otM;}}
-  const otPay=ot*otR;
-  let base=0;
-  if(pt==='hourly'){
-    const r=histRate;const h=parseFloat(rec.hours)||0;
-    base=Math.max(0,h-ot)*r*wkM;
-  } else if(pt==='daily'){
-    const r=histRate;
-    const ch=parseFloat(e.contracted_hours)||8;
-    const workedH=parseFloat(rec.hours)||0;
-    const hourlyEquiv=ch>0?r/ch:0;
-    if(rec.status==='HD'){
-      base=r*0.5*wkM;
-    } else if(workedH>0&&workedH<ch){
-      const shortfall=ch-workedH;
-      const deduction=shortfall*hourlyEquiv;
-      base=(r-deduction)*wkM;
-    } else {
-      base=r*wkM;
-    }
-  } else if(pt==='fixed'){
-    const monthlySalary=histRate;
-    const ch=parseFloat(e.contracted_hours)||8;
-    const workDays=workDaysInMonth(e,dt.getFullYear(),dt.getMonth());
-    const dailyEquiv=workDays>0?monthlySalary/workDays:0;
-    const hrlyEquiv=ch>0?dailyEquiv/ch:0;
-    const workedH=parseFloat(rec.hours)||0;
-    if(rec.status==='HD'){
-      base=dailyEquiv*0.5*wkM;
-    } else if(workedH>0&&workedH<ch){
-      const shortfall=ch-workedH;
-      const deduction=shortfall*hrlyEquiv;
-      base=(dailyEquiv-deduction)*wkM;
-    } else if(workedH>0){
-      base=dailyEquiv*wkM;
-    } else {
-      base=0;
-    }
-  }
-  return{base:parseFloat(base.toFixed(2)),ot:parseFloat(otPay.toFixed(2)),total:parseFloat((base+otPay).toFixed(2))};
-}
+
+
 function togglePillMenu(){
   const m=document.getElementById('pillMenu');
   if(m)m.style.display=m.style.display==='none'?'block':'none';
@@ -939,7 +871,7 @@ function doLogout(){
   if(realtimeChannel){SB.removeChannel(realtimeChannel);realtimeChannel=null;}
   // Clear ALL in-memory data — no stale data for next employee
   emp=null;
-  myAtt=[];myExp=[];myMsgs=[];myBatches=[];mySalHist=[];myPaySt=[];myAttReqs=[];
+  myAtt=[];myExp=[];myMsgs=[];myBatches=[];mySalHist=[];myPaySt=[];myAttReqs=[];myPayroll=[];
   allEmps=[];cfg={};
   // Reset UI state
   attM=new Date().getMonth();attY=new Date().getFullYear();
@@ -1013,6 +945,7 @@ async function silentSync(){
   myBatches=batR.error?myBatches:batR.data||[];
   myPaySt=payStR.error?myPaySt:payStR.data||[];
   myAttReqs=attReqR2.error?myAttReqs:attReqR2.data||[];
+  myPayroll=prSumR2.error?myPayroll:prSumR2.data||[];
   updateBadges();
   setSyncUI('live');
   // Refresh current page silently
@@ -1032,20 +965,22 @@ async function silentSync(){
 
 // ── DATA LOADING ──
 async function loadAll(){
-  const [attR,expR,msgR,batR,salR,payStR,attReqR]=await Promise.all([
+  const [attR,expR,msgR,batR,salR,payStR,attReqR,prSumR]=await Promise.all([
     SB.from('attendance').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
     SB.from('expenses').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
     SB.from('messages').select('*').eq('employee_id',emp.id).order('created_at'),
     SB.from('expense_batches').select('*').eq('employee_id',emp.id).order('submitted_at',{ascending:false}),
     SB.from('salary_history').select('*').eq('employee_id',emp.id).order('effective_from',{ascending:false}),
     SB.from('payment_status').select('*').eq('employee_id',emp.id),
-    SB.from('attendance_requests').select('*').eq('employee_id',emp.id).order('date',{ascending:false})
+    SB.from('attendance_requests').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
+    SB.from('payroll_summary').select('*').eq('employee_id',emp.id)
   ]);
   myAtt=attR.data||[];
   myExp=expR.data||[];
   myMsgs=msgR.data||[];
   myBatches=batR.error?[]:batR.data||[];
   mySalHist=salR.error?[]:salR.data||[];
+  myPayroll=prSumR.error?[]:prSumR.data||[];
   myPaySt=payStR.error?[]:payStR.data||[];
   myAttReqs=attReqR.error?[]:attReqR.data||[];
   updateBadges();
@@ -1144,29 +1079,23 @@ function renderHome(){
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
   const mRecs=myAtt.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;});
   const activeR=mRecs.filter(r=>isP(r.status));
-  let base=0,ot=0;
-  activeR.forEach(r=>{const p=calcPay(emp,r);base+=p.base;ot+=p.ot;});
-  const bonus=mRecs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-  // Add expenses to total
-  const mExpAll=myExp.filter(function(e){
-    var d=new Date(e.date+'T00:00:00');
-    return d.getMonth()===m&&d.getFullYear()===y&&(e.merchant||e.description||(e.amount&&parseFloat(e.amount)!==0));
-  });
-  const mExpNetTotal=mExpAll.reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
-  const total=base+ot+bonus+mExpNetTotal;
+  const pr=myPayroll.find(p=>p.month===m&&p.year===y);
+  const base=pr?parseFloat(pr.base_pay)||0:0;
+  const ot=pr?parseFloat(pr.overtime_pay)||0:0;
+  const bonus=pr?parseFloat(pr.bonus_pay)||0:0;
+  const mExpNetTotal=pr?parseFloat(pr.expense_total)||0:0;
+  const total=pr?parseFloat(pr.net_pay)||0:0;
   const days=dim(y,m);
-  const wD=Array.from({length:days},(_,i)=>new Date(y,m,i+1).getDay()!==0).filter(Boolean).length;
-  const pres=activeR.filter(r=>new Date(r.date+'T00:00:00').getDay()!==0).length;
+  const wD=pr?(pr.working_days||0):Array.from({length:days},(_,i)=>new Date(y,m,i+1).getDay()!==0).filter(Boolean).length;
+  const pres=pr?(pr.present_days||0):activeR.filter(r=>new Date(r.date+'T00:00:00').getDay()!==0).length;
   const pct=wD>0?Math.round(pres/wD*100):0;
-  const hrs=mRecs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
-  const otHrs=mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
+  const hrs=pr?parseFloat(pr.total_hours)||0:mRecs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
+  const otHrs=pr?parseFloat(pr.overtime_hours)||0:mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
 
   document.getElementById('hmMonth').textContent=MONTHS[m]+' '+y;
-  document.getElementById('hmAmount').textContent=fmt(total);
-  document.getElementById('hmBase').textContent=fmt(base);
-  // Show OT hours for all, with pay if >0
-  const otHrs2=mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
-  document.getElementById('hmOT').textContent=ot>0?fmt(ot):(otHrs2>0?otHrs2.toFixed(1)+'h':'£0.00');
+  document.getElementById('hmAmount').textContent=pr?fmt(total):'—';
+  document.getElementById('hmBase').textContent=pr?fmt(base):'—';
+  document.getElementById('hmOT').textContent=pr?(ot>0?fmt(ot):(otHrs>0?otHrs.toFixed(1)+'h':fmt(0))):'—';
   // Bonus: only show if employee has any bonus ever
   const lifetimeBonus=myAtt.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
   const bonusEl=document.getElementById('hmBonusWrap');
@@ -1177,7 +1106,10 @@ function renderHome(){
   var expWrap=document.getElementById('hmExpWrap');
   var expAmtEl=document.getElementById('hmExpAmt');
   var subEl=document.getElementById('hmPaySub');
-  if(mExpNetTotal!==0&&expWrap&&expAmtEl){
+  if(!pr){
+    if(expWrap)expWrap.style.display='none';
+    if(subEl)subEl.textContent='Pay estimate not calculated yet · check later';
+  } else if(mExpNetTotal!==0&&expWrap&&expAmtEl){
     expWrap.style.display='';
     expAmtEl.textContent=fmt(mExpNetTotal);
     expAmtEl.style.color=mExpNetTotal<0?'var(--red)':'var(--tel)';
@@ -1601,46 +1533,50 @@ async function toggleFlag(id){
 // ── PAY ──
 function renderPay(){
   const m=payM,y=payY;
-  const mRecs=myAtt.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;});
-  const mExp=myExp.filter(e=>{
-    const d=new Date(e.date+'T00:00:00');
-    if(d.getMonth()!==m||d.getFullYear()!==y)return false;
-    // Skip blank rows (no merchant AND no amount AND no description)
-    if(!e.merchant&&!e.description&&(!e.amount||parseFloat(e.amount)===0))return false;
-    return true;
-  });
-  const activeR=mRecs.filter(r=>isP(r.status));
-  let base=0,ot=0;
-  activeR.forEach(r=>{const p=calcPay(emp,r);base+=p.base;ot+=p.ot;});
-  const bonus=mRecs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-  const expTotal=mExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
-  // Add expenses to total
-  const mExpAll=myExp.filter(function(e){
-    var d=new Date(e.date+'T00:00:00');
-    return d.getMonth()===m&&d.getFullYear()===y&&(e.merchant||e.description||(e.amount&&parseFloat(e.amount)!==0));
-  });
-  const mExpNetTotal=mExpAll.reduce(function(s,e){return s+(parseFloat(e.amount)||0);},0);
-  const total=base+ot+bonus+mExpNetTotal;
-  const lifetimeBonus=myAtt.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-  const days=dim(y,m);
-  const wD=Array.from({length:days},(_,i)=>new Date(y,m,i+1).getDay()!==0).filter(Boolean).length;
-  const pres=activeR.filter(r=>new Date(r.date+'T00:00:00').getDay()!==0).length;
-  const pct=wD>0?Math.round(pres/wD*100):0;
-  const hrs=mRecs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
-  const otHrs=mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
+  const pr=myPayroll.find(p=>p.month===m&&p.year===y);
 
-  // Payment status - clean Paid/Pending display
-  const payStM=myPaySt.find(p=>p.month===m&&p.year===y);
-  const bankAmt=parseFloat(emp.bank_amt)||0;
-  const cashAmt=Math.max(0,total-bankAmt);
+  if(!pr){
+    document.getElementById('payCards').innerHTML=`
+      <div class="sal-card">
+        <div class="sal-month">${MONTHS[m]} ${y}</div>
+        <div class="sal-amount" style="font-size:18px;color:var(--txtm);">—</div>
+        <div class="sal-sub">Pay estimate not calculated yet.<br>Please check later.</div>
+      </div>`;
+    document.getElementById('payHistory').innerHTML='<div class="empty-s"><i class="fa-solid fa-clock-rotate-left"></i><p>No payments recorded yet</p></div>';
+    document.getElementById('lifetimeStats').innerHTML='';
+    return;
+  }
+
+  const isLocked=!!pr.locked||pr.status==='final';
+  const total=parseFloat(pr.net_pay)||0;
+  const base=parseFloat(pr.base_pay)||0;
+  const ot=parseFloat(pr.overtime_pay)||0;
+  const otHrs=parseFloat(pr.overtime_hours)||0;
+  const bonus=parseFloat(pr.bonus_pay)||0;
+  const expTotal=parseFloat(pr.expense_total)||0;
+  const grossPay=parseFloat(pr.gross_pay)||0;
+  const deduction=parseFloat(pr.deduction_total)||0;
+  const pres=pr.present_days||0;
+  const wD=pr.working_days||0;
+  const hrs=parseFloat(pr.total_hours)||0;
+  const pct=wD>0?Math.round(pres/wD*100):0;
+
+  // "Last updated" time
+  let lastUpdated='';
+  if(pr.calculated_at){
+    const dt=new Date(pr.calculated_at);
+    lastUpdated=dt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  }
+
+  // Payment status
+  const bankAmt=parseFloat(pr.bank_amount)||0;
+  const cashAmt=parseFloat(pr.cash_amount)||0;
+  const totalPaid=(pr.bank_paid?bankAmt:0)+(pr.cash_paid?cashAmt:0);
+  const pending=Math.max(0,total-totalPaid);
+  const allDone=total>0&&pending<0.01;
   let payStatusHtml='';
   if(total>0){
-    if(payStM&&(payStM.bank_paid||payStM.cash_paid)){
-      const paidB=payStM.bank_paid?(payStM.bank_custom!=null?parseFloat(payStM.bank_custom):bankAmt):0;
-      const paidC=payStM.cash_paid?(payStM.cash_custom!=null?parseFloat(payStM.cash_custom):cashAmt):0;
-      const totalPaid=paidB+paidC;
-      const pending=Math.max(0,total-totalPaid);
-      const allDone=pending<0.01;
+    if(pr.bank_paid||pr.cash_paid){
       payStatusHtml=`<div style="background:${allDone?'var(--grnl)':'#fffbeb'};border:1px solid ${allDone?'rgba(22,163,74,0.2)':'rgba(217,119,6,0.2)'};border-radius:var(--r);padding:14px 15px;margin-bottom:12px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:${pending>0?'10px':'0'};">
           <i class="fa-solid fa-${allDone?'circle-check':'clock'}" style="color:${allDone?'var(--grn)':'var(--amb)'};font-size:20px;flex-shrink:0;"></i>
@@ -1661,76 +1597,68 @@ function renderPay(){
     }
   }
 
+  const lockedBadge=isLocked?`<div style="display:inline-flex;align-items:center;gap:5px;background:var(--grnl);color:var(--grn);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:6px;"><i class="fa-solid fa-lock"></i>Final Pay — locked</div>`:'';
+  const lastUpdatedHtml=!isLocked&&lastUpdated?`<div style="font-size:11px;color:var(--txtm);margin-top:4px;">Last updated: ${lastUpdated}</div>`:'';
+
   document.getElementById('payCards').innerHTML=`
     <div class="sal-card">
+      ${lockedBadge}
       <div class="sal-month">${MONTHS[m]} ${y}</div>
       <div class="sal-amount">${fmt(total)}</div>
-      <div class="sal-sub">Estimated · Tax &amp; NI not included</div>
+      <div class="sal-sub">${isLocked?'Final pay':'Estimated'} · Tax &amp; NI not included</div>
+      ${lastUpdatedHtml}
       <div class="sal-grid">
         <div class="sal-it"><div class="sal-it-l">Base</div><div class="sal-it-v">${fmt(base)}</div></div>
-        <div class="sal-it"><div class="sal-it-l">Overtime</div><div class="sal-it-v">${ot>0?fmt(ot):(otHrs>0?otHrs.toFixed(1)+'h':'£0.00')}</div></div>
-        ${lifetimeBonus>0?`<div class="sal-it"><div class="sal-it-l">Bonus</div><div class="sal-it-v">${fmt(bonus)}</div></div>`:''}
+        <div class="sal-it"><div class="sal-it-l">Overtime</div><div class="sal-it-v">${ot>0?fmt(ot):(otHrs>0?otHrs.toFixed(1)+'h':fmt(0))}</div></div>
+        ${bonus>0?`<div class="sal-it"><div class="sal-it-l">Bonus</div><div class="sal-it-v">${fmt(bonus)}</div></div>`:''}
         <div class="sal-it"><div class="sal-it-l">Expenses</div><div class="sal-it-v">${fmt(expTotal)}</div></div>
+        <div class="sal-it"><div class="sal-it-l">Gross Pay</div><div class="sal-it-v">${fmt(grossPay)}</div></div>
+        <div class="sal-it"><div class="sal-it-l">Net Pay</div><div class="sal-it-v">${fmt(total)}</div></div>
       </div>
+      ${deduction>0?`<div style="margin-top:8px;font-size:11px;color:var(--red);">−${fmt(deduction)} short-hours deduction</div>`:''}
     </div>
     ${payStatusHtml}
     <div class="card"><div class="card-b">
-      ${(()=>{const suns=activeR.filter(r=>new Date(r.date+'T00:00:00').getDay()===0);return suns.length?`<div class="row-div" style="background:var(--ambl);border-radius:8px;padding:8px 11px;margin:4px 0;"><span style="font-weight:600;color:var(--amb);">Sundays Worked ☀️</span><strong style="color:var(--amb);">${suns.length} day${suns.length>1?'s':''}</strong></div>`:'';})()}
-      <div class="row-div"><span>Weekdays Present</span><strong>${pres}/${wD}</strong></div>
+      <div class="row-div"><span>Present Days</span><strong>${pres}/${wD}</strong></div>
       <div class="row-div"><span>Attendance Rate</span><strong style="color:${pct>=80?'var(--grn)':pct>=60?'var(--amb)':'var(--red)'};">${pct}%</strong></div>
       <div class="row-div"><span>Total Hours</span><strong>${hrs.toFixed(1)}h</strong></div>
       <div class="row-div"><span>Overtime Hours</span><strong style="color:var(--amb);">${otHrs.toFixed(1)}h</strong></div>
-      ${lifetimeBonus>0&&bonus>0?`<div class="row-div" style="background:var(--grnl);border-radius:8px;padding:9px 11px;margin:5px 0;"><span style="font-weight:700;color:var(--grn);">Bonus this month</span><strong style="color:var(--grn);">${fmt(bonus)}</strong></div>`:''}
+      ${bonus>0?`<div class="row-div" style="background:var(--grnl);border-radius:8px;padding:9px 11px;margin:5px 0;"><span style="font-weight:700;color:var(--grn);">Bonus this month</span><strong style="color:var(--grn);">${fmt(bonus)}</strong></div>`:''}
     </div></div>`;
 
-  // Pay history - show each month that has been paid with running balance
-  const allPaidMonths=myPaySt.filter(p=>p.bank_paid||p.cash_paid).sort((a,b)=>b.year-a.year||b.month-a.month);
-  if(allPaidMonths.length>0){
-    // Calculate each month's total
+  // Pay history — list locked/paid months from payroll_summary, newest first
+  const histMonths=myPayroll.filter(p=>(p.locked||p.bank_paid||p.cash_paid)&&!(p.month===m&&p.year===y&&!p.locked&&!p.bank_paid&&!p.cash_paid))
+    .sort((a,b)=>b.year-a.year||b.month-a.month);
+  if(histMonths.length>0){
     let runningTotal=0;
-    const rows=allPaidMonths.map(ps=>{
-      const mR=myAtt.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===ps.month&&d.getFullYear()===ps.year;});
-      const mE=myExp.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===ps.month&&d.getFullYear()===ps.year;});
-      const aR=mR.filter(r=>isP(r.status));
-      let mb=0,mot=0;
-      if(emp.pay_type==='fixed')mb=parseFloat(emp.salary)||0;
-      else aR.forEach(r=>{const p=calcPay(emp,r);mb+=p.base;mot+=p.ot;});
-      const mBonus=mR.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-      const mTotal=mb+mot+mBonus;
-      const paidB=ps.bank_paid?(ps.bank_custom!=null?parseFloat(ps.bank_custom):(parseFloat(emp.bank_amt)||0)):0;
-      const paidC=ps.cash_paid?(ps.cash_custom!=null?parseFloat(ps.cash_custom):Math.max(0,mTotal-(parseFloat(emp.bank_amt)||0))):0;
-      const paid=paidB+paidC;
+    const rows=histMonths.map(ps=>{
+      const psBank=parseFloat(ps.bank_amount)||0;
+      const psCash=parseFloat(ps.cash_amount)||0;
+      const paid=(ps.bank_paid?psBank:0)+(ps.cash_paid?psCash:0);
       runningTotal+=paid;
       const isThisMonth=ps.month===m&&ps.year===y;
-      return`<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:0.5px solid var(--bdr);${isThisMonth?'background:var(--accl);border-radius:9px;padding:11px 10px;margin:3px 0;':''}">
+      return `<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:0.5px solid var(--bdr);${isThisMonth?'background:var(--accl);border-radius:9px;padding:11px 10px;margin:3px 0;':''}">
         <div style="width:36px;height:36px;border-radius:10px;background:${isThisMonth?'var(--acc)':'var(--grnl)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <i class="fa-solid fa-check" style="color:${isThisMonth?'#fff':'var(--grn)'};font-size:13px;"></i>
+          <i class="fa-solid fa-${ps.locked?'lock':'check'}" style="color:${isThisMonth?'#fff':'var(--grn)'};font-size:13px;"></i>
         </div>
         <div style="flex:1;">
           <div style="font-size:13px;font-weight:700;${isThisMonth?'color:var(--acc);':''}">${MONTHS[ps.month]} ${ps.year}</div>
-          <div style="font-size:11px;color:var(--txtm);">${aR.filter(r=>new Date(r.date+'T00:00:00').getDay()!==0).length} days worked</div>
+          <div style="font-size:11px;color:var(--txtm);">${ps.present_days||0} days worked${ps.locked?' · final':''}</div>
         </div>
         <div style="text-align:right;">
-          <div style="font-size:14px;font-weight:800;color:var(--grn);">${fmt(paid)}</div>
-          <div style="font-size:10px;color:var(--txtm);">Running: ${fmt(runningTotal)}</div>
+          <div style="font-size:14px;font-weight:800;color:var(--grn);">${fmt(paid>0?paid:(parseFloat(ps.net_pay)||0))}</div>
+          ${paid>0?`<div style="font-size:10px;color:var(--txtm);">Running: ${fmt(runningTotal)}</div>`:''}
         </div>
       </div>`;
     }).join('');
-    const grandTotal=allPaidMonths.reduce((s,ps)=>{
-      const mR=myAtt.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===ps.month&&d.getFullYear()===ps.year;});
-      const aR=mR.filter(r=>isP(r.status));
-      let mb=0,mot=0;
-      if(emp.pay_type==='fixed')mb=parseFloat(emp.salary)||0;
-      else aR.forEach(r=>{const p=calcPay(emp,r);mb+=p.base;mot+=p.ot;});
-      const mBonus=mR.reduce((s2,r)=>s2+(parseFloat(r.bonus)||0),0);
-      const mTotal=mb+mot+mBonus;
-      const paidB=ps.bank_paid?(ps.bank_custom!=null?parseFloat(ps.bank_custom):(parseFloat(emp.bank_amt)||0)):0;
-      const paidC=ps.cash_paid?(ps.cash_custom!=null?parseFloat(ps.cash_custom):Math.max(0,mTotal-(parseFloat(emp.bank_amt)||0))):0;
-      return s+paidB+paidC;
+    const grandTotal=histMonths.reduce((s,ps)=>{
+      const psBank=parseFloat(ps.bank_amount)||0;
+      const psCash=parseFloat(ps.cash_amount)||0;
+      return s+(ps.bank_paid?psBank:0)+(ps.cash_paid?psCash:0);
     },0);
     document.getElementById('payHistory').innerHTML=`<div class="card"><div class="card-b">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0 13px;border-bottom:1px solid var(--bdr);margin-bottom:4px;">
-        <div style="font-size:12px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:0.05em;">${allPaidMonths.length} months paid</div>
+        <div style="font-size:12px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:0.05em;">${histMonths.length} month${histMonths.length>1?'s':''}</div>
         <div style="font-size:15px;font-weight:800;color:var(--grn);">Total: ${fmt(grandTotal)}</div>
       </div>
       ${rows}
@@ -1739,15 +1667,24 @@ function renderPay(){
     document.getElementById('payHistory').innerHTML='<div class="empty-s"><i class="fa-solid fa-clock-rotate-left"></i><p>No payments recorded yet</p></div>';
   }
 
-  // Lifetime
+  // Lifetime stats — sum across all payroll_summary rows
   let lt={days:0,hrs:0,ot:0,bonus:0,total:0};
-  myAtt.forEach(r=>{if(isP(r.status)){lt.days++;lt.hrs+=parseFloat(r.hours)||0;const cp=calcPay(emp,r);lt.total+=cp.base+cp.ot;}lt.ot+=parseFloat(r.overtime)||0;lt.bonus+=parseFloat(r.bonus)||0;});
+  myPayroll.forEach(p=>{
+    lt.days+=p.present_days||0;
+    lt.hrs+=parseFloat(p.total_hours)||0;
+    lt.ot+=parseFloat(p.overtime_hours)||0;
+    lt.bonus+=parseFloat(p.bonus_pay)||0;
+    const pBank=parseFloat(p.bank_amount)||0;
+    const pCash=parseFloat(p.cash_amount)||0;
+    lt.total+=(p.bank_paid?pBank:0)+(p.cash_paid?pCash:0);
+  });
   document.getElementById('lifetimeStats').innerHTML=`
     <div class="row-div"><span>Total Days Worked</span><strong>${lt.days}</strong></div>
     <div class="row-div"><span>Total Hours</span><strong>${lt.hrs.toFixed(0)}h</strong></div>
     ${lt.ot>0?`<div class="row-div"><span>Total OT Hours</span><strong style="color:var(--amb);">${lt.ot.toFixed(0)}h</strong></div>`:''}
     ${lt.bonus>0?`<div class="row-div" style="background:var(--grnl);border-radius:8px;padding:8px 11px;margin-top:4px;"><span style="font-weight:600;color:var(--grn);">Total Bonuses Received</span><strong style="color:var(--grn);">${fmt(lt.bonus)}</strong></div>`:''}`;
 }
+
 
 // ── MESSAGES ──
 async function renderMsgs(){
