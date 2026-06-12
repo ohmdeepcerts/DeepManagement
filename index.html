@@ -98,6 +98,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .admin-pill-open{border-color:var(--acc)!important;}
 .thm-tog{display:flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--bdr);border-radius:20px;padding:3px 9px;cursor:pointer;}
 .thm-tog i{font-size:11px;color:var(--txtm);}
+#hardRefreshBtn:hover{background:var(--card2);color:var(--acc);border-color:var(--acc);}
+#hardRefreshBtn:disabled{opacity:0.6;cursor:default;}
 .tog-sw{width:28px;height:15px;background:#cbd5e1;border-radius:8px;position:relative;transition:var(--tr);}
 [data-theme=dark] .tog-sw{background:#3b82f6;}
 .tog-sw::after{content:'';position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#fff;transition:var(--tr);}
@@ -580,6 +582,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <div class="tb-right">
       <span class="pg-title" id="pgTitle">DASHBOARD</span>
       <div class="thm-tog" onclick="toggleTheme()"><i class="fa-solid fa-sun"></i><div class="tog-sw"></div><i class="fa-solid fa-moon"></i></div>
+      <button id="hardRefreshBtn" onclick="hardRefresh()" title="Refresh data from Supabase" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--bdr);background:var(--card);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:var(--tr);"><i class="fa-solid fa-rotate-right"></i></button>
       <div class="sync saved" id="syncBadge"><i class="fa-solid fa-circle-check"></i><span id="syncTxt">Ready</span></div>
       <!-- ADMIN DROPDOWN -->
       <div style="position:relative;">
@@ -931,7 +934,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
               <button class="np-seg-btn" onclick="shiftPayroll(12)"><i class="fa-solid fa-chevron-right"></i></button>
             </div>
           </div>
-          <select id="prMonth" style="display:none;"></select><select id="prYear" style="display:none;"></select><button class="btn btn-s btn-sm" onclick="exportPayrollCSV()"><i class="fa-solid fa-file-csv"></i>CSV</button><button class="btn btn-o btn-sm" onclick="window.print()"><i class="fa-solid fa-print"></i>Print</button><button class="btn btn-o btn-sm" id="lockBtn" onclick="togglePayrollLock()"><i class="fa-solid fa-lock"></i>Lock</button></div></div>
+          <select id="prMonth" style="display:none;"></select><select id="prYear" style="display:none;"></select><button class="btn btn-s btn-sm" onclick="exportPayrollCSV()"><i class="fa-solid fa-file-csv"></i>CSV</button><button class="btn btn-o btn-sm" onclick="window.print()"><i class="fa-solid fa-print"></i>Print</button><button class="btn btn-o btn-sm" id="recalcBtn" onclick="recalcPayrollBtn()"><i class="fa-solid fa-arrows-rotate"></i>Recalculate</button><button class="btn btn-o btn-sm" id="lockBtn" onclick="togglePayrollLock()"><i class="fa-solid fa-lock"></i>Lock</button></div></div>
       <div id="prLockBanner" style="display:none;" class="lkd-b"><i class="fa-solid fa-lock"></i><span id="prLockTxt">Locked</span></div>
       <div class="cr cr4" id="prStats"></div>
       <div class="card"><div class="ch"><div class="ct" id="prTitle">Payroll</div><div class="cs">Expenses auto-pulled from ledger · OT & bonus per day</div></div><div class="ts" id="prTable"></div></div>
@@ -1487,6 +1490,183 @@ function calcPay(emp,rec){
   return{base:basePay,ot:otPay,total:basePay+otPay};
 }
 
+// ════════════════════════════════════════════════════════════
+// PAYROLL SUMMARY ENGINE — single source of truth for pay calcs
+// Saved to Supabase table 'payroll_summary' (one row per emp/month/year)
+// ════════════════════════════════════════════════════════════
+
+let payrollSummaries=[]; // cache loaded from Supabase
+
+function isPayrollLocked(month,year){
+  const row=payrollSummaries.find(p=>p.month===month&&p.year===year&&p.employee_id);
+  // Locked if cfg.locked_months has the key (legacy) OR any payroll_summary row for this month is locked
+  if((cfg.locked_months||[]).includes(`${year}_${month}`))return true;
+  return payrollSummaries.some(p=>p.month===month&&p.year===year&&p.locked);
+}
+
+function calculatePayrollForEmployeeMonth(employeeId,month,year){
+  const emp=employees.find(e=>e.id===employeeId);
+  if(!emp)return null;
+  const pt=emp.pay_type||'hourly';
+  const mRecs=attendance.filter(r=>{
+    if(r.employee_id!==employeeId)return false;
+    const d=new Date(r.date+'T00:00:00');
+    return d.getMonth()===month&&d.getFullYear()===year;
+  });
+  const aR=mRecs.filter(r=>isP(r.status));
+  const totalHours=mRecs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
+  const overtimeHours=mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
+  const presentDays=aR.length;
+  const workingDays=workDaysInMonth(emp,year,month);
+  const bonusPay=mRecs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
+
+  // Base + OT via calcPay (per-day, handles short-hour deductions + historical rates)
+  let basePay=0,overtimePay=0;
+  aR.forEach(r=>{const p=calcPay(emp,r);basePay+=p.base;overtimePay+=p.ot;});
+  basePay=parseFloat(basePay.toFixed(2));
+  overtimePay=parseFloat(overtimePay.toFixed(2));
+
+  // Expected (full-hours) base for deduction calculation
+  let expectedBase=basePay;
+  if(emp.contracted_hours&&(pt==='daily'||pt==='fixed')){
+    const ch=parseFloat(emp.contracted_hours)||8;
+    if(pt==='daily'){
+      const rate=getRateForDate(emp,'daily',dateKey(new Date(year,month,1)));
+      expectedBase=aR.length*rate;
+    } else if(pt==='fixed'){
+      const rate=getRateForDate(emp,'fixed',dateKey(new Date(year,month,1)));
+      const dailyEq=workingDays>0?rate/workingDays:0;
+      expectedBase=aR.length*dailyEq;
+    }
+  } else if(pt==='hourly'&&emp.contracted_hours&&emp.hourly_rate){
+    const ch=parseFloat(emp.contracted_hours)||8;
+    const rate=getRateForDate(emp,'hourly',dateKey(new Date(year,month,1)));
+    expectedBase=aR.length*ch*rate;
+  }
+  const deductionTotal=Math.max(0,parseFloat((expectedBase-basePay).toFixed(2)));
+  const grossPay=parseFloat((expectedBase+overtimePay+bonusPay).toFixed(2));
+
+  // Expenses (approved only, matches ledger totals)
+  const empExp=expenses.filter(e=>{
+    if(e.employee_id!==employeeId)return false;
+    const d=new Date(e.date+'T00:00:00');
+    return d.getMonth()===month&&d.getFullYear()===year;
+  });
+  const expenseTotal=parseFloat(empExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0).toFixed(2));
+
+  const netPay=parseFloat((basePay+overtimePay+bonusPay+expenseTotal).toFixed(2));
+
+  // Bank / cash split
+  const bankAmt=Math.min(parseFloat(emp.bank_amt)||0,netPay);
+  const cashAmt=Math.max(0,parseFloat((netPay-bankAmt).toFixed(2)));
+
+  // Payment status cache
+  const psKey=`${employeeId}_${month}_${year}`;
+  const ps=paymentStatuses[psKey]||{};
+
+  return{
+    employee_id:employeeId,
+    month,year,
+    base_pay:basePay,
+    overtime_pay:overtimePay,
+    bonus_pay:parseFloat(bonusPay.toFixed(2)),
+    expense_total:expenseTotal,
+    deduction_total:deductionTotal,
+    gross_pay:grossPay,
+    net_pay:netPay,
+    total_hours:parseFloat(totalHours.toFixed(2)),
+    overtime_hours:parseFloat(overtimeHours.toFixed(2)),
+    present_days:presentDays,
+    working_days:workingDays,
+    bank_amount:parseFloat(bankAmt.toFixed(2)),
+    cash_amount:cashAmt,
+    bank_paid:!!ps.bank_paid,
+    cash_paid:!!ps.cash_paid
+  };
+}
+
+async function savePayrollSummary(employeeId,month,year,opts){
+  opts=opts||{};
+  // Don't overwrite a locked/final row unless explicitly forced (e.g. by Lock/Unlock actions)
+  const existing=payrollSummaries.find(p=>p.employee_id===employeeId&&p.month===month&&p.year===year);
+  if(existing&&existing.locked&&!opts.force){
+    return existing; // skip silently — locked months are frozen
+  }
+  const calc=calculatePayrollForEmployeeMonth(employeeId,month,year);
+  if(!calc)return null;
+  const row={
+    ...calc,
+    status:opts.status||(existing?existing.status:'draft'),
+    locked:opts.locked!=null?opts.locked:(existing?existing.locked:false),
+    calculated_at:new Date().toISOString(),
+    calculation_version:(existing?.calculation_version||0)+1
+  };
+  const r=await sb.from('payroll_summary').upsert(row,{onConflict:'employee_id,month,year'}).select().single();
+  if(r.error){console.error('payroll_summary upsert error:',r.error);return null;}
+  const idx=payrollSummaries.findIndex(p=>p.employee_id===employeeId&&p.month===month&&p.year===year);
+  if(idx>=0)payrollSummaries[idx]=r.data;else payrollSummaries.push(r.data);
+  return r.data;
+}
+
+// Recalculate one employee's payroll for one month — call after attendance/expense/salary changes
+async function recalcEmployeeMonth(employeeId,month,year){
+  return await savePayrollSummary(employeeId,month,year);
+}
+
+// Recalculate every month from a given date through the current month for one employee
+async function recalcMonthsFrom(employeeId,fromDateStr){
+  const from=new Date(fromDateStr+'T00:00:00');
+  const now=new Date();
+  let y=from.getFullYear(),m=from.getMonth();
+  const endY=now.getFullYear(),endM=now.getMonth();
+  let guard=0;
+  while((y<endY||(y===endY&&m<=endM))&&guard<36){
+    await recalcEmployeeMonth(employeeId,m,y);
+    m++;if(m>11){m=0;y++;}
+    guard++;
+  }
+}
+// Recalculate every active employee for a given month — manual "Recalculate Whole Month" button
+async function recalcWholeMonth(month,year){
+  const emps=employees.filter(e=>e.status==='Active');
+  setSyncStatus('saving');
+  for(const emp of emps){
+    await savePayrollSummary(emp.id,month,year);
+  }
+  setSyncStatus('saved');
+}
+
+// Lock a month: marks all employees' payroll_summary rows for that month as final+locked
+async function lockPayrollMonth(month,year){
+  const emps=employees.filter(e=>e.status==='Active');
+  setSyncStatus('saving');
+  for(const emp of emps){
+    await savePayrollSummary(emp.id,month,year,{status:'final',locked:true,force:true});
+  }
+  // Keep legacy cfg.locked_months in sync so existing UI checks still work
+  const key=`${year}_${month}`;
+  const locks=[...(cfg.locked_months||[])];
+  if(!locks.includes(key)){locks.push(key);await sbUpsertSettings({locked_months:locks});}
+  setSyncStatus('saved');
+}
+
+// Unlock a month: marks payroll_summary rows back to draft so they can be recalculated
+async function unlockPayrollMonth(month,year){
+  const emps=employees.filter(e=>e.status==='Active');
+  setSyncStatus('saving');
+  for(const emp of emps){
+    const existing=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===month&&p.year===year);
+    if(existing){
+      await savePayrollSummary(emp.id,month,year,{status:'draft',locked:false,force:true});
+    }
+  }
+  const key=`${year}_${month}`;
+  const locks=(cfg.locked_months||[]).filter(k=>k!==key);
+  await sbUpsertSettings({locked_months:locks});
+  setSyncStatus('saved');
+}
+
+
 // ═══════════════════════════════════════════════════
 // AUTH — SIMPLE ADMIN PIN
 // ═══════════════════════════════════════════════════
@@ -1538,6 +1718,61 @@ async function changePin(){
 // ═══════════════════════════════════════════════════
 // DATA LOADING
 // ═══════════════════════════════════════════════════
+async function hardRefresh(){
+  const btn=document.getElementById('hardRefreshBtn');
+  if(btn){btn.disabled=true;btn.querySelector('i').classList.add('fa-spin');}
+  toast('Refreshing data from Supabase...','i');
+  try{
+    await loadAllDataSilent();
+    // Re-render whichever page is currently open (without forcing navigation to dashboard)
+    const page=currentPage||'dashboard';
+    navigate(page);
+    updateBadges();
+    toast('Data refreshed','s');
+  }catch(e){
+    console.error('Hard refresh error:',e);
+    toast('Refresh failed: '+e.message,'e');
+  }finally{
+    if(btn){btn.disabled=false;btn.querySelector('i').classList.remove('fa-spin');}
+  }
+}
+async function loadAllDataSilent(){
+  // Same as loadAllData but does NOT call navigate('dashboard') — used by hardRefresh to preserve current page
+  const [empR,cfgR,attR,expR,batR,msgR]=await Promise.all([
+    sb.from('employees').select('*').order('name'),
+    sb.from('settings').select('*').eq('id',1).single(),
+    sb.from('attendance').select('*').order('date',{ascending:false}),
+    sb.from('expenses').select('*').order('date',{ascending:false}),
+    sb.from('expense_batches').select('*').order('submitted_at',{ascending:false}),
+    sb.from('messages').select('*').order('created_at')
+  ]);
+  if(empR.error)throw empR.error;
+  employees=empR.data||[];
+  cfg=cfgR.data||{};
+  attendance=attR.data||[];
+  expenses=expR.data||[];
+  batches=batR.data||[];
+  messages=msgR.data||[];
+
+  const [docR,salR,payR,attReqR,prSumR]=await Promise.all([
+    sb.from('employee_documents').select('*').order('uploaded_at',{ascending:false}),
+    sb.from('salary_history').select('*').order('effective_from',{ascending:false}),
+    sb.from('payment_status').select('*'),
+    sb.from('attendance_requests').select('*').order('created_at',{ascending:false}),
+    sb.from('payroll_summary').select('*')
+  ]);
+  payrollSummaries=prSumR.error?[]:prSumR.data||[];
+  employeeDocuments=docR.error?[]:docR.data||[];
+  salaryHistory=salR.error?[]:salR.data||[];
+  attRequests=attReqR.error?[]:attReqR.data||[];
+  paymentStatuses={};
+  if(!payR.error)(payR.data||[]).forEach(row=>{
+    paymentStatuses[`${row.employee_id}_${row.month}_${row.year}`]={
+      bank_paid:row.bank_paid,cash_paid:row.cash_paid,
+      paid_at:row.paid_at,bank_custom:row.bank_custom,cash_custom:row.cash_custom
+    };
+  });
+}
 async function loadAllData(){
   setSyncStatus('saving');
   try{
@@ -1559,15 +1794,17 @@ async function loadAllData(){
     messages=msgR.data||[];
 
     // Optional tables - fail gracefully if not created yet
-    const [docR,salR,payR,attReqR]=await Promise.all([
+    const [docR,salR,payR,attReqR,prSumR]=await Promise.all([
       sb.from('employee_documents').select('*').order('uploaded_at',{ascending:false}),
       sb.from('salary_history').select('*').order('effective_from',{ascending:false}),
       sb.from('payment_status').select('*'),
-      sb.from('attendance_requests').select('*').order('created_at',{ascending:false})
+      sb.from('attendance_requests').select('*').order('created_at',{ascending:false}),
+      sb.from('payroll_summary').select('*')
     ]);
     employeeDocuments=docR.error?[]:docR.data||[];
     salaryHistory=salR.error?[]:salR.data||[];
     attRequests=attReqR.error?[]:attReqR.data||[];
+    payrollSummaries=prSumR.error?[]:prSumR.data||[];
     // Pre-load payment statuses into cache
     if(!payR.error)(payR.data||[]).forEach(row=>{
       paymentStatuses[`${row.employee_id}_${row.month}_${row.year}`]={
@@ -2224,11 +2461,14 @@ async function saveAttSilent(){
   // Update local state
   results.forEach(r=>{if(!r.data)return;const idx=attendance.findIndex(a=>a.employee_id===r.data.employee_id&&a.date===r.data.date);if(idx>=0)attendance[idx]=r.data;else attendance.push(r.data);});
   setSyncStatus('saved');
+  // Auto-recalc payroll for each affected employee's month
+  const affMonth=markDate.getMonth(),affYear=markDate.getFullYear();
+  results.forEach(r=>{if(r.data)recalcEmployeeMonth(r.data.employee_id,affMonth,affYear);});
 }
 async function saveAllAttendance(){
   const isLocked=(cfg.locked_months||[]).includes(`${markDate.getFullYear()}_${markDate.getMonth()}`);
   if(isLocked){toast(`${MONTHS[markDate.getMonth()]} ${markDate.getFullYear()} is locked`,'e');return;}
-  const key=dateKey(markDate);const toSave=[];
+  const key=dateKey(markDate);const toSave=[];const clearedEmpIds=[];
   document.querySelectorAll('#markBody tr').forEach(row=>{
     const empId=row.querySelector('[data-eid]')?.dataset.eid;if(!empId)return;
     const g=f=>row.querySelector(`[data-f="${f}"]`)?.value||null;
@@ -2240,6 +2480,7 @@ async function saveAllAttendance(){
         sb.from('attendance').delete().eq('id',existRec.id).then(()=>{
           attendance=attendance.filter(a=>a.id!==existRec.id);
         });
+        clearedEmpIds.push(empId);
       }
       return;
     }
@@ -2247,13 +2488,17 @@ async function saveAllAttendance(){
     const h=g('hours'),ot=g('overtime');
     toSave.push({employee_id:empId,date:key,status,sign_in:g('sign_in')||null,sign_out:g('sign_out')||null,hours:h?parseFloat(h):null,overtime:ot?parseFloat(ot):null,bonus:g('bonus')?parseFloat(g('bonus')):null,jobs:g('jobs')?parseInt(g('jobs')):null,notes:g('notes')||null});
   });
-  if(toSave.length===0){toast('Nothing to save','i');return;}
+  if(toSave.length===0&&clearedEmpIds.length===0){toast('Nothing to save','i');return;}
   setSyncStatus('saving');
-  const results=await Promise.all(toSave.map(r=>sb.from('attendance').upsert(r,{onConflict:'employee_id,date'}).select().single()));
+  const results=toSave.length?await Promise.all(toSave.map(r=>sb.from('attendance').upsert(r,{onConflict:'employee_id,date'}).select().single())):[];
   const hasErr=results.some(r=>r.error);
   if(hasErr){setSyncStatus('err');toast('Some records failed to save','e');console.error(results.filter(r=>r.error));return;}
   results.forEach(r=>{if(!r.data)return;const idx=attendance.findIndex(a=>a.employee_id===r.data.employee_id&&a.date===r.data.date);if(idx>=0)attendance[idx]=r.data;else attendance.push(r.data);});
   _touched.clear();setSyncStatus('saved');toast('Attendance saved!','s');
+  // Recalculate payroll for every saved AND cleared employee, for this date's month
+  const affMonth=markDate.getMonth(),affYear=markDate.getFullYear();
+  const affectedIds=new Set([...results.filter(r=>r.data).map(r=>r.data.employee_id),...clearedEmpIds]);
+  affectedIds.forEach(empId=>recalcEmployeeMonth(empId,affMonth,affYear));
 }
 function markAll(status){employees.filter(e=>e.status==='Active').forEach(e=>{_touched.add(e.id);qMark(e.id,status);});}
 async function clearDay(){
@@ -2261,10 +2506,14 @@ async function clearDay(){
 }
 async function doClearDay(){
   const key=dateKey(markDate);
+  const affected=attendance.filter(a=>a.date===key).map(a=>a.employee_id);
   const r=await sb.from('attendance').delete().eq('date',key);
   if(r.error){toast(r.error.message,'e');return;}
   attendance=attendance.filter(a=>a.date!==key);
   _touched.clear();buildMarkTable();toast('Day cleared','i');
+  // Recalculate payroll for every employee who had attendance on this day
+  const affMonth=markDate.getMonth(),affYear=markDate.getFullYear();
+  [...new Set(affected)].forEach(empId=>recalcEmployeeMonth(empId,affMonth,affYear));
 }
 function shiftMark(n){_touched.clear();markDate=new Date(markDate);markDate.setDate(markDate.getDate()+n);updateMarkNav();buildMarkTable();}
 function setMarkToday(){_touched.clear();markDate=new Date();updateMarkNav();buildMarkTable();}
@@ -2415,7 +2664,10 @@ async function toggleTag(expId,tagName){
 async function updateExp(id,field,val){
   const exp=expenses.find(e=>e.id===id);if(!exp)return;
   exp[field]=val;
-  deb('exp-save-'+id,async()=>{await sb.from('expenses').update({[field]:val}).eq('id',id);},900);
+  deb('exp-save-'+id,async()=>{
+    await sb.from('expenses').update({[field]:val}).eq('id',id);
+    if(field==='amount'){const d=new Date(exp.date+'T00:00:00');recalcEmployeeMonth(exp.employee_id,d.getMonth(),d.getFullYear());}
+  },900);
 }
 var _autoAddingRow=false;
 var _cleaningBlanks=false;
@@ -2497,21 +2749,28 @@ function updateLedgerFooterOnly(){
 }
 async function deleteLedRow(id){
   if(!confirm('Delete this expense row?'))return;
+  const exp=expenses.find(e=>e.id===id);
   const r=await sb.from('expenses').delete().eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   expenses=expenses.filter(e=>e.id!==id);renderLedger();toast('Row deleted','i');
+  if(exp&&exp.employee_id&&exp.date){
+    const d=new Date(exp.date+'T00:00:00');
+    recalcEmployeeMonth(exp.employee_id,d.getMonth(),d.getFullYear());
+  }
 }
 async function approveExp(id){
   const r=await sb.from('expenses').update({status:'approved'}).eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   const idx=expenses.findIndex(e=>e.id===id);if(idx>=0)expenses[idx].status='approved';
   renderLedger();toast('Expense approved','s');
+  const exp=expenses[idx];if(exp){const d=new Date(exp.date+'T00:00:00');recalcEmployeeMonth(exp.employee_id,d.getMonth(),d.getFullYear());}
 }
 async function rejectExp(id){
   const r=await sb.from('expenses').update({status:'rejected'}).eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   const idx=expenses.findIndex(e=>e.id===id);if(idx>=0)expenses[idx].status='rejected';
   renderLedger();toast('Expense rejected','i');
+  const exp=expenses[idx];if(exp){const d=new Date(exp.date+'T00:00:00');recalcEmployeeMonth(exp.employee_id,d.getMonth(),d.getFullYear());}
 }
 async function flagExp(id){
   const reason=prompt('Reason for flagging (shown to employee):');if(reason===null)return;
@@ -2537,6 +2796,7 @@ async function approveAllExp(){
   await Promise.all(data.map(e=>sb.from('expenses').update({status:'approved'}).eq('id',e.id)));
   data.forEach(e=>{const idx=expenses.findIndex(x=>x.id===e.id);if(idx>=0)expenses[idx].status='approved';});
   renderLedger();toast(`${data.length} expenses approved ✓`,'s');
+  recalcEmployeeMonth(ledgerStaff,parseInt(ledgerMonth)-1,ledgerYear);
 }
 async function handleQE(e){
   if(e.key!=='Enter')return;
@@ -3238,31 +3498,50 @@ function renderPayroll(){
     const otH=recs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
     const bonusTotal=recs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
     const absent=recs.filter(r=>r.status==='A').length;
-    let basePay=0;
-    // Fixed salary: sum per-day calcPay (handles short hours/absent days)
-    aR.forEach(r=>{basePay+=calcPay(emp,r).base;});
-    let otPay=0;aR.forEach(r=>{otPay+=calcPay(emp,r).ot;});
-    // Expenses from Supabase
-    const empExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===emp.id&&d.getMonth()===m&&d.getFullYear()===y;});
-    const expAmt=empExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
-    const rowTotal=basePay+otPay+bonusTotal+expAmt;
-    const bankAmt=Math.min(parseFloat(emp.bank_amt)||0,rowTotal);
-    const cashAmt=Math.max(0,rowTotal-bankAmt);
-    gBase+=basePay;gOT+=otPay;gBonus+=bonusTotal;gExp+=expAmt;gTotal+=rowTotal;gBank+=bankAmt;gCash+=cashAmt;
+    // ── Use saved payroll_summary row as the source of truth (matches Employee app) ──
+    const prRow=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===m&&p.year===y);
+    let basePay,otPay,expAmt,rowTotal,bankAmt,cashAmt,totalHFinal,otHFinal,bonusFinal,deductionTotal;
+    if(prRow){
+      basePay=parseFloat(prRow.base_pay)||0;
+      otPay=parseFloat(prRow.overtime_pay)||0;
+      bonusFinal=parseFloat(prRow.bonus_pay)||0;
+      expAmt=parseFloat(prRow.expense_total)||0;
+      rowTotal=parseFloat(prRow.net_pay)||0;
+      bankAmt=parseFloat(prRow.bank_amount)||0;
+      cashAmt=parseFloat(prRow.cash_amount)||0;
+      totalHFinal=parseFloat(prRow.total_hours)||0;
+      otHFinal=parseFloat(prRow.overtime_hours)||0;
+      deductionTotal=parseFloat(prRow.deduction_total)||0;
+    } else {
+      // No saved row yet — calculate live for display, and kick off a save in the background
+      basePay=0;
+      aR.forEach(r=>{basePay+=calcPay(emp,r).base;});
+      otPay=0;aR.forEach(r=>{otPay+=calcPay(emp,r).ot;});
+      const empExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===emp.id&&d.getMonth()===m&&d.getFullYear()===y;});
+      expAmt=empExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      bonusFinal=bonusTotal;
+      rowTotal=basePay+otPay+bonusTotal+expAmt;
+      bankAmt=Math.min(parseFloat(emp.bank_amt)||0,rowTotal);
+      cashAmt=Math.max(0,rowTotal-bankAmt);
+      totalHFinal=totalH;otHFinal=otH;
+      deductionTotal=undefined;
+      recalcEmployeeMonth(emp.id,m,y).then(()=>{if(currentPage==='payroll')renderPayroll();});
+    }
+    gBase+=basePay;gOT+=otPay;gBonus+=bonusFinal;gExp+=expAmt;gTotal+=rowTotal;gBank+=bankAmt;gCash+=cashAmt;
     const ptBdg=pt==='fixed'?'<span style="background:#dbeafe;color:#1d4ed8;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:3px;">SALARY</span>':pt==='daily'?'<span style="background:#fef3c7;color:#b45309;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:3px;">DAILY</span>':'<span style="background:#dcfce7;color:#15803d;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:3px;">HOURLY</span>';
     const cPill=`<span class="cp ${emp.contract_type==='PAYE'?'cp-p':'cp-s'}">${emp.contract_type||'PAYE'}</span>`;
     const baseDisp=(function(){
     var contrH=parseFloat(emp.contracted_hours)||8;
     var fullDays=aR.filter(function(r){return r.status==='P'||r.status==='LA';}).length;
-    var shortfallH=pt==='daily'?Math.max(0,contrH*fullDays-totalH):0;
-    var shortfallAmt=shortfallH>0?parseFloat(((shortfallH*(parseFloat(emp.daily_rate)||0)/contrH)).toFixed(2)):0;
+    var dedAmt=deductionTotal!=null?deductionTotal:0;
+    var shortfallH=(pt==='daily'&&deductionTotal==null)?Math.max(0,contrH*fullDays-totalHFinal):0;
+    var shortfallAmt=deductionTotal!=null?deductionTotal:(shortfallH>0?parseFloat(((shortfallH*(parseFloat(emp.daily_rate)||0)/contrH)).toFixed(2)):0);
     if(pt==='fixed'){
-      var monthlySal2=parseFloat(emp.salary)||0;
-      var fixedShortAmt=Math.max(0,parseFloat((monthlySal2-basePay).toFixed(2)));
+      var fixedShortAmt=deductionTotal!=null?deductionTotal:Math.max(0,parseFloat(((parseFloat(emp.salary)||0)-basePay).toFixed(2)));
       return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+(fixedShortAmt>0?'<span style=\'color:var(--red)\'>−'+C+fixedShortAmt.toFixed(2)+' deducted</span>':'monthly salary')+'</span>';
     }
-    if(pt==='daily')return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+aR.length+' days</span>'+(shortfallAmt>0?'<br><span style="font-size:10px;color:var(--red);font-weight:600;">-'+C+shortfallAmt.toFixed(2)+' ('+shortfallH.toFixed(1)+'h short)</span>':'');
-    return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+totalH.toFixed(1)+'h</span>';
+    if(pt==='daily')return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+aR.length+' days</span>'+(shortfallAmt>0?'<br><span style="font-size:10px;color:var(--red);font-weight:600;">-'+C+shortfallAmt.toFixed(2)+(shortfallH>0?' ('+shortfallH.toFixed(1)+'h short)':'')+'</span>':'');
+    return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+totalHFinal.toFixed(1)+'h</span>';
   })();
     const hasRate=(pt==='fixed'&&emp.salary)||(pt==='daily'&&emp.daily_rate)||emp.hourly_rate;
     const bkName=emp.bank_name||'bank';
@@ -3310,6 +3589,9 @@ async function updateBankAmt(el,rowTotal){
   const cashAmt=Math.max(0,rowTotal-Math.min(val,rowTotal));
   const cashEl=document.querySelector(`.pr-cash-${empId}`);
   if(cashEl)cashEl.textContent=cur()+cashAmt.toFixed(2)+' cash';
+  const m=parseInt(document.getElementById('prMonth').value);
+  const y=parseInt(document.getElementById('prYear').value);
+  recalcEmployeeMonth(empId,m,y);
 }
 // showMonthClosedStamp (duplicate removed)
 
@@ -3317,10 +3599,41 @@ async function togglePayrollLock(){
   const m=parseInt(document.getElementById('prMonth').value);
   const y=parseInt(document.getElementById('prYear').value);
   const key=`${y}_${m}`;
-  let locks=[...(cfg.locked_months||[])];
-  if(locks.includes(key)){if(!confirm(`Unlock ${MONTHS[m]} ${y}?`))return;locks=locks.filter(k=>k!==key);toast(`${MONTHS[m]} ${y} unlocked`,'i');}
-  else{if(!confirm(`Lock ${MONTHS[m]} ${y} for payroll?`))return;locks.push(key);toast(`${MONTHS[m]} ${y} locked ✓`,'s');}
-  await sbUpsertSettings({locked_months:locks});renderPayroll();
+  const locked=(cfg.locked_months||[]).includes(key)||payrollSummaries.some(p=>p.month===m&&p.year===y&&p.locked);
+  if(locked){
+    if(!confirm(`Unlock ${MONTHS[m]} ${y}? You'll be able to recalculate and edit payroll again.`))return;
+    setSyncStatus('saving');
+    await unlockPayrollMonth(m,y);
+    setSyncStatus('saved');
+    toast(`${MONTHS[m]} ${y} unlocked`,'i');
+  } else {
+    if(!confirm(`Lock ${MONTHS[m]} ${y} for payroll? This will finalize all employees' pay for this month — employees will see "Final Pay".`))return;
+    setSyncStatus('saving');
+    // Ensure everything is calculated before locking
+    await recalcWholeMonth(m,y);
+    await lockPayrollMonth(m,y);
+    setSyncStatus('saved');
+    toast(`${MONTHS[m]} ${y} locked ✓ — payroll finalized`,'s');
+  }
+  renderPayroll();
+}
+async function recalcPayrollBtn(){
+  const m=parseInt(document.getElementById('prMonth').value);
+  const y=parseInt(document.getElementById('prYear').value);
+  const locked=(cfg.locked_months||[]).includes(`${y}_${m}`)||payrollSummaries.some(p=>p.month===m&&p.year===y&&p.locked);
+  if(locked){toast(`${MONTHS[m]} ${y} is locked — unlock first to recalculate`,'e');return;}
+  const btn=document.getElementById('recalcBtn');
+  if(btn){btn.disabled=true;btn.querySelector('i').classList.add('fa-spin');}
+  toast('Recalculating payroll for all employees...','i');
+  try{
+    await recalcWholeMonth(m,y);
+    renderPayroll();
+    toast(`${MONTHS[m]} ${y} payroll recalculated ✓`,'s');
+  }catch(e){
+    toast('Recalculate failed: '+e.message,'e');
+  }finally{
+    if(btn){btn.disabled=false;btn.querySelector('i').classList.remove('fa-spin');}
+  }
 }
 function exportPayrollCSV(){
   const m=parseInt(document.getElementById('prMonth').value),y=parseInt(document.getElementById('prYear').value);
@@ -3581,6 +3894,8 @@ async function saveEmployee(){
     } else {
       toast(`${name} saved!`,'s');
     }
+    // Recalc payroll for every month from the effective date through the current month
+    recalcMonthsFrom(saved.id,effectiveFrom||dateKey(new Date()));
   } else if(!id&&newRate>0){
     // New employee — create initial history entry
     const histRow={employee_id:saved.id,pay_type:pt3,old_rate:0,new_rate:newRate,effective_from:effectiveFrom||saved.join_date||dateKey(new Date()),notes:'Initial rate'};
@@ -4108,6 +4423,21 @@ async function markPaid(empId,m,y,type,checked,bankAmt,cashAmt){
     const emp=employees.find(e=>e.id===empId);
     toast(`${emp?.name||''} — ${type==='bank'?'Bank transfer':'Cash payment'} marked ✓`,'s');
   }
+  // Update payroll_summary so employee app sees paid status (skip if locked — Lock already wrote final paid state)
+  const existing=payrollSummaries.find(p=>p.employee_id===empId&&p.month===m&&p.year===y);
+  if(existing&&!existing.locked){
+    const r=await sb.from('payroll_summary').update({
+      bank_paid:paymentStatuses[key].bank_paid,
+      cash_paid:paymentStatuses[key].cash_paid
+    }).eq('employee_id',empId).eq('month',m).eq('year',y).select().single();
+    if(!r.error&&r.data){
+      const idx=payrollSummaries.findIndex(p=>p.employee_id===empId&&p.month===m&&p.year===y);
+      if(idx>=0)payrollSummaries[idx]=r.data;
+    }
+  } else if(!existing){
+    // No payroll_summary row yet — calculate one now so paid status has somewhere to live
+    recalcEmployeeMonth(empId,m,y).then(()=>markPaid(empId,m,y,type,checked,bankAmt,cashAmt));
+  }
 }
 
 async function loadPaymentStatuses(m,y){
@@ -4270,6 +4600,11 @@ async function reviewAttReq(id,status,officeNote){
   } else if(status==='rejected'){toast('Request rejected','i');}
   else{toast('Reset to pending','i');}
   updateBadges();renderAttRequests();
+  // Auto-recalc payroll for this employee's month
+  if(status==='approved'&&req){
+    const rd=new Date(req.date+'T00:00:00');
+    recalcEmployeeMonth(req.employee_id,rd.getMonth(),rd.getFullYear());
+  }
 }
 
 function promptRejectAtt(id){
