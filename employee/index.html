@@ -164,7 +164,9 @@ body.sunday-active{background:linear-gradient(180deg,#d1fae5 0%,#f0fdf4 30%,#f1f
 /* ── FORM ── */
 .fg{margin-bottom:12px;}
 .fg label{display:block;font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:5px;}
-.fg input,.fg select,.fg textarea{width:100%;padding:11px 13px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:14px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;transition:var(--tr);}
+.fg input,.fg select,.fg textarea{width:100%;padding:11px 13px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:14px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;transition:var(--tr);box-sizing:border-box;}
+.fg input[type="date"]{height:46px;line-height:1.2;-webkit-appearance:none;appearance:none;}
+.fg input[type="date"]::-webkit-date-and-time-value{text-align:left;}
 .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(37,99,235,0.1);}
 .fg textarea{resize:vertical;min-height:70px;}
 .btn{width:100%;padding:13px;border-radius:var(--rs);border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:var(--tr);}
@@ -931,14 +933,17 @@ function setSyncUI(state){
 
 async function silentSync(){
   if(!emp)return;
+  if(!navigator.onLine){setSyncUI('offline');return;}
   setSyncUI('syncing');
-  const [attR,expR,msgR,batR,payStR,attReqR2]=await Promise.all([
+  try{
+  const [attR,expR,msgR,batR,payStR,attReqR2,prSumR2]=await Promise.all([
     SB.from('attendance').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
     SB.from('expenses').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
     SB.from('messages').select('*').eq('employee_id',emp.id).order('created_at'),
     SB.from('expense_batches').select('*').eq('employee_id',emp.id).order('submitted_at',{ascending:false}),
     SB.from('payment_status').select('*').eq('employee_id',emp.id),
-    SB.from('attendance_requests').select('*').eq('employee_id',emp.id).order('date',{ascending:false})
+    SB.from('attendance_requests').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
+    SB.from('payroll_summary').select('*').eq('employee_id',emp.id)
   ]);
   const hadNewMsg=myMsgs.length<(msgR.data||[]).length;
   myAtt=attR.data||[];myExp=expR.data||[];myMsgs=msgR.data||[];
@@ -960,6 +965,10 @@ async function silentSync(){
     else if(cur==='pay')renderPay();
     else if(cur==='exp')renderExpenses();
     else if(cur==='msg'&&hadNewMsg)renderMsgs();
+  }
+  }catch(err){
+    console.error('Sync error:',err);
+    setSyncUI('err');
   }
 }
 
