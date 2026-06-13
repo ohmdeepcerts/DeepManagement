@@ -500,6 +500,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
     <div id="pillMenu" style="display:none;position:absolute;top:62px;left:14px;z-index:300;background:var(--card);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.18);min-width:190px;overflow:hidden;">
       <div onclick="showPg('home');togglePillMenu()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-house" style="width:16px;color:var(--txtm);"></i>Home</div>
       <div onclick="openChangePin()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-key" style="width:16px;color:var(--txtm);"></i>Change PIN</div>
+      <div onclick="sessionStorage.removeItem('dam_page_sig');location.reload();" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-arrows-rotate" style="width:16px;color:var(--txtm);"></i>Reload App</div>
       <div onclick="toggleTheme()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-circle-half-stroke" style="width:16px;color:var(--txtm);"></i>Toggle Theme</div>
       <div onclick="confirmLogout()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--red);cursor:pointer;" onmouseover="this.style.background='var(--redl)'" onmouseout="this.style.background=''"><i class="fa-solid fa-right-from-bracket" style="width:16px;"></i>Sign Out</div>
     </div>
@@ -766,6 +767,32 @@ function togglePillMenu(){
   const m=document.getElementById('pillMenu');
   if(m)m.style.display=m.style.display==='none'?'block':'none';
 }
+async function checkForUpdateAndReload(isFirstCheck){
+  try{
+    const url=location.pathname+'?_v='+Date.now();
+    const res=await fetch(url,{cache:'no-store'});
+    if(!res.ok)return;
+    const text=await res.text();
+    const sig=text.length+':'+text.slice(0,300)+text.slice(-300);
+    const stored=sessionStorage.getItem('dam_page_sig');
+    if(!stored){
+      sessionStorage.setItem('dam_page_sig',sig);
+      return;
+    }
+    if(sig!==stored){
+      // New version deployed — reload silently, but only if it's safe to do so
+      const activeEl=document.activeElement;
+      const userTyping=activeEl&&(activeEl.tagName==='INPUT'||activeEl.tagName==='TEXTAREA'||activeEl.tagName==='SELECT');
+      const markOpen=document.getElementById('markModal')&&document.getElementById('markModal').style.display==='flex';
+      const changePinOpen=document.getElementById('changePinModal')&&document.getElementById('changePinModal').style.display==='flex';
+      if(userTyping||markOpen||changePinOpen)return; // try again on the next check
+      sessionStorage.removeItem('dam_page_sig');
+      location.reload();
+    }
+  }catch(e){
+    // Silent — ignore (e.g. offline)
+  }
+}
 function openTrialInfo(){
   document.getElementById('trialInfoModal').style.display='flex';
 }
@@ -883,6 +910,10 @@ async function enterApp(e){
   setInterval(applyAutoTheme, 3600000);
   setInterval(silentSync, 30000);
   maybeShowTrialInfo();
+  // Silently reload if a newer version of the app has been deployed
+  setInterval(checkForUpdateAndReload, 5*60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkForUpdateAndReload();});
+  checkForUpdateAndReload(true);
 }
 function confirmLogout(){
   if(confirm('Sign out? You will need your PIN to sign back in.'))doLogout();
