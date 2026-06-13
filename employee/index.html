@@ -281,6 +281,8 @@ body.sunday-active{background:linear-gradient(180deg,#d1fae5 0%,#f0fdf4 30%,#f1f
 
 /* Pull to refresh indicator */
 .pull-tag{font-size:11px;color:var(--txtm);padding:6px;text-align:center;transition:all 0.3s;}
+.trial-pill{display:flex;align-items:center;justify-content:center;gap:7px;background:#fce7f3;color:#be185d;border:1px solid #fbcfe8;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;margin:0 0 12px;cursor:pointer;text-align:center;}
+[data-theme="dark"] .trial-pill{background:rgba(190,24,93,0.18);color:#f9a8d4;border-color:rgba(190,24,93,0.35);}
 
 /* Expense icon colours */
 .exp-icon-travel{background:#eff6ff;color:#2563eb;}
@@ -388,10 +390,12 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
   <div id="stepSetPin" style="display:none;width:100%;max-width:340px;">
     <div class="pin-card">
       <div class="pin-who" id="setPinWho">Set up your PIN</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.6);text-align:center;margin-bottom:10px;">Choose a 4-6 digit PIN. You'll use this to sign in next time.</div>
-      <input type="password" id="newPinInput" inputmode="numeric" maxlength="6" placeholder="New PIN" style="width:100%;text-align:center;font-size:20px;letter-spacing:8px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#fff;margin:6px 0;box-sizing:border-box;">
-      <input type="password" id="confirmPinInput" inputmode="numeric" maxlength="6" placeholder="Confirm PIN" onkeydown="if(event.key==='Enter')submitNewPin()" style="width:100%;text-align:center;font-size:20px;letter-spacing:8px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#fff;margin:6px 0 12px;box-sizing:border-box;">
-      <button class="btn btn-p" style="width:100%;" onclick="submitNewPin()"><i class="fa-solid fa-check" style="margin-right:6px;"></i>Save & Continue</button>
+      <div style="font-size:12px;color:rgba(255,255,255,0.6);text-align:center;margin-bottom:14px;">No PIN found for your account.<br>Please create a 4-6 digit PIN — you'll use this to sign in next time.</div>
+      <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">New PIN</div>
+      <input type="password" id="newPinInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" name="dam-new-pin-field" style="width:100%;text-align:center;font-size:22px;letter-spacing:10px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#fff;margin:0 0 10px;box-sizing:border-box;">
+      <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Confirm PIN</div>
+      <input type="password" id="confirmPinInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" name="dam-confirm-pin-field" onkeydown="if(event.key==='Enter')submitNewPin()" style="width:100%;text-align:center;font-size:22px;letter-spacing:10px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#fff;margin:0 0 12px;box-sizing:border-box;">
+      <button class="btn btn-p" style="width:100%;" onclick="submitNewPin()"><i class="fa-solid fa-check" style="margin-right:6px;"></i>Save &amp; Continue</button>
       <div class="pin-err" id="setPinErr"></div>
       <div style="text-align:center;margin-top:10px;"><span style="font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;" onclick="backToPhone()"><i class="fa-solid fa-chevron-left" style="margin-right:4px;"></i>Back</span></div>
     </div>
@@ -416,6 +420,27 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
       </div>
       <div class="pin-err" id="pinErr"></div>
     </div>
+  </div>
+</div>
+
+<!-- TRIAL APP INFO MODAL -->
+<div id="trialInfoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:700;align-items:flex-end;justify-content:center;">
+  <div style="background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:24px 20px calc(40px + max(env(safe-area-inset-bottom),10px));max-height:88vh;overflow-y:auto;">
+    <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr);margin:0 auto 18px;"></div>
+    <div style="text-align:center;margin-bottom:14px;">
+      <div style="width:56px;height:56px;border-radius:16px;background:#fce7f3;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+        <i class="fa-solid fa-flask" style="color:#be185d;font-size:24px;"></i>
+      </div>
+      <div style="font-size:17px;font-weight:800;">This app is in trial</div>
+    </div>
+    <div style="font-size:13px;color:var(--txt2);line-height:1.6;margin-bottom:16px;">
+      Attendance, hours and pay shown here are <strong>estimates only</strong>, generated automatically while this system is being tested.
+      <br><br>
+      Your <strong>official wages will continue to be calculated and confirmed by the office as usual</strong> — the figures in this app do not replace that process.
+      <br><br>
+      Please do not use this app, or any screenshot of it, as proof of attendance, hours worked, or pay owed. If you spot anything that looks wrong, let the office know directly.
+    </div>
+    <button class="btn btn-p" style="width:100%;" onclick="closeTrialInfo()">Got it</button>
   </div>
 </div>
 
@@ -487,6 +512,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
     <!-- HOME -->
     <div class="pg on" id="pg-home">
       <div class="pull-tag">DAM Employee Portal</div>
+      <div class="trial-pill" onclick="openTrialInfo()"><i class="fa-solid fa-flask"></i> Trial app — pay shown is an estimate, not official</div>
       <!-- TODAY MARK SECTION on home -->
       <div id="homeTodayMark"></div>
       <!-- Salary card -->
@@ -651,6 +677,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
 
     <!-- PAY -->
     <div class="pg" id="pg-pay">
+      <div class="trial-pill" onclick="openTrialInfo()" style="margin-bottom:10px;"><i class="fa-solid fa-flask"></i> Trial app — figures below are estimates, not official pay</div>
       <div class="sec">Pay Summary</div>
       <div class="month-tabs" id="payTabs"></div>
       <div id="payCards"></div>
@@ -739,6 +766,20 @@ function togglePillMenu(){
   const m=document.getElementById('pillMenu');
   if(m)m.style.display=m.style.display==='none'?'block':'none';
 }
+function openTrialInfo(){
+  document.getElementById('trialInfoModal').style.display='flex';
+}
+function closeTrialInfo(){
+  document.getElementById('trialInfoModal').style.display='none';
+  try{sessionStorage.setItem('dam_trial_seen','1');}catch(e){}
+}
+function maybeShowTrialInfo(){
+  let seen=false;
+  try{seen=sessionStorage.getItem('dam_trial_seen')==='1';}catch(e){}
+  if(!seen){
+    setTimeout(()=>openTrialInfo(),700);
+  }
+}
 function openChangePin(){
   const m=document.getElementById('pillMenu');if(m)m.style.display='none';
   document.getElementById('cpCurrent').value='';
@@ -794,26 +835,6 @@ function applyAutoTheme(){
 }
 
 // ── AUTH ──
-async function initAuth(){
-  // Sign in to shared portal account first so RLS allows DB access
-  const {data:authData,error:authErr}=await SB.auth.signInWithPassword({email:PORTAL_EMAIL,password:PORTAL_PASS});
-  if(authErr){
-    document.getElementById('empList').innerHTML='<div style="color:#fca5a5;text-align:center;padding:14px;">Could not connect to server. Please try again.</div>';
-    console.error('Portal auth error:',authErr.message);
-    return;
-  }
-  const r=await SB.from('employees').select('*').eq('status','Active').order('name');
-  if(r.error){document.getElementById('empList').innerHTML='<div style="color:#fca5a5;text-align:center;padding:14px;">Could not load employees. Check your internet.</div>';return;}
-  allEmps=r.data||[];
-  const cfgR=await SB.from('settings').select('*').eq('id',1).single();
-  if(cfgR.data)cfg=cfgR.data;
-  document.getElementById('empList').innerHTML=allEmps.map((e,i)=>`
-    <div class="emp-card" onclick="selEmp('${e.id}')">
-      <div class="emp-av" style="background:${AVCOLS[i%AVCOLS.length]}">${ini(e.name)}</div>
-      <div><div class="emp-cn">${e.name}</div><div class="emp-cr">${e.role||'Employee'}</div></div>
-      <i class="fa-solid fa-chevron-right" style="margin-left:auto;color:rgba(255,255,255,0.35);font-size:13px;"></i>
-    </div>`).join('');
-}
 
 function selEmp(id){
   selEmpId=id;pinEntry='';
@@ -861,6 +882,7 @@ async function enterApp(e){
   applyAutoTheme();
   setInterval(applyAutoTheme, 3600000);
   setInterval(silentSync, 30000);
+  maybeShowTrialInfo();
 }
 function confirmLogout(){
   if(confirm('Sign out? You will need your PIN to sign back in.'))doLogout();
@@ -898,9 +920,10 @@ function doLogout(){
   document.getElementById('auth').style.display='flex';
   document.getElementById('step2').style.display='none';
   document.getElementById('step1').style.display='block';
-  pinEntry='';selEmpId='';renderPinDots();
-  // Reload employee list fresh from DB
-  setTimeout(()=>initAuth(),100);
+  pinEntry='';selEmpId='';renderPinDots();allEmps=[];
+  // Clear phone field for next login
+  const ph=document.getElementById('phoneInput');if(ph)ph.value='';
+  const pe=document.getElementById('phoneErr');if(pe)pe.textContent='';
 }
 
 function setSyncUI(state){
@@ -936,6 +959,13 @@ async function silentSync(){
   if(!navigator.onLine){setSyncUI('offline');return;}
   setSyncUI('syncing');
   try{
+  // Check if office has revoked access (PIN cleared or employee deactivated) — force logout if so
+  const meCheck=await SB.from('employees').select('pin,status').eq('id',emp.id).single();
+  if(!meCheck.error&&meCheck.data&&(!meCheck.data.pin||meCheck.data.status!=='Active')){
+    toast('Your access was reset by the office. Please log in again.','e');
+    doLogout();
+    return;
+  }
   const [attR,expR,msgR,batR,payStR,attReqR2,prSumR2]=await Promise.all([
     SB.from('attendance').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
     SB.from('expenses').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
@@ -2214,11 +2244,14 @@ async function tryAutoLogin(){
     const r=await SB.from('employees').select('*').eq('id',savedId).single();
     const cfgR=await SB.from('settings').select('*').eq('id',1).single();
     if(cfgR.data)cfg=cfgR.data;
-    if(!r.error&&r.data&&r.data.status==='Active'){
+    if(!r.error&&r.data&&r.data.status==='Active'&&r.data.pin){
       allEmps=[r.data];
       await enterApp(r.data);
       return;
     }
+    // PIN was cleared, employee deactivated, or record missing — force re-login
+    localStorage.removeItem('dam_emp_id');
+    localStorage.removeItem('dam_emp_ts');
   }
   // Load settings only — employee list NOT shown until phone is entered
   const cfgR=await SB.from('settings').select('*').eq('id',1).single();
@@ -2247,8 +2280,12 @@ async function submitPhone(){
   if(!e.pin){
     // First login — set up PIN
     document.getElementById('setPinWho').textContent='Welcome, '+e.name+'!';
+    document.getElementById('newPinInput').value='';
+    document.getElementById('confirmPinInput').value='';
+    document.getElementById('setPinErr').textContent='';
     document.getElementById('step1').style.display='none';
     document.getElementById('stepSetPin').style.display='block';
+    setTimeout(()=>document.getElementById('newPinInput').focus(),100);
   } else {
     document.getElementById('pinWho').textContent='Welcome back, '+e.name;
     document.getElementById('step1').style.display='none';
