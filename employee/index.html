@@ -27,11 +27,11 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 html,body{height:100%;overflow:hidden;}
 body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--txt);max-width:430px;margin:0 auto;position:relative;display:flex;flex-direction:column;transition:background 0.8s ease;}
-body.sunday-beach{background:linear-gradient(180deg,#e0f7ff 0%,#f0f9ff 30%,#f1f5f9 100%);}
-body.sunday-mountain{background:linear-gradient(180deg,#d1fae5 0%,#ecfdf5 30%,#f1f5f9 100%);}
-body.sunday-family{background:linear-gradient(180deg,#fce7f3 0%,#fdf2f8 30%,#f1f5f9 100%);}
-body.sunday-recharge{background:linear-gradient(180deg,#ede9fe 0%,#f5f3ff 30%,#f1f5f9 100%);}
-body.sunday-active{background:linear-gradient(180deg,#d1fae5 0%,#f0fdf4 30%,#f1f5f9 100%);}
+
+
+
+
+
 /* Floating background particles for sunday */
 .sun-particle{position:fixed;pointer-events:none;z-index:0;font-size:20px;opacity:0.15;animation:floatParticle linear infinite;}
 @keyframes floatParticle{0%{transform:translateY(100vh) rotate(0deg);}100%{transform:translateY(-100px) rotate(360deg);}}
@@ -281,8 +281,6 @@ body.sunday-active{background:linear-gradient(180deg,#d1fae5 0%,#f0fdf4 30%,#f1f
 
 /* Pull to refresh indicator */
 .pull-tag{font-size:11px;color:var(--txtm);padding:6px;text-align:center;transition:all 0.3s;}
-.trial-pill{display:flex;align-items:center;justify-content:center;gap:7px;background:#fce7f3;color:#be185d;border:1px solid #fbcfe8;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;margin:0 0 12px;cursor:pointer;text-align:center;}
-[data-theme="dark"] .trial-pill{background:rgba(190,24,93,0.18);color:#f9a8d4;border-color:rgba(190,24,93,0.35);}
 
 /* Expense icon colours */
 .exp-icon-travel{background:#eff6ff;color:#2563eb;}
@@ -343,7 +341,6 @@ body.time-evening{--time-tint:rgba(255,237,213,0.12);}
 body.time-night{--time-tint:rgba(15,23,42,0.15);}
 
 /* Sunday banner spacing */
-#sundayBanner{pointer-events:none;}
 
 /* ── MISC ── */
 .month-tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px;-webkit-overflow-scrolling:touch;}
@@ -513,7 +510,6 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
     <!-- HOME -->
     <div class="pg on" id="pg-home">
       <div class="pull-tag">DAM Employee Portal</div>
-      <div class="trial-pill" onclick="openTrialInfo()"><i class="fa-solid fa-flask"></i> Trial app — pay shown is an estimate, not official</div>
       <!-- TODAY MARK SECTION on home -->
       <div id="homeTodayMark"></div>
       <!-- Salary card -->
@@ -678,7 +674,6 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
 
     <!-- PAY -->
     <div class="pg" id="pg-pay">
-      <div class="trial-pill" onclick="openTrialInfo()" style="margin-bottom:10px;"><i class="fa-solid fa-flask"></i> Trial app — figures below are estimates, not official pay</div>
       <div class="sec">Pay Summary</div>
       <div class="month-tabs" id="payTabs"></div>
       <div id="payCards"></div>
@@ -904,8 +899,6 @@ async function enterApp(e){
   renderHome();
   startRealtime();
   setSyncUI('live');
-  checkSundayMode();
-  initHiddenGems();
   applyAutoTheme();
   setInterval(applyAutoTheme, 3600000);
   setInterval(silentSync, 30000);
@@ -944,8 +937,7 @@ function doLogout(){
   const nm=document.getElementById('tbName');if(nm)nm.textContent='Loading...';
   const rl=document.getElementById('tbRole');if(rl)rl.textContent='Employee Portal';
   // Remove Sunday theme + particles
-  document.body.style.background='';removeParticles();
-  const sb=document.getElementById('sundayBanner');if(sb)sb.remove();
+  document.body.style.background='';
   // Show auth screen
   document.getElementById('app').style.display='none';
   document.getElementById('auth').style.display='flex';
@@ -2007,143 +1999,13 @@ async function submitAttRequest(){
 // ═══════════════════════════════════════════════════
 // SUNDAY ENGINE v2 — 52 unique weekly themes
 // ═══════════════════════════════════════════════════
-const SUNDAY_THEMES=[
-  // Week 1-13: Winter
-  {name:'New Year Reset',bg:'linear-gradient(135deg,#0f172a,#1e3a5f,#2563eb)',particles:['✨','🎊','🥂','🎆','🌟','💫','🎯','🌙'],quote:"New year, fresh start. You've got this.",lazy:"It's a new chapter. No rush.",col:'#93c5fd'},
-  {name:'Cozy Blanket',bg:'linear-gradient(135deg,#1c1917,#44403c,#78716c)',particles:['🧸','☕','🛋️','🕯️','📖','🧶','🍵','💤'],quote:"Warmth is a gift. Wrap yourself in it.",lazy:"Stay warm. Do nothing. Perfect.",col:'#d6d3d1'},
-  {name:'Rainy Window',bg:'linear-gradient(135deg,#0c4a6e,#075985,#0284c7)',particles:['🌧️','💧','🪟','☔','🌊','🐚','💦','🌈'],quote:"Rainy days make rivers.",lazy:"Listen to the rain. Rest.",col:'#7dd3fc'},
-  {name:'Fireplace',bg:'linear-gradient(135deg,#7c2d12,#b91c1c,#ea580c)',particles:['🔥','🪵','♨️','🍂','🌰','🫖','🕯️','✨'],quote:"You are warmth itself.",lazy:"Fireside. Nowhere to be.",col:'#fdba74'},
-  {name:'Snow Day',bg:'linear-gradient(135deg,#1e3a5f,#3b82f6,#bfdbfe)',particles:['❄️','⛄','🌨️','🏔️','🧊','🌬️','🦌','🎿'],quote:"Everything is quiet under snow.",lazy:"Snow days are rest days.",col:'#e0f2fe'},
-  {name:'Book & Tea',bg:'linear-gradient(135deg,#1c1917,#292524,#57534e)',particles:['📚','🍵','🌿','🕯️','✒️','📖','🌙','🫖'],quote:"A good book and warm tea. Perfect.",lazy:"Read. Sip. Repeat.",col:'#a8a29e'},
-  {name:'Soup Sunday',bg:'linear-gradient(135deg,#14532d,#15803d,#4ade80)',particles:['🍲','🥘','🫕','🧅','🥕','🌿','🍀','♨️'],quote:"Nourish yourself gently today.",lazy:"Soup weather. Slow down.",col:'#86efac'},
-  {name:'Nap Time',bg:'linear-gradient(135deg,#312e81,#4338ca,#818cf8)',particles:['😴','🌙','💤','🛌','🌛','⭐','🌜','✨'],quote:"Rest is productive too.",lazy:"Naps are self-care.",col:'#c7d2fe'},
-  {name:'Winter Sun',bg:'linear-gradient(135deg,#78350f,#b45309,#fbbf24)',particles:['☀️','🌤️','❄️','🌟','💛','🌞','✨','🌈'],quote:"Even winter has its golden hours.",lazy:"Find the sunny spot. Sit there.",col:'#fde68a'},
-  {name:'Puzzle Day',bg:'linear-gradient(135deg,#1e3a5f,#1d4ed8,#60a5fa)',particles:['🧩','🎲','♟️','🎯','🃏','🎮','🎪','🌀'],quote:"Life is a puzzle — enjoy the pieces.",lazy:"No pressure. Just play.",col:'#93c5fd'},
-  {name:'Slow Cooker',bg:'linear-gradient(135deg,#7c2d12,#9a3412,#c2410c)',particles:['🫕','🧄','🌶️','🍖','🌿','♨️','🥘','🍲'],quote:"Good things take time.",lazy:"Let things simmer today.",col:'#fed7aa'},
-  {name:'Winter Garden',bg:'linear-gradient(135deg,#064e3b,#065f46,#059669)',particles:['🌱','❄️','🌿','🪴','🌾','🍃','🌲','🎋'],quote:"Even in winter, roots grow.",lazy:"Rest. Things are growing underground.",col:'#6ee7b7'},
-  {name:'Hot Chocolate',bg:'linear-gradient(135deg,#1c0a00,#3d1a00,#7c3500)',particles:['🍫','☕','🥛','🍪','🌙','❄️','✨','🫖'],quote:"Small pleasures, big happiness.",lazy:"Hot chocolate weather. Stay in.",col:'#d4a88a'},
-  // Week 14-26: Spring
-  {name:'First Bloom',bg:'linear-gradient(135deg,#1a0533,#5b21b6,#a78bfa)',particles:['🌸','🌺','🌼','🌷','🦋','🌱','🐝','🌿'],quote:"Something beautiful is always beginning.",lazy:"Spring is here. Breathe it in.",col:'#ddd6fe'},
-  {name:'Easter Brunch',bg:'linear-gradient(135deg,#0a1a0a,#14532d,#4ade80)',particles:['🐣','🥚','🌸','🐰','🌼','🍳','☀️','🌈'],quote:"New beginnings come in all shapes.",lazy:"Brunch is the best meal. No debate.",col:'#bbf7d0'},
-  {name:'Rain & Growth',bg:'linear-gradient(135deg,#0c4a6e,#164e63,#0e7490)',particles:['🌧️','🌱','🌿','🍃','🌊','💧','🌈','🐸'],quote:"Rain makes everything grow.",lazy:"Let the rain do its work. Rest.",col:'#a5f3fc'},
-  {name:'Picnic Blanket',bg:'linear-gradient(135deg,#14532d,#166534,#16a34a)',particles:['🧺','🥪','🍎','🌸','🦋','☀️','🌼','🐜'],quote:"Simple moments are the best ones.",lazy:"Find a patch of grass. Lie down.",col:'#86efac'},
-  {name:'Butterfly Garden',bg:'linear-gradient(135deg,#4a044e,#7e22ce,#c084fc)',particles:['🦋','🌸','🌺','🌼','🌿','💜','✨','🌷'],quote:"Transformation takes patience.",lazy:"Float through today. Light as wings.",col:'#e9d5ff'},
-  {name:'Morning Dew',bg:'linear-gradient(135deg,#0f2027,#203a43,#2c5364)',particles:['💧','🌿','🌅','🌸','🦜','☀️','🌾','✨'],quote:"Every morning is a clean slate.",lazy:"Dew dries. New day begins. Relax.",col:'#bae6fd'},
-  {name:'Farmers Market',bg:'linear-gradient(135deg,#1a2e05,#365314,#4d7c0f)',particles:['🥕','🍓','🧅','🌽','🍅','🫐','🌻','🥦'],quote:"Fresh things feed the soul.",lazy:"Slow walk. Good food. Sunday done.",col:'#bef264'},
-  {name:'Kite Flying',bg:'linear-gradient(135deg,#0c4a6e,#0369a1,#38bdf8)',particles:['🪁','🌬️','☁️','🌈','⛅','🌤️','🦅','✨'],quote:"Let your worries fly away.",lazy:"Look up. Sky is free. So are you.",col:'#7dd3fc'},
-  {name:'Garden Reading',bg:'linear-gradient(135deg,#052e16,#14532d,#15803d)',particles:['📚','🌿','🦋','☀️','🌸','🐝','🌼','🍃'],quote:"Words and nature — perfect company.",lazy:"Book. Garden. Nothing else needed.",col:'#86efac'},
-  {name:'Sunset Stroll',bg:'linear-gradient(135deg,#450a0a,#991b1b,#f97316)',particles:['🌅','🌸','🚶','🌿','🦋','💛','🌇','✨'],quote:"The best walks have no destination.",lazy:"Wander. No plan. Perfect Sunday.",col:'#fed7aa'},
-  {name:'Berry Picking',bg:'linear-gradient(135deg,#3b0764,#6d28d9,#a78bfa)',particles:['🫐','🍓','🍒','🌿','🦋','🌸','💜','🌱'],quote:"Small things. Sweet moments.",lazy:"Pick the good stuff. Leave the rest.",col:'#ddd6fe'},
-  {name:'Meadow Nap',bg:'linear-gradient(135deg,#052e16,#166534,#4ade80)',particles:['🌾','🦋','☀️','🌼','🐝','🌿','💛','🌈'],quote:"Nature invented napping. Trust it.",lazy:"Grass. Sky. Nap. Perfect.",col:'#bbf7d0'},
-  {name:'Blossom Rain',bg:'linear-gradient(135deg,#4a044e,#9d174d,#f472b6)',particles:['🌸','💮','🌺','🌷','✨','💕','🌸','🌹'],quote:"Beauty falls without trying.",lazy:"Pink sky today. Rest well.",col:'#fbcfe8'},
-  // Week 27-39: Summer
-  {name:'Beach Sunrise',bg:'linear-gradient(135deg,#0c4a6e,#0369a1,#f97316)',particles:['🌅','🌊','🏖️','🦀','🐚','⛱️','🌴','☀️'],quote:"The ocean heals what words cannot.",lazy:"Beach day. No agenda. Freedom.",col:'#fed7aa'},
-  {name:'Watermelon Slice',bg:'linear-gradient(135deg,#14532d,#15803d,#dc2626)',particles:['🍉','🌊','☀️','🌴','🦋','💚','🌿','🐝'],quote:"Summer is a state of mind.",lazy:"Watermelon weather. No plans needed.",col:'#86efac'},
-  {name:'Pool Float',bg:'linear-gradient(135deg,#0c4a6e,#0284c7,#38bdf8)',particles:['🏊','🌊','☀️','🦆','💦','🌴','🍹','🕶️'],quote:"Float through today. Literally.",lazy:"Floating is allowed on Sundays.",col:'#7dd3fc'},
-  {name:'Ice Cream Truck',bg:'linear-gradient(135deg,#450a0a,#be123c,#f9a8d4)',particles:['🍦','🍧','🍨','🎠','✨','🌈','🎶','🌸'],quote:"Simple joy. One scoop at a time.",lazy:"Ice cream for breakfast. It's Sunday.",col:'#fbcfe8'},
-  {name:'Sunset BBQ',bg:'linear-gradient(135deg,#7c2d12,#b45309,#fbbf24)',particles:['🔥','🌅','🥩','🌽','🍺','🎵','👨‍👩‍👧','🌻'],quote:"Good food. Good people. Enough.",lazy:"BBQ smoke and golden hour. Bliss.",col:'#fde68a'},
-  {name:'Stargazing',bg:'linear-gradient(135deg,#030712,#0f172a,#1e3a5f)',particles:['⭐','🌟','💫','🌙','🔭','🌌','✨','🪐'],quote:"You are made of stars. Remember that.",lazy:"Look up. Universe says hi.",col:'#bfdbfe'},
-  {name:'Road Trip',bg:'linear-gradient(135deg,#1c1917,#44403c,#f59e0b)',particles:['🚗','🛣️','🌄','🎵','☀️','🌲','🗺️','🎒'],quote:"The journey is the destination.",lazy:"No destination. Just drive. Or don't.",col:'#fde68a'},
-  {name:'Thunderstorm',bg:'linear-gradient(135deg,#0f172a,#1e293b,#475569)',particles:['⛈️','⚡','🌧️','🌩️','💨','🌀','🌊','🌑'],quote:"Storms remind us of our strength.",lazy:"Safe inside. Let it rain. Rest.",col:'#94a3b8'},
-  {name:'Harvest Moon',bg:'linear-gradient(135deg,#1c0a00,#7c2d12,#ea580c)',particles:['🌕','🌾','🦊','🍂','🌙','⭐','🎑','✨'],quote:"Harvest what you've sown with care.",lazy:"Full moon tonight. Howl optional.",col:'#fdba74'},
-  {name:'Backyard Camp',bg:'linear-gradient(135deg,#14532d,#166534,#1a2e05)',particles:['⛺','🔥','🌲','🦉','⭐','🌙','🐛','🦟'],quote:"Adventure doesn't need a passport.",lazy:"Backyard campfire. Toasted marshmallows.",col:'#86efac'},
-  {name:'Last Swim',bg:'linear-gradient(135deg,#0c4a6e,#075985,#0ea5e9)',particles:['🏊','🌊','🍂','☀️','🐠','🌅','💧','🦈'],quote:"Every ending holds a new beginning.",lazy:"Last warm Sunday. Savour it.",col:'#7dd3fc'},
-  {name:'Hammock Day',bg:'linear-gradient(135deg,#1a2e05,#365314,#65a30d)',particles:['🌴','😴','🌿','🦋','☀️','🍹','💤','🌸'],quote:"Hammocks invented horizontal ambition.",lazy:"Swinging slowly. Perfect Sunday.",col:'#bef264'},
-  {name:'Sunflower Field',bg:'linear-gradient(135deg,#3d2c00,#854d0e,#ca8a04)',particles:['🌻','☀️','🐝','🦋','🌾','💛','🌼','🌞'],quote:"Face the sun and shadows fall behind.",lazy:"Golden hour. Golden mood.",col:'#fef08a'},
-  // Week 40-52: Autumn
-  {name:'Pumpkin Patch',bg:'linear-gradient(135deg,#431407,#9a3412,#f97316)',particles:['🎃','🍂','🌙','👻','🕯️','🦇','🕸️','🌾'],quote:"Spooky season is rest season.",lazy:"Pumpkin spice and everything nice.",col:'#fed7aa'},
-  {name:'Cozy Socks',bg:'linear-gradient(135deg,#1c1917,#292524,#78716c)',particles:['🧦','☕','🧸','🕯️','📖','🌙','❤️','🫖'],quote:"Comfort is underrated. Embrace it.",lazy:"Socks on. World off.",col:'#d6d3d1'},
-  {name:'Leaf Pile',bg:'linear-gradient(135deg,#1a2e05,#365314,#ea580c)',particles:['🍁','🍂','🌿','🦔','🐿️','🍄','🌾','🍃'],quote:"Let go like autumn leaves. Beautifully.",lazy:"Jump in the leaves. Or just look.",col:'#fed7aa'},
-  {name:'Apple Orchard',bg:'linear-gradient(135deg,#14532d,#15803d,#dc2626)',particles:['🍎','🍏','🌿','🦋','🌸','🍃','🐝','🧺'],quote:"Good things grow in good conditions.",lazy:"Apple picking or apple eating. Both fine.",col:'#bbf7d0'},
-  {name:'Foggy Morning',bg:'linear-gradient(135deg,#0f172a,#1e293b,#64748b)',particles:['🌫️','🌲','🦉','🍂','☕','🌙','🕯️','🌿'],quote:"Mystery is beautiful. Lean in.",lazy:"Fog says: stay home. Wise fog.",col:'#94a3b8'},
-  {name:'Bonfire Night',bg:'linear-gradient(135deg,#1c0a00,#7c2d12,#dc2626)',particles:['🔥','🎆','✨','🌙','⭐','🎇','🕯️','💫'],quote:"Light up dark nights.",lazy:"Fireworks and blankets. Classic.",col:'#fdba74'},
-  {name:'Hot Chocolate Bar',bg:'linear-gradient(135deg,#1c0a00,#3d1a00,#92400e)',particles:['🍫','☕','🍪','🥛','❄️','🌙','🎄','✨'],quote:"Sweetness is always available.",lazy:"Build your hot choc. Add all the toppings.",col:'#d4a88a'},
-  {name:'Gratitude Sunday',bg:'linear-gradient(135deg,#0a1628,#1e3a5f,#f59e0b)',particles:['🙏','💛','✨','🌟','💫','❤️','🌺','🦋'],quote:"What you have is enough. More than enough.",lazy:"Count blessings, not tasks.",col:'#fde68a'},
-  {name:'First Frost',bg:'linear-gradient(135deg,#0c4a6e,#0369a1,#bfdbfe)',particles:['❄️','🌬️','🌿','⭐','🦌','🌙','✨','🏔️'],quote:"Cold outside, warm within.",lazy:"First frost day. Stay in. Non-negotiable.",col:'#e0f2fe'},
-  {name:'Holiday Prep',bg:'linear-gradient(135deg,#14532d,#166534,#dc2626)',particles:['🎄','🎁','⭐','🦌','❄️','🕯️','🔔','🌟'],quote:"Joy is in the preparation.",lazy:"List can wait. Mulled wine cannot.",col:'#bbf7d0'},
-  {name:'Winter Solstice',bg:'linear-gradient(135deg,#030712,#0f172a,#7c3aed)',particles:['🌙','⭐','💫','✨','🌌','🪐','❄️','🌑'],quote:"The longest night ends. Light returns.",lazy:"Shortest day. Longest rest. Perfect.",col:'#ddd6fe'},
-  {name:'Christmas Eve',bg:'linear-gradient(135deg,#14532d,#166534,#dc2626)',particles:['🎄','⭐','🎁','❄️','🦌','🔔','🕯️','🌟'],quote:"Magic is real if you believe it.",lazy:"Eve of something wonderful. Rest now.",col:'#86efac'},
-  {name:"Year's End",bg:'linear-gradient(135deg,#0f172a,#1e3a5f,#fbbf24)',particles:['🎊','🥂','⭐','✨','🎆','💫','🌟','🎇'],quote:"You made it. Every single day. Proud of you.",lazy:"Last Sunday of the year. Make it count — by resting.",col:'#fde68a'},
-];
-
-function getSundayTheme(){
-  const now=new Date();
-  const start=new Date(now.getFullYear(),0,1);
-  const weekNum=Math.floor((now-start)/(7*24*60*60*1000));
-  return SUNDAY_THEMES[weekNum%52];
-}
-
-function checkSundayMode(){
-  const now=new Date();
-  if(now.getDay()!==0){
-    document.body.style.background='';
-    removeParticles();
-    return;
-  }
-  const theme=getSundayTheme();
-  applySundayTheme(theme);
-}
-
-function applySundayTheme(theme){
-  // Always clean first to avoid leaks
-  removeParticles();
-  const oldBanner=document.getElementById('sundayBanner');if(oldBanner)oldBanner.remove();
-  // Background
-  document.body.style.background=theme.bg;
-  document.body.style.minHeight='100%';
-
-  // Inject quote banner if not there
-  let banner=document.getElementById('sundayBanner');
-  if(!banner){
-    banner=document.createElement('div');
-    banner.id='sundayBanner';
-    banner.style.cssText='position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:999;pointer-events:none;';
-    document.body.appendChild(banner);
-  }
-  banner.innerHTML=`<div style="background:rgba(0,0,0,0.35);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,0.1);padding:8px 16px;text-align:center;">
-    <div style="font-size:11px;font-weight:700;color:${theme.col};letter-spacing:0.08em;opacity:0.9;">☀️ ${theme.name.toUpperCase()}</div>
-    <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:2px;font-style:italic;">"${theme.quote}"</div>
-  </div>`;
-
-  spawnParticles(theme);
-}
-
-function spawnParticles(theme){
-  removeParticles();
-  const emojis=theme.particles;
-  for(let i=0;i<10;i++){
-    const p=document.createElement('div');
-    p.className='sun-particle';
-    p.textContent=emojis[i%emojis.length];
-    const size=14+Math.floor(Math.random()*12);
-    const dur=10+Math.floor(Math.random()*20);
-    const delay=Math.random()*10;
-    const left=5+Math.random()*90;
-    p.style.cssText=`position:fixed;pointer-events:none;z-index:0;font-size:${size}px;opacity:0.18;left:${left}%;animation:floatParticle ${dur}s linear ${delay}s infinite;`;
-    document.body.appendChild(p);
-  }
-}
-
-function removeParticles(){document.querySelectorAll('.sun-particle').forEach(p=>p.remove());}
+;
 
 // ═══════════════════════════════════════════════════
 // HIDDEN GEMS — Micro-interactions
 // ═══════════════════════════════════════════════════
 
 // 1. TACTILE BUTTON RIPPLES
-function initTactileRipples(){
-  document.querySelectorAll('.btn,.nb,.pk,.hr-btn,.min-btn,.mark-today-btn').forEach(btn=>{
-    btn.addEventListener('pointerdown',e=>{
-      const r=document.createElement('span');
-      const rect=btn.getBoundingClientRect();
-      const size=Math.max(rect.width,rect.height);
-      r.style.cssText=`position:absolute;border-radius:50%;background:rgba(255,255,255,0.25);width:${size}px;height:${size}px;left:${e.clientX-rect.left-size/2}px;top:${e.clientY-rect.top-size/2}px;pointer-events:none;animation:tactileRipple 0.5s ease-out forwards;z-index:10;`;
-      btn.style.position='relative';btn.style.overflow='hidden';
-      btn.appendChild(r);setTimeout(()=>r.remove(),500);
-    });
-  });
-}
-
 // 2. CONFETTI BURST
 const CONFETTI_COLORS=['#2563eb','#16a34a','#f59e0b','#ec4899','#8b5cf6','#06b6d4','#f97316'];
 let _confettiCount=0;
@@ -2165,35 +2027,7 @@ function confettiBurst(x,y,amount=30){
 }
 
 // 3. TIME-OF-DAY AWARENESS
-function initTimeAwareness(){
-  function applyTime(){
-    const h=new Date().getHours();
-    document.body.classList.remove('time-morning','time-afternoon','time-evening','time-night');
-    if(h>=5&&h<12)document.body.classList.add('time-morning');
-    else if(h>=12&&h<17)document.body.classList.add('time-afternoon');
-    else if(h>=17&&h<21)document.body.classList.add('time-evening');
-    else document.body.classList.add('time-night');
-  }
-  applyTime();setInterval(applyTime,60000);
-}
-
 // 4. SECRET GESTURE COMMANDS
-function initGestureCommands(){
-  let gestureLog=[];let tx=0,ty=0;
-  document.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
-  document.addEventListener('touchend',e=>{
-    const dx=e.changedTouches[0].clientX-tx;
-    const dy=e.changedTouches[0].clientY-ty;
-    let dir='';
-    if(Math.abs(dx)>Math.abs(dy)){dir=dx>80?'r':dx<-80?'l':'';}
-    else{dir=dy>80?'d':dy<-80?'u':'';}
-    if(!dir)return;
-    gestureLog.push(dir);if(gestureLog.length>4)gestureLog.shift();
-    const g=gestureLog.join('');
-    if(g.includes('uudd')){triggerRainbow();}
-    else if(g.includes('lrlr')){triggerWiggle();}
-  },{passive:true});
-}
 function triggerRainbow(){
   let hue=0;const iv=setInterval(()=>{
     hue+=4;document.body.style.filter=`hue-rotate(${hue}deg)`;
@@ -2209,43 +2043,8 @@ function triggerWiggle(){
 }
 
 // 5. LIVING GLASS SHIMMER on salary card
-function initLivingGlass(){
-  const sc=document.querySelector('.sal-card');
-  if(!sc)return;
-  const sh=document.createElement('div');
-  sh.style.cssText='position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:linear-gradient(45deg,transparent 40%,rgba(255,255,255,0.04) 50%,transparent 60%);animation:livingShimmer 8s linear infinite;pointer-events:none;z-index:1;border-radius:inherit;';
-  sc.style.position='relative';sc.style.overflow='hidden';
-  sc.appendChild(sh);
-}
-
 // 6. PARALLAX DEPTH ORBS
-function initParallax(){
-  const content=document.querySelector('.content');
-  if(!content)return;
-  const orbs=[[0.08,200,'var(--acc)'],[0.05,140,'#7c3aed'],[0.06,100,'#0891b2']];
-  orbs.forEach(([opacity,size,col],i)=>{
-    const orb=document.createElement('div');
-    orb.className='bg-orb';
-    orb.style.cssText=`position:fixed;width:${size}px;height:${size}px;border-radius:50%;background:radial-gradient(circle,${col} 0%,transparent 70%);opacity:${opacity};pointer-events:none;z-index:0;top:${15+i*25}%;left:${10+i*30}%;animation:parallaxFloat ${12+i*6}s ease-in-out ${i*3}s infinite;`;
-    document.body.appendChild(orb);
-  });
-  content.addEventListener('scroll',()=>{
-    const sy=content.scrollTop;
-    document.querySelectorAll('.bg-orb').forEach((orb,i)=>{
-      orb.style.transform=`translateY(${sy*(0.05*(i+1))}px)`;
-    });
-  },{passive:true});
-}
-
 // INITIALISE ALL GEMS
-function initHiddenGems(){
-  initTactileRipples();
-  initTimeAwareness();
-  initGestureCommands();
-  initLivingGlass();
-  initParallax();
-}
-
 // Keyboard PIN support
 document.addEventListener('keydown',e=>{
   const s2=document.getElementById('step2');
