@@ -1301,6 +1301,7 @@ function renderAtt(){
   const m=attM,y=attY;
   const mRecs=myAtt.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;}).sort((a,b)=>a.date.localeCompare(b.date));
   const days=dim(y,m);
+  // Working days = Mon-Sat (exclude Sundays only, consistent with office app dashboard)
   const wD=Array.from({length:days},(_,i)=>new Date(y,m,i+1).getDay()!==0).filter(Boolean).length;
   const pres=mRecs.filter(r=>isP(r.status)&&new Date(r.date+'T00:00:00').getDay()!==0).length;
   const pct=wD>0?Math.round(pres/wD*100):0;
@@ -1435,7 +1436,7 @@ function renderAtt(){
       </div>
       <div style="text-align:right;flex-shrink:0;">
         ${rec?.hours?`<div style="font-size:13px;font-weight:700;">${parseFloat(rec.hours).toFixed(1)}h</div>`:''}
-        ${rec?.overtime>0&&parseFloat(rec.overtime)<=parseFloat(rec.hours||0)?`<div style="font-size:10px;color:var(--amb);font-weight:600;">+${parseFloat(rec.overtime).toFixed(1)}h OT</div>`:''}
+        ${rec?.overtime>0?`<div style="font-size:10px;color:var(--amb);font-weight:600;">+${parseFloat(rec.overtime).toFixed(1)}h OT</div>`:''}
         ${rec?.bonus?`<div style="font-size:11px;font-weight:700;color:var(--grn);">+${fmt(rec.bonus)}</div>`:''}
       </div>
     </div>`;
@@ -1480,7 +1481,7 @@ async function submitExp(){
   const merchant=document.getElementById('expMerchant').value.trim();
   const amt=parseFloat(document.getElementById('expAmt').value);
   const date=document.getElementById('expDate').value;
-  if(!merchant||!amt||!date){toast('Please fill date, description and amount','e');return;}
+  if(!merchant||!amt||!date){_submittingExp=false;toast('Please fill date, description and amount','e');return;}
   let fileUrl=null;
   if(_rcptFile){
     const ext=_rcptFile.name.split('.').pop()||'jpg';
@@ -1786,7 +1787,7 @@ async function sendMsg(){
   const body=input.value.trim();if(!body)return;
   _sendingMsg=true;
   input.disabled=true;
-  const r=await SB.from('messages').insert({employee_id:emp.id,sender:emp.id,body,read:false}).select().single();
+  const r=await SB.from('messages').insert({employee_id:emp.id,sender:'employee',body,read:false}).select().single();
   input.disabled=false;_sendingMsg=false;
   if(r.error){toast(r.error.message,'e');return;}
   // Only add if not already in list (realtime may have already added it)
