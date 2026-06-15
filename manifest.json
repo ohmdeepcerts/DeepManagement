@@ -1,0 +1,15 @@
+{
+  "name": "OHM Attendance — Office",
+  "short_name": "OHM Office",
+  "description": "OHM Electrical staff attendance and payroll management",
+  "icons": [
+    { "src": "logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "start_url": "/DEEPFLOW/index.html",
+  "scope": "/DEEPFLOW/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#f59e0b"
+}
