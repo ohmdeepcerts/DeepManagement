@@ -351,12 +351,27 @@ tr.rsun td{background:var(--sut)!important;}
 .dc.L{background:#dbeafe;color:#1d4ed8;}.dc.S{background:#fce7f3;color:#9d174d;}
 .dc.H{background:#ede9fe;color:#6d28d9;}.dc.HD{background:#fff7ed;color:#c2410c;}
 .dc.empty{background:transparent;border:1px dashed var(--bdr);color:var(--txtm);}
-.ec{background:var(--card);border:1px solid var(--bdr);border-radius:var(--rl);padding:14px;box-shadow:var(--sh);transition:var(--tr);cursor:pointer;}
+.ec{background:var(--card);border:1px solid var(--bdr);border-radius:var(--rl);padding:0;box-shadow:var(--sh);transition:var(--tr);cursor:pointer;overflow:hidden;display:flex;flex-direction:column;}
 .ec:hover{box-shadow:var(--shm);transform:translateY(-2px);}
 .ec.ex{border-color:rgba(139,92,246,0.3);background:linear-gradient(135deg,var(--card) 0%,rgba(139,92,246,0.04) 100%);}
-.ec-ava{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;margin-bottom:9px;}
-.ec-name{font-size:14px;font-weight:700;margin-bottom:2px;}
-.ec-meta{font-size:11px;color:var(--txtm);margin-bottom:5px;}
+.ec-head{display:flex;align-items:center;gap:10px;padding:13px 13px 11px;}
+.ec-ava-wrap{position:relative;width:54px;height:54px;flex-shrink:0;}
+.ec-ava-wrap svg{position:absolute;inset:0;width:54px;height:54px;}
+.ec-ava{position:absolute;top:4px;left:4px;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;overflow:hidden;}
+.ec-ava img{width:100%;height:100%;object-fit:cover;object-position:top;}
+.ec-ava-dot{position:absolute;bottom:1px;right:1px;width:10px;height:10px;border-radius:50%;border:2px solid var(--card);z-index:2;}
+.ec-info{flex:1;min-width:0;}
+.ec-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
+.ec-meta{font-size:11px;color:var(--txtm);}
+.ec-divider{height:1px;background:var(--bdr);margin:0;}
+.ec-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:9px 13px;}
+.ec-stat{text-align:center;}
+.ec-stat-lbl{font-size:9px;color:var(--txtm);margin-bottom:2px;}
+.ec-stat-val{font-size:13px;font-weight:700;}
+.ec-pay{display:flex;align-items:center;justify-content:space-between;padding:9px 13px 13px;}
+.ec-pay-val{font-size:13px;font-weight:700;}
+.ec-pay-sub{font-size:10px;color:var(--txtm);margin-top:1px;}
+.ec-reinstate{margin:0 13px 13px;width:calc(100% - 26px);padding:6px 0;border:1px solid var(--pur);border-radius:6px;font-size:11px;color:var(--pur);background:var(--purl);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
 .sp{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;}
 .sp-a{background:var(--grnl);color:var(--grn);}
 .sp-ex{background:var(--purl);color:var(--pur);}
@@ -1037,9 +1052,32 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 <div class="mo" id="empModal">
   <div class="modal">
     <div class="mh"><div class="mt" id="empMTitle">Add Employee</div><button class="mc" onclick="closeEmpModal()"><i class="fa-solid fa-xmark"></i></button></div>
-    <div class="mo-tabs"><div class="mo-tab active" onclick="switchEmpTab('details',this)"><i class="fa-solid fa-user" style="margin-right:5px;"></i>Details</div><div class="mo-tab" onclick="switchEmpTab('pay',this)"><i class="fa-solid fa-sterling-sign" style="margin-right:5px;"></i>Pay &amp; Contract</div><div class="mo-tab" onclick="switchEmpTab('hours',this)"><i class="fa-solid fa-clock" style="margin-right:5px;"></i>Hours &amp; PIN</div><div class="mo-tab" onclick="switchEmpTab('docs',this);loadEmpDocs()"><i class="fa-solid fa-folder-open" style="margin-right:5px;"></i>Documents</div><div class="mo-tab" onclick="switchEmpTab('salary',this)"><i class="fa-solid fa-clock-rotate-left" style="margin-right:5px;"></i>Pay History</div></div>
+    <div class="mo-tabs"><div class="mo-tab active" onclick="switchEmpTab('details',this)"><i class="fa-solid fa-user" style="margin-right:5px;"></i>Details</div><div class="mo-tab" onclick="switchEmpTab('pay',this)"><i class="fa-solid fa-sterling-sign" style="margin-right:5px;"></i>Pay &amp; Contract</div><div class="mo-tab" onclick="switchEmpTab('hours',this)"><i class="fa-solid fa-clock" style="margin-right:5px;"></i>Hours &amp; PIN</div><div class="mo-tab" onclick="switchEmpTab('docs',this);loadEmpDocs()"><i class="fa-solid fa-folder-open" style="margin-right:5px;"></i>Documents</div><div class="mo-tab" onclick="switchEmpTab('salary',this)"><i class="fa-solid fa-clock-rotate-left" style="margin-right:5px;"></i>Pay History</div><div class="mo-tab" onclick="switchEmpTab('danger',this);initDangerTab()" style="color:var(--red);"><i class="fa-solid fa-user-slash" style="margin-right:5px;"></i>Ex-Employee</div></div>
     <input type="hidden" id="empId">
     <div class="mo-sec active" id="empTab-details">
+      <!-- PHOTO UPLOAD -->
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--bdr);">
+        <div style="position:relative;width:64px;height:64px;flex-shrink:0;cursor:pointer;" onclick="document.getElementById('empPhotoFile').click()" title="Click to upload photo">
+          <svg viewBox="0 0 64 64" width="64" height="64" style="position:absolute;inset:0;"><circle cx="32" cy="32" r="28" fill="none" stroke="var(--bdr)" stroke-width="3"/></svg>
+          <div id="empPhotoPreview" style="position:absolute;top:5px;left:5px;width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;overflow:hidden;font-family:inherit;"></div>
+          <div style="position:absolute;bottom:0;right:0;width:20px;height:20px;background:var(--acc);border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid var(--card);"><i class="fa-solid fa-camera" style="font-size:9px;color:#fff;"></i></div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:5px;">Profile Photo <span style="font-weight:400;color:var(--txtm);">(optional)</span></div>
+          <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
+            <label style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:12px;cursor:pointer;background:var(--card2);color:var(--txt2);">
+              <i class="fa-solid fa-camera"></i>Upload photo
+              <input type="file" id="empPhotoFile" accept="image/*" style="display:none;" onchange="openPhotoCropper(this)">
+            </label>
+            <button class="btn btn-o btn-sm" id="empPhotoRemoveBtn" onclick="removeEmpPhoto()" style="display:none;"><i class="fa-solid fa-xmark"></i>Remove</button>
+            <button class="btn btn-o btn-sm" id="empPhotoAdjustBtn" onclick="openPhotoCropperAdjust()" style="display:none;"><i class="fa-solid fa-crop-simple"></i>Adjust</button>
+          </div>
+          <div style="font-size:11px;color:var(--txtm);margin-top:5px;">Drag to reposition face after upload</div>
+        </div>
+        <input type="hidden" id="empPhotoUrl">
+        <input type="hidden" id="empPhotoOffsetX" value="50">
+        <input type="hidden" id="empPhotoOffsetY" value="50">
+      </div>
       <div class="fg fg2">
         <div class="fgl" style="grid-column:1/-1"><label>Full Name *</label><input type="text" id="eName" placeholder="e.g. JAVED KHAN"></div>
         <div class="fgl"><label>Status</label><select id="eStatus"><option value="Active">Active</option><option value="ex">Ex-Employee</option></select></div>
@@ -1074,17 +1112,32 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div id="eRateDisplay" style="margin-top:9px;padding:9px 13px;background:var(--purl);border-radius:8px;font-size:13px;color:var(--pur);font-weight:700;display:none;"></div>
       </div>
 
+      <!-- CURRENT RATE DISPLAY (read-only — change via Pay Rise modal) -->
+      <div id="currentRateDisplay" style="background:var(--card2);border:1.5px solid var(--bdr);border-radius:var(--r);padding:14px 16px;margin-bottom:13px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px;">
+          <div>
+            <div style="font-size:11px;color:var(--txtm);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;" id="currentRateLabel">Current Rate</div>
+            <div style="font-size:24px;font-weight:800;color:var(--grn);font-family:'JetBrains Mono',monospace;" id="currentRateValue">—</div>
+            <div style="font-size:11px;color:var(--txtm);margin-top:3px;" id="currentRateSince"></div>
+          </div>
+          <button class="btn btn-p btn-sm" onclick="openPayRiseModal()" id="changeRateBtn" style="display:none;">
+            <i class="fa-solid fa-arrow-trend-up"></i>Change Rate
+          </button>
+        </div>
+      </div>
+      <!-- Hidden inputs to hold rate values for save (populated by selPayType / editEmpModal) -->
+      <input type="hidden" id="eSalary">
+      <input type="hidden" id="eDailyRate">
+      <input type="hidden" id="eHrRate">
+
       <div id="pf-fixed">
-        <div class="ibox"><i class="fa-solid fa-circle-info"></i>Monthly salary paid regardless of hours. OT hours above contracted hours paid at OT rate.</div>
-        <div class="fg fg2"><div class="fgl"><label>Monthly Salary (£)</label><input type="number" id="eSalary" min="0" step="50" placeholder="e.g. 2500" oninput="updateRateDisplay()"></div><div class="fgl"><label>Contracted Hours/Day</label><input type="number" id="eContHrs" min="1" max="16" step="0.5" placeholder="e.g. 8" oninput="var d=document.getElementById('eContHrsD');if(d)d.value=this.value;updateRateDisplay();"></div></div>
+        <div class="fg fg2"><div class="fgl"><label>Contracted Hours/Day</label><input type="number" id="eContHrs" min="1" max="16" step="0.5" placeholder="e.g. 8" oninput="var d=document.getElementById('eContHrsD');if(d)d.value=this.value;updateRateDisplay();"></div></div>
       </div>
       <div id="pf-daily" style="display:none;">
-        <div class="ibox"><i class="fa-solid fa-circle-info"></i>Fixed daily rate per day present. OT hours at agreed rate.</div>
-        <div class="fg fg2"><div class="fgl"><label>Daily Rate (£)</label><input type="number" id="eDailyRate" min="0" step="5" placeholder="e.g. 120" oninput="updateRateDisplay()"></div><div class="fgl"><label>Contracted Hours/Day</label><input type="number" id="eContHrsD" min="1" max="16" step="0.5" placeholder="e.g. 8" oninput="var f=document.getElementById('eContHrs');if(f)f.value=this.value;updateRateDisplay();"></div></div>
+        <div class="fg fg2"><div class="fgl"><label>Contracted Hours/Day</label><input type="number" id="eContHrsD" min="1" max="16" step="0.5" placeholder="e.g. 8" oninput="var f=document.getElementById('eContHrs');if(f)f.value=this.value;updateRateDisplay();"></div></div>
       </div>
       <div id="pf-hourly" style="display:none;">
-        <div class="ibox"><i class="fa-solid fa-circle-info"></i>Paid per hour. OT hours at OT rate.</div>
-        <div class="fg fg2"><div class="fgl"><label>Hourly Rate (£/h)</label><input type="number" id="eHrRate" min="0" step="0.5" placeholder="e.g. 15" oninput="updateRateDisplay()"></div><div class="fgl"><label>OT Threshold (hrs/day)</label><input type="number" id="eOTThr" min="0" max="16" step="0.5" placeholder="Uses global if blank"></div></div>
+        <div class="fg fg2"><div class="fgl"><label>OT Threshold (hrs/day)</label><input type="number" id="eOTThr" min="0" max="16" step="0.5" placeholder="Uses global if blank"></div></div>
       </div>
       <div style="border-top:1px solid var(--bdr);padding-top:13px;margin-top:13px;">
         <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-hourglass-half" style="color:var(--amb);margin-right:5px;"></i>Overtime Rate</div>
@@ -1098,8 +1151,16 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-building-columns" style="color:var(--tel);margin-right:5px;"></i>Payment Split</div>
         <div class="fg fg2"><div class="fgl"><label>Monthly Bank Transfer (£)</label><input type="number" id="eBankAmt" min="0" step="10" placeholder="e.g. 700"></div><div class="fgl"><label>Bank Account</label><select id="eBankName" onchange="toggleCustomBank(this.value)"></select></div><div class="fgl" id="customBankG" style="display:none;grid-column:1/-1"><label>Custom Bank Name</label><input type="text" id="eBankCustom"></div></div>
       </div>
-      <input type="hidden" id="eSalaryFrom">
-      <input type="hidden" id="eSalaryAdj">
+      <!-- NEW EMPLOYEE ONLY: initial rate entry -->
+      <div id="newEmpRateBox" style="display:none;border-top:1px solid var(--bdr);padding-top:13px;margin-top:13px;background:var(--grnl);border-radius:var(--r);padding:14px 16px;border:1.5px solid rgba(22,163,74,0.25);">
+        <div style="font-size:13px;font-weight:700;color:var(--grn);margin-bottom:11px;"><i class="fa-solid fa-circle-plus" style="margin-right:6px;"></i>Set Starting Rate</div>
+        <div class="fg fg2">
+          <div class="fgl" id="newRateFixedG"><label>Monthly Salary (£)</label><input type="number" id="eNewSalary" min="0" step="50" placeholder="e.g. 2500" oninput="syncNewRate()"></div>
+          <div class="fgl" id="newRateDailyG" style="display:none;"><label>Daily Rate (£)</label><input type="number" id="eNewDailyRate" min="0" step="5" placeholder="e.g. 120" oninput="syncNewRate()"></div>
+          <div class="fgl" id="newRateHourlyG" style="display:none;"><label>Hourly Rate (£/h)</label><input type="number" id="eNewHrRate" min="0" step="0.5" placeholder="e.g. 15" oninput="syncNewRate()"></div>
+          <div class="fgl"><label>Effective From</label><input type="date" id="eNewRateFrom" value=""></div>
+        </div>
+      </div>
       <input type="hidden" id="eDailyFrom">
     </div>
     <div class="mo-sec" id="empTab-hours">
@@ -1114,6 +1175,10 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     </div>
     <!-- SALARY HISTORY TAB -->
     <div class="mo-sec" id="empTab-salary">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;flex-wrap:wrap;gap:8px;">
+        <div style="font-size:13px;font-weight:700;">Pay Rate History</div>
+        <button class="btn btn-p btn-sm" onclick="openPayRiseModal()"><i class="fa-solid fa-arrow-trend-up"></i>Add Pay Rise / Change</button>
+      </div>
       <div id="salaryHistList"><div style="text-align:center;color:var(--txtm);padding:20px;font-size:13px;">No salary history yet.</div></div>
     </div>
     <!-- DOCUMENTS TAB -->
@@ -1169,11 +1234,109 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div style="text-align:center;color:var(--txtm);padding:26px;font-size:13px;"><i class="fa-solid fa-folder-open" style="font-size:28px;display:block;margin-bottom:9px;"></i>No documents yet.<br>Click + Add Document to upload IDs, Share Codes etc.</div>
       </div>
     </div>
+    <!-- DANGER / EX-EMPLOYEE TAB -->
+    <div class="mo-sec" id="empTab-danger">
+      <div id="dangerTabContent">
+        <!-- populated by initDangerTab() -->
+      </div>
+    </div>
     <div class="mf"><button class="btn btn-d btn-sm" id="empDelBtn" style="display:none;" onclick="deleteEmployee()"><i class="fa-solid fa-trash"></i>Delete</button><div style="display:flex;gap:7px;"><button class="btn btn-o" onclick="closeEmpModal()">Cancel</button><button class="btn btn-p" onclick="saveEmployee()"><i class="fa-solid fa-floppy-disk"></i>Save Employee</button></div></div>
   </div>
 </div>
 
+<!-- PHOTO CROPPER MODAL -->
+<div class="mo" id="photoCropperModal" style="z-index:10001;">
+  <div class="modal modal-sm" style="max-width:360px;">
+    <div class="mh">
+      <div class="mt"><i class="fa-solid fa-crop-simple" style="color:var(--acc);margin-right:7px;"></i>Adjust Photo</div>
+      <button class="mc" onclick="closeCropper()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div style="padding:18px;">
+      <div style="font-size:12px;color:var(--txtm);margin-bottom:12px;text-align:center;">Drag the image to reposition · Scroll or pinch to zoom</div>
+      <!-- Circle crop viewport -->
+      <div style="display:flex;justify-content:center;margin-bottom:16px;">
+        <div id="cropViewport" style="width:240px;height:240px;border-radius:50%;overflow:hidden;border:3px solid var(--acc);position:relative;cursor:grab;background:#000;flex-shrink:0;">
+          <img id="cropImg" style="position:absolute;transform-origin:0 0;user-select:none;-webkit-user-select:none;pointer-events:none;" draggable="false">
+        </div>
+      </div>
+      <!-- Zoom slider -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+        <button onclick="_cropState.zoom=Math.max(0.3,parseFloat((_cropState.zoom-0.02).toFixed(3)));document.getElementById('cropZoom').value=_cropState.zoom;constrainCrop();updateCrop();" style="width:28px;height:28px;border:1px solid var(--bdr);border-radius:6px;background:var(--card2);color:var(--txt);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">−</button>
+        <input type="range" id="cropZoom" min="0.3" max="2" step="0.005" value="1" style="flex:1;" oninput="_cropState.zoom=parseFloat(this.value);constrainCrop();updateCrop()">
+        <button onclick="_cropState.zoom=Math.min(2,parseFloat((_cropState.zoom+0.02).toFixed(3)));document.getElementById('cropZoom').value=_cropState.zoom;constrainCrop();updateCrop();" style="width:28px;height:28px;border:1px solid var(--bdr);border-radius:6px;background:var(--card2);color:var(--txt);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>
+      </div>
+      <!-- Preview -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:10px 12px;background:var(--card2);border-radius:var(--r);">
+        <div style="font-size:11px;color:var(--txtm);">Preview on card:</div>
+        <div style="width:42px;height:42px;border-radius:50%;overflow:hidden;border:2px solid var(--bdr);flex-shrink:0;position:relative;background:#000;">
+          <img id="cropPreviewImg" style="position:absolute;transform-origin:0 0;" draggable="false">
+        </div>
+        <div style="width:32px;height:32px;border-radius:50%;overflow:hidden;border:2px solid var(--bdr);flex-shrink:0;position:relative;background:#000;">
+          <img id="cropPreviewImgSm" style="position:absolute;transform-origin:0 0;" draggable="false">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-o" style="flex:1;" onclick="closeCropper()">Cancel</button>
+        <button class="btn btn-p" style="flex:1;" onclick="applyCrop()"><i class="fa-solid fa-check"></i>Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- DOCUMENT VIEWER MODAL -->
+<!-- PAY RISE MODAL -->
+<div class="mo" id="payRiseModal">
+  <div class="modal modal-sm">
+    <div class="mh">
+      <div><div class="mt"><i class="fa-solid fa-arrow-trend-up" style="color:var(--grn);margin-right:7px;"></i>Add Pay Rise / Rate Change</div>
+      <div style="font-size:12px;color:var(--txtm);margin-top:2px;" id="prEmpName"></div></div>
+      <button class="mc" onclick="document.getElementById('payRiseModal').classList.remove('open')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div style="padding:18px;">
+      <div style="background:var(--card2);border:1px solid var(--bdr);border-radius:var(--r);padding:12px 14px;margin-bottom:16px;">
+        <div style="font-size:11px;color:var(--txtm);margin-bottom:3px;">Current Rate</div>
+        <div style="font-size:18px;font-weight:800;color:var(--grn);" id="prCurrentRate">—</div>
+        <div style="font-size:11px;color:var(--txtm);" id="prPayType">—</div>
+      </div>
+      <div class="fg" style="margin-bottom:13px;">
+        <label>New Rate (£) *</label>
+        <input type="number" id="prNewRate" min="0" step="10" placeholder="e.g. 2800" oninput="updatePayRisePreview()">
+      </div>
+      <div id="prPreview" style="display:none;background:var(--grnl);border:1px solid rgba(22,163,74,0.2);border-radius:var(--rs);padding:10px 13px;margin-bottom:13px;font-size:13px;">
+        <span id="prPreviewText"></span>
+      </div>
+      <div class="fg fg2">
+        <div class="fgl">
+          <label>Effective From *</label>
+          <input type="date" id="prEffectiveFrom">
+        </div>
+        <div class="fgl">
+          <label>Reason</label>
+          <select id="prReason" style="padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--txt);background:var(--card);outline:none;width:100%;">
+            <option value="">— Select reason —</option>
+            <option value="Annual increment">Annual increment</option>
+            <option value="Performance raise">Performance raise</option>
+            <option value="Promotion">Promotion</option>
+            <option value="Correction">Correction</option>
+            <option value="Agreed increase">Agreed increase</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="fgl" style="grid-column:1/-1;">
+          <label>Notes (optional)</label>
+          <input type="text" id="prNotes" placeholder="e.g. Annual performance review — approved by management">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--txtm);margin-top:4px;background:var(--blul);border:1px solid rgba(37,99,235,0.15);border-radius:var(--rs);padding:9px 11px;">
+        <i class="fa-solid fa-circle-info" style="color:var(--blu);margin-right:5px;"></i>Payroll will be recalculated from the effective date forward. Past months stay unchanged.
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-o" onclick="document.getElementById('payRiseModal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-p" onclick="savePayRise()"><i class="fa-solid fa-floppy-disk"></i>Save Pay Change</button>
+    </div>
+  </div>
+</div>
 <div class="mo" id="docViewModal">
   <div class="modal modal-sm">
     <div class="mh">
@@ -3717,38 +3880,125 @@ function renderEmployees(){
       hrEquiv=parseFloat(emp.hourly_rate);
     }
     const hrEquivLabel=hrEquiv>0?`${C}${hrEquiv.toFixed(2)}/h`:'';
+    // Attendance ring calc
+    const ringCirc=Math.PI*2*23; // r=23
+    const ringFill=Math.round((pct/100)*ringCirc);
+    const ringGap=Math.round(ringCirc-ringFill);
+    const ringCol=pct>=80?'var(--grn)':pct>=60?'var(--amb)':'var(--red)';
+    const dotCol=emp.status==='Active'?'var(--grn)':emp.status==='ex'?'var(--pur)':'var(--amb)';
+    // Avatar — photo or initials
+    const photoHtml=emp.photo_url
+      ?`<img src="${emp.photo_url}" alt="${emp.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;">${inits(emp.name)}</span>`
+      :`<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;">${inits(emp.name)}</span>`;
+    const avaBg=isEx?'linear-gradient(135deg,#7c3aed,#4c1d95)':avcol(emp.id);
     return`<div class="ec${isEx?' ex':''}" onclick="editEmpModal('${emp.id}')">
-      <div class="ec-ava" style="background:${isEx?'linear-gradient(135deg,#7c3aed,#4c1d95)':avcol(emp.id)}">${inits(emp.name)}</div>
-      <div class="ec-name">${emp.name}</div>
-      <div class="ec-meta">${emp.role||'No role set'} ${emp.contract_type?`<span class="cp ${emp.contract_type==='PAYE'?'cp-p':'cp-s'}">${emp.contract_type}</span>`:''}</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <span class="sp ${isEx?'sp-ex':'sp-a'}">${isEx?'● Ex':'● Active'}</span>
-        ${hasRate?`<span style="font-size:10px;color:var(--grn);font-weight:700;">${payLabel}${hrEquivLabel?` <span style="color:var(--txtm);font-weight:500;">(≈${hrEquivLabel})</span>`:''}</span>`:''}
+      <div class="ec-head">
+        <div class="ec-ava-wrap">
+          <svg viewBox="0 0 54 54"><circle cx="27" cy="27" r="23" fill="none" stroke="var(--bdr)" stroke-width="3.5"/><circle cx="27" cy="27" r="23" fill="none" stroke="${ringCol}" stroke-width="3.5" stroke-dasharray="${ringFill} ${ringGap}" stroke-dashoffset="37" stroke-linecap="round"/></svg>
+          <div class="ec-ava" style="background:${avaBg};">${photoHtml}</div>
+          <div class="ec-ava-dot" style="background:${dotCol};"></div>
+        </div>
+        <div class="ec-info">
+          <div class="ec-name">${emp.name}</div>
+          <div class="ec-meta">${emp.role||'No role set'}</div>
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:7px;text-align:center;">
-        <div style="font-size:10px;color:var(--txtm);">Present<br><strong style="font-size:14px;color:var(--grn);">${pWD}</strong></div>
-        <div style="font-size:10px;color:var(--txtm);">Sundays<br><strong style="font-size:14px;color:#4338ca;">${suns}</strong></div>
-        <div style="font-size:10px;color:var(--txtm);">Rate<br><strong style="font-size:14px;color:${pct>=80?'var(--grn)':pct>=60?'var(--amb)':'var(--red)'};">${pct}%</strong></div>
+      <div class="ec-divider"></div>
+      <div class="ec-stats">
+        <div class="ec-stat"><div class="ec-stat-lbl">Present</div><div class="ec-stat-val" style="color:var(--grn);">${pWD}</div></div>
+        <div class="ec-stat"><div class="ec-stat-lbl">Sundays</div><div class="ec-stat-val" style="color:#4338ca;">${suns}</div></div>
+        <div class="ec-stat"><div class="ec-stat-lbl">Att.</div><div class="ec-stat-val" style="color:${ringCol};">${pct}%</div></div>
       </div>
       ${(function(){
-        if(!emp.contracted_hours)return'';
+        if(!emp.contracted_hours)return'<div style="height:4px;"></div>';
         var ch=parseFloat(emp.contracted_hours);
         var expected=ch*pWD;
         var short=expected-mHrsThisMonth;
         var ok=mHrsThisMonth>=expected-0.5;
-        return'<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 7px;background:var(--card2);border-radius:6px;margin-bottom:7px;font-size:11px;">'+
-          '<span style="color:var(--txtm);">Contract <strong>'+ch+'h/day</strong></span>'+
-          '<span style="color:'+(ok?'var(--grn)':'var(--red)')+';">Worked <strong>'+mHrsThisMonth.toFixed(1)+'h</strong></span>'+
-          (ok?'<span style="color:var(--grn);">✓ On track</span>':'<span style="color:var(--red);font-weight:700;">-'+short.toFixed(1)+'h short</span>')+
+        return'<div class="ec-divider"></div><div class="ec-stats" style="padding-bottom:6px;">'+
+          '<div class="ec-stat"><div class="ec-stat-lbl">Contract</div><div class="ec-stat-val" style="font-size:11px;">'+ch+'h/day</div></div>'+
+          '<div class="ec-stat"><div class="ec-stat-lbl">Worked</div><div class="ec-stat-val" style="font-size:11px;">'+mHrsThisMonth.toFixed(1)+'h</div></div>'+
+          '<div class="ec-stat"><div class="ec-stat-lbl"></div><div class="ec-stat-val" style="font-size:10px;color:'+(ok?'var(--grn)':'var(--red)')+';">'+( ok?'✓ On track':'-'+short.toFixed(1)+'h')+'</div></div>'+
         '</div>';
       })()}
-      <button onclick="event.stopPropagation();${isEx?`markEmpActive('${emp.id}')`:`markEmpEx('${emp.id}')`}" style="width:100%;padding:4px;border:1px solid ${isEx?'var(--pur)':'var(--bdr)'};border-radius:5px;font-size:11px;color:${isEx?'var(--pur)':'var(--txtm)'};background:${isEx?'var(--purl)':'transparent'};cursor:pointer;"><i class="fa-solid ${isEx?'fa-user-check':'fa-user-slash'}" style="margin-right:3px;"></i>${isEx?'Reinstate':'Mark as Ex-Employee'}</button>
+      <div class="ec-divider"></div>
+      <div class="ec-pay">
+        <div>
+          <div class="ec-pay-val">${hasRate?payLabel:`<span style="color:var(--red);font-size:11px;font-weight:600;">⚠ No rate set</span>`}</div>
+          ${hrEquivLabel&&hasRate?`<div class="ec-pay-sub">≈ ${hrEquivLabel}</div>`:''}
+        </div>
+        <span class="cp ${emp.contract_type==='PAYE'?'cp-p':'cp-s'}">${emp.contract_type||'—'}</span>
+      </div>
+      ${isEx?`<button class="ec-reinstate" onclick="event.stopPropagation();markEmpActive('${emp.id}')"><i class="fa-solid fa-user-check" style="margin-right:4px;"></i>Reinstate Employee</button>`:''}
     </div>`;
   }).join('');
 }
 function setEmpTab(f,el){empTabFilter=f;document.querySelectorAll('#page-employees .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderEmployees();}
-async function markEmpEx(id){if(!confirm('Mark as ex-employee?'))return;const idx=employees.findIndex(e=>e.id===id);if(idx<0)return;await sb.from('employees').update({status:'ex'}).eq('id',id);employees[idx].status='ex';renderEmployees();toast('Marked as ex-employee','i');}
+// markEmpEx removed — use the Ex-Employee tab in the employee modal (confirmMarkEx)
 async function markEmpActive(id){const idx=employees.findIndex(e=>e.id===id);if(idx<0)return;await sb.from('employees').update({status:'Active',left_date:null}).eq('id',id);employees[idx].status='Active';employees[idx].left_date=null;renderEmployees();toast('Employee reinstated','s');}
+
+function initDangerTab(){
+  const id=document.getElementById('empId').value;
+  const emp=employees.find(e=>e.id===id);
+  if(!emp){document.getElementById('dangerTabContent').innerHTML='<p style="color:var(--txtm);font-size:13px;text-align:center;padding:20px;">Save the employee first.</p>';return;}
+  const isEx=emp.status==='ex';
+  const box=document.getElementById('dangerTabContent');
+  if(isEx){
+    box.innerHTML=`
+      <div style="background:var(--purl);border:1px solid rgba(139,92,246,0.3);border-radius:var(--r);padding:18px 18px 16px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <i class="fa-solid fa-user-check" style="color:var(--pur);font-size:16px;"></i>
+          <span style="font-size:14px;font-weight:700;color:var(--pur);">Currently an Ex-Employee</span>
+        </div>
+        <p style="font-size:12px;color:var(--txtm);margin-bottom:14px;line-height:1.6;">${emp.name} is currently marked as an ex-employee and does not appear in active payroll or attendance. You can reinstate them at any time.</p>
+        <button class="btn btn-p" onclick="markEmpActive('${emp.id}');closeEmpModal();" style="width:100%;background:var(--pur);border-color:var(--pur);">
+          <i class="fa-solid fa-user-check"></i>Reinstate ${emp.name}
+        </button>
+      </div>`;
+    return;
+  }
+  box.innerHTML=`
+    <div style="background:var(--redl);border:1px solid rgba(239,68,68,0.3);border-radius:var(--r);padding:18px 18px 16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <i class="fa-solid fa-user-slash" style="color:var(--red);font-size:16px;"></i>
+        <span style="font-size:14px;font-weight:700;color:var(--red);">Mark as Ex-Employee</span>
+      </div>
+      <p style="font-size:12px;color:var(--txtm);margin-bottom:6px;line-height:1.6;">This will archive <strong>${emp.name}</strong>'s record and remove them from active payroll, attendance, and reports. Their historical data is kept. You can reinstate them at any time.</p>
+      <p style="font-size:12px;color:var(--txtm);margin-bottom:14px;line-height:1.6;">This does <strong>not</strong> delete any records — it only changes their status to ex-employee.</p>
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:6px;">Type <strong style="color:var(--red);">${emp.name.toUpperCase()}</strong> to confirm</label>
+      <input type="text" id="exConfirmInput" placeholder="Type employee name to confirm..." oninput="checkExConfirm('${emp.name}')"
+        style="width:100%;padding:9px 11px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--txt);background:var(--card);outline:none;margin-bottom:10px;"
+        onfocus="this.style.borderColor='var(--red)'" onblur="this.style.borderColor='var(--bdr)'">
+      <button id="exConfirmBtn" onclick="confirmMarkEx('${emp.id}')" disabled
+        style="width:100%;padding:9px 0;border:none;border-radius:var(--rs);background:var(--red);color:#fff;font-size:13px;font-weight:600;cursor:not-allowed;opacity:0.4;display:flex;align-items:center;justify-content:center;gap:7px;transition:opacity 0.2s;">
+        <i class="fa-solid fa-user-slash"></i>Confirm — Mark as Ex-Employee
+      </button>
+      <p style="font-size:11px;color:var(--txtm);text-align:center;margin-top:8px;">Button activates only when the name is typed correctly</p>
+    </div>`;
+}
+function checkExConfirm(empName){
+  const input=document.getElementById('exConfirmInput');
+  const btn=document.getElementById('exConfirmBtn');
+  if(!input||!btn)return;
+  const match=input.value.trim().toUpperCase()===empName.trim().toUpperCase();
+  btn.disabled=!match;
+  btn.style.opacity=match?'1':'0.4';
+  btn.style.cursor=match?'pointer':'not-allowed';
+}
+async function confirmMarkEx(id){
+  const btn=document.getElementById('exConfirmBtn');
+  if(btn)btn.disabled=true;
+  const idx=employees.findIndex(e=>e.id===id);if(idx<0)return;
+  const empName=employees[idx].name;
+  const leftDate=dateKey(new Date());
+  const r=await sb.from('employees').update({status:'ex',left_date:leftDate}).eq('id',id);
+  if(r.error){toast(r.error.message,'e');if(btn)btn.disabled=false;return;}
+  employees[idx].status='ex';
+  employees[idx].left_date=leftDate;
+  closeEmpModal();
+  renderEmployees();
+  toast(`${empName} marked as ex-employee`,'i');
+}
 
 function openEmpModal(){
   document.getElementById('empMTitle').textContent='Add Employee';
@@ -3762,6 +4012,24 @@ function openEmpModal(){
   document.getElementById('eJoin').value='';document.getElementById('eLeft').value='';
   selPayType('fixed');toggleOTF();refreshBankSel();
   document.getElementById('empDelBtn').style.display='none';
+  // Reset photo for new employee
+  const prev=document.getElementById('empPhotoPreview');
+  if(prev){prev.innerHTML='<i class="fa-solid fa-user" style="font-size:20px;color:#fff;"></i>';prev.style.background='var(--acc)';}
+  const photoUrl=document.getElementById('empPhotoUrl');if(photoUrl){photoUrl.value='';photoUrl.dataset.pending='';}
+  const removeBtn=document.getElementById('empPhotoRemoveBtn');if(removeBtn)removeBtn.style.display='none';
+  const photoFile=document.getElementById('empPhotoFile');if(photoFile)photoFile.value='';
+  // New employee: show initial rate entry box, hide current rate display
+  document.getElementById('currentRateDisplay').style.display='none';
+  document.getElementById('newEmpRateBox').style.display='block';
+  document.getElementById('changeRateBtn').style.display='none';
+  document.getElementById('eNewSalary').value='';
+  document.getElementById('eNewDailyRate').value='';
+  document.getElementById('eNewHrRate').value='';
+  document.getElementById('eNewRateFrom').value=dateKey(new Date());
+  // Clear hidden rate fields
+  document.getElementById('eSalary').value='';
+  document.getElementById('eDailyRate').value='';
+  document.getElementById('eHrRate').value='';
   switchEmpTab('details',document.querySelector('.mo-tab'));
   document.getElementById('empModal').classList.add('open');
 }
@@ -3780,11 +4048,10 @@ function editEmpModal(id){
   document.getElementById('eWStart').value=emp.work_start||'08:00';
   document.getElementById('eWEnd').value=emp.work_end||'17:00';
   selPayType(emp.pay_type||'fixed');
+  // Store current rates in hidden fields (used by saveEmployee for non-rate fields)
   document.getElementById('eSalary').value=emp.salary||'';
-  // Show effective date of current rate from history
-  const empLatestHist=salaryHistory.filter(h=>h.employee_id===emp.id)[0];
-  if(document.getElementById('eSalaryFrom'))document.getElementById('eSalaryFrom').value=empLatestHist?.effective_from||'';
-  if(document.getElementById('eSalaryAdj'))document.getElementById('eSalaryAdj').value='';
+  document.getElementById('eDailyRate').value=emp.daily_rate||'';
+  document.getElementById('eHrRate').value=emp.hourly_rate||'';
   document.getElementById('eContHrs').value=emp.contracted_hours||'';
   document.getElementById('eContHrsD').value=emp.contracted_hours||'';
   // Prefill work days checkboxes
@@ -3792,9 +4059,6 @@ function editEmpModal(id){
     var wd=(emp.work_days&&emp.work_days.length)?emp.work_days:[1,2,3,4,5,6];
     document.querySelectorAll('.eWorkDay').forEach(function(c){c.checked=wd.indexOf(parseInt(c.value))>=0;});
   })();
-  setTimeout(updateRateDisplay,50);
-  document.getElementById('eDailyRate').value=emp.daily_rate||'';
-  document.getElementById('eHrRate').value=emp.hourly_rate||'';
   document.getElementById('eOTThr').value=emp.ot_threshold||'';
   document.getElementById('eOTType').value=emp.ot_type||'multiplier';
   document.getElementById('eOTMult').value=emp.ot_mult||'';
@@ -3810,7 +4074,22 @@ function editEmpModal(id){
   if(stored&&!accounts.includes(stored)){document.getElementById('eBankName').value='custom';document.getElementById('eBankCustom').value=stored;document.getElementById('customBankG').style.display='grid';}
   else{document.getElementById('eBankName').value=stored;document.getElementById('customBankG').style.display='none';}
   toggleOTF();
+  // Show current rate display (existing employee)
+  const pt=emp.pay_type||'fixed';
+  const currentRate=pt==='fixed'?parseFloat(emp.salary)||0:pt==='daily'?parseFloat(emp.daily_rate)||0:parseFloat(emp.hourly_rate)||0;
+  const rateLabel=pt==='fixed'?'Monthly Salary':pt==='daily'?'Daily Rate':'Hourly Rate';
+  document.getElementById('currentRateDisplay').style.display='block';
+  document.getElementById('newEmpRateBox').style.display='none';
+  document.getElementById('changeRateBtn').style.display='inline-flex';
+  document.getElementById('currentRateLabel').textContent=rateLabel;
+  document.getElementById('currentRateValue').textContent=cur()+currentRate.toFixed(2);
+  // Show effective date of current rate from history
+  const empHist=salaryHistory.filter(h=>h.employee_id===emp.id).sort((a,b)=>(b.effective_from||'').localeCompare(a.effective_from||''));
+  const latestHist=empHist[0];
+  document.getElementById('currentRateSince').textContent=latestHist?'Since '+fmtDate(latestHist.effective_from):'Rate set on employee creation';
+  setTimeout(updateRateDisplay,50);
   document.getElementById('empDelBtn').style.display='inline-flex';
+  loadEmpPhotoPreview(emp);
   switchEmpTab('details',document.querySelector('.mo-tab'));
   document.getElementById('empModal').classList.add('open');
   setTimeout(()=>{loadEmpDocs(id);loadSalaryHistory(id);},100);
@@ -3869,8 +4148,18 @@ async function saveEmployee(){
     bank_amt:document.getElementById('eBankAmt').value?parseFloat(document.getElementById('eBankAmt').value):null,
     bank_name:bkName||null,
     pin:pin||null,
-    work_days:(function(){var cbs=document.querySelectorAll('.eWorkDay:checked');return cbs.length?Array.from(cbs).map(function(c){return parseInt(c.value);}):null;})()
+    work_days:(function(){var cbs=document.querySelectorAll('.eWorkDay:checked');return cbs.length?Array.from(cbs).map(function(c){return parseInt(c.value);}):null;})(),
+    photo_url:(function(){
+      var el=document.getElementById('empPhotoUrl');
+      if(!el)return undefined;
+      if(el.value==='__pending__'&&el.dataset.pending)return el.dataset.pending; // base64
+      if(el.value==='__removed__')return null;
+      if(el.value&&el.value!=='__pending__'&&el.value!=='__removed__')return el.value; // existing URL unchanged
+      return undefined; // don't touch it
+    })()
   };
+  // Remove undefined keys so we don't accidentally null fields
+  Object.keys(data).forEach(function(k){if(data[k]===undefined)delete data[k];});
   const id=document.getElementById('empId').value;
   // Try save, if schema cache error on ot_threshold retry without it
   async function trySave(d){
@@ -3883,53 +4172,41 @@ async function saveEmployee(){
     }
   }
   let r=await trySave(data);
-  if(r.error&&r.error.message&&(r.error.message.includes('ot_threshold')||r.error.message.includes('column'))){
-    // Schema cache issue - try without ot_threshold
-    const {ot_threshold,...dataNoOT}=data;
-    r=await trySave(dataNoOT);
+  if(r.error&&r.error.message&&(r.error.message.includes('ot_threshold')||r.error.message.includes('column')||r.error.message.includes('photo_url'))){
+    // Schema cache issue or missing column — retry stripping unknown columns
+    const {ot_threshold,photo_url,...dataStripped}=data;
+    r=await trySave(dataStripped);
+    // If photo_url column missing, show SQL hint
+    if(r.error===null&&data.photo_url){
+      toast('Photo not saved — run the SQL below in Supabase to add photo support','w');
+    }
   }
   if(r.error){toast(r.error.message,'e');return;}
   const saved=r.data;
-  const prevEmp=employees.find(e=>e.id===id);
+  // Patch photo_url into saved data (column may not be in select response if newly added)
+  if(data.photo_url!==undefined)saved.photo_url=data.photo_url;
 
-  if(id){const idx=employees.findIndex(e=>e.id===id);if(idx>=0)employees[idx]={...employees[idx],...saved};}
+  if(id){const idx=employees.findIndex(e=>e.id===id);if(idx>=0)employees[idx]={...employees[idx],...saved,photo_url:data.photo_url!==undefined?data.photo_url:employees.find(e=>e.id===id)?.photo_url};}
   else{employees.push(saved);}
 
-  // Track salary/rate change in history
-  const effectiveFrom=document.getElementById('eSalaryFrom')?.value||document.getElementById('eDailyFrom')?.value||dateKey(new Date());
-  const adj=parseFloat(document.getElementById('eSalaryAdj')?.value)||0;
-  const pt3=payType2;
-  const newRate=pt3==='fixed'?parseFloat(document.getElementById('eSalary').value)||0:
-                pt3==='daily'?parseFloat(document.getElementById('eDailyRate').value)||0:
-                parseFloat(document.getElementById('eHrRate').value)||0;
-  const oldRate=prevEmp?(pt3==='fixed'?parseFloat(prevEmp.salary||0):pt3==='daily'?parseFloat(prevEmp.daily_rate||0):parseFloat(prevEmp.hourly_rate||0)):0;
-
-  if(id&&newRate!==oldRate&&newRate>0){
-    // Salary changed — save to history
-    const histRow={
-      employee_id:saved.id,
-      pay_type:pt3,
-      old_rate:oldRate,
-      new_rate:newRate,
-      effective_from:effectiveFrom||dateKey(new Date()),
-      adjustment:adj||null,
-      notes:`Rate changed from ${cur()}${oldRate.toFixed(2)} to ${cur()}${newRate.toFixed(2)}`
-    };
-    const hr=await sb.from('salary_history').insert(histRow).select().single();
-    if(!hr.error){
-      salaryHistory.unshift(hr.data);
-      toast(`${name} saved! Rate updated ${cur()}${oldRate.toFixed(2)} → ${cur()}${newRate.toFixed(2)} from ${effectiveFrom||'today'}.`,'s');
-    } else {
-      toast(`${name} saved!`,'s');
+  if(!id){
+    // New employee — save initial rate from newEmpRateBox inputs
+    const pt3=payType2;
+    const newRate=pt3==='fixed'?parseFloat(document.getElementById('eNewSalary').value)||0:
+                  pt3==='daily'?parseFloat(document.getElementById('eNewDailyRate').value)||0:
+                  parseFloat(document.getElementById('eNewHrRate').value)||0;
+    const fromDate=document.getElementById('eNewRateFrom').value||saved.join_date||dateKey(new Date());
+    if(newRate>0){
+      const rateField=pt3==='fixed'?'salary':pt3==='daily'?'daily_rate':'hourly_rate';
+      await sb.from('employees').update({[rateField]:newRate}).eq('id',saved.id);
+      const idx2=employees.findIndex(e=>e.id===saved.id);
+      if(idx2>=0)employees[idx2][rateField]=newRate;
+      const histRow={employee_id:saved.id,pay_type:pt3,old_rate:0,new_rate:newRate,effective_from:fromDate,notes:'Initial rate'};
+      const hr=await sb.from('salary_history').insert(histRow).select().single();
+      if(!hr.error)salaryHistory.unshift(hr.data);
     }
-    // Recalc payroll for every month from the effective date through the current month
-    recalcMonthsFrom(saved.id,effectiveFrom||dateKey(new Date()));
-  } else if(!id&&newRate>0){
-    // New employee — create initial history entry
-    const histRow={employee_id:saved.id,pay_type:pt3,old_rate:0,new_rate:newRate,effective_from:effectiveFrom||saved.join_date||dateKey(new Date()),notes:'Initial rate'};
-    const hr=await sb.from('salary_history').insert(histRow).select().single();
-    if(!hr.error)salaryHistory.unshift(hr.data);
-    toast(`${name} saved!`,'s');
+    // Photo is included in main save above
+    toast(`${name} added!`,'s');
   } else {
     toast(`${name} saved!`,'s');
   }
@@ -3957,6 +4234,247 @@ function selPayType(type){
     if(document.getElementById('eContHrs'))document.getElementById('eContHrs').value=ch;
     if(document.getElementById('eContHrsD'))document.getElementById('eContHrsD').value=ch;
   }
+  // For new employee: toggle which rate input is visible
+  var isNew=!document.getElementById('empId').value;
+  if(isNew){
+    document.getElementById('newRateFixedG').style.display=type==='fixed'?'':'none';
+    document.getElementById('newRateDailyG').style.display=type==='daily'?'':'none';
+    document.getElementById('newRateHourlyG').style.display=type==='hourly'?'':'none';
+  }
+  // Update current rate label for existing employees
+  var crLabel=document.getElementById('currentRateLabel');
+  if(crLabel){crLabel.textContent=type==='fixed'?'Monthly Salary':type==='daily'?'Daily Rate':'Hourly Rate';}
+  updateRateDisplay();
+}
+// ── EMPLOYEE PHOTO + CROPPER SYSTEM ──
+var _cropState={src:null,x:0,y:0,zoom:1,dragging:false,lastX:0,lastY:0,imgW:0,imgH:0};
+
+function openPhotoCropper(input){
+  if(!input.files||!input.files[0])return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    _cropState.src=e.target.result;
+    _cropState.zoom=1;_cropState.x=0;_cropState.y=0;
+    initCropper(e.target.result);
+  };
+  reader.readAsDataURL(input.files[0]);
+  input.value=''; // reset so same file can be re-picked
+}
+function openPhotoCropperAdjust(){
+  const src=document.getElementById('empPhotoUrl').value;
+  if(!src||src==='__removed__')return;
+  _cropState.src=src;
+  _cropState.zoom=parseFloat(document.getElementById('empPhotoOffsetX').dataset.zoom||1);
+  _cropState.x=parseFloat(document.getElementById('empPhotoOffsetX').dataset.tx||0);
+  _cropState.y=parseFloat(document.getElementById('empPhotoOffsetY').dataset.ty||0);
+  initCropper(src,true);
+}
+function initCropper(src,restore){
+  const modal=document.getElementById('photoCropperModal');
+  const img=document.getElementById('cropImg');
+  modal.classList.add('open');
+  img.onload=function(){
+    _cropState.imgW=img.naturalWidth;
+    _cropState.imgH=img.naturalHeight;
+    const vp=240;
+    if(!restore){
+      // Auto-fit: zoom so image fills the circle at 75% — leaves room to pan/adjust
+      const minDim=Math.min(_cropState.imgW,_cropState.imgH);
+      _cropState.zoom=(240/minDim)*0.75;
+      // Centre the image
+      _cropState.x=(240-_cropState.imgW*_cropState.zoom)/2;
+      _cropState.y=(240-_cropState.imgH*_cropState.zoom)/2;
+    }
+    document.getElementById('cropZoom').value=_cropState.zoom;
+    updateCrop();
+    setupCropDrag();
+  };
+  img.src=src;
+}
+function updateCrop(){
+  const img=document.getElementById('cropImg');
+  if(!img||!_cropState.src)return;
+  const iw=_cropState.imgW*_cropState.zoom;
+  const ih=_cropState.imgH*_cropState.zoom;
+  img.style.position='absolute';
+  img.style.width=iw+'px';
+  img.style.height=ih+'px';
+  img.style.left=_cropState.x+'px';
+  img.style.top=_cropState.y+'px';
+  img.style.transform='none';
+  img.style.maxWidth='none';
+  img.style.pointerEvents='none';
+  img.style.userSelect='none';
+  // Update previews
+  [['cropPreviewImg',42],['cropPreviewImgSm',32]].forEach(function(pair){
+    var el=document.getElementById(pair[0]);
+    var sz=pair[1];
+    if(!el)return;
+    var s=sz/240;
+    el.src=_cropState.src;
+    el.style.position='absolute';
+    el.style.width=(iw*s)+'px';
+    el.style.height=(ih*s)+'px';
+    el.style.left=(_cropState.x*s)+'px';
+    el.style.top=(_cropState.y*s)+'px';
+    el.style.transform='none';
+    el.style.maxWidth='none';
+  });
+}
+function setupCropDrag(){
+  const vp=document.getElementById('cropViewport');
+  if(!vp)return;
+  // Remove any old listeners by cloning
+  var newVp=vp.cloneNode(true);
+  vp.parentNode.replaceChild(newVp,vp);
+  var cv=document.getElementById('cropViewport');
+
+  // Mouse
+  cv.addEventListener('mousedown',function(e){
+    e.preventDefault();
+    _cropState.dragging=true;
+    _cropState.lastX=e.clientX;
+    _cropState.lastY=e.clientY;
+    cv.style.cursor='grabbing';
+  });
+  window.addEventListener('mousemove',function(e){
+    if(!_cropState.dragging)return;
+    var dx=e.clientX-_cropState.lastX;
+    var dy=e.clientY-_cropState.lastY;
+    _cropState.lastX=e.clientX;
+    _cropState.lastY=e.clientY;
+    _cropState.x+=dx;
+    _cropState.y+=dy;
+    constrainCrop();
+    updateCrop();
+  });
+  window.addEventListener('mouseup',function(){
+    _cropState.dragging=false;
+    var c=document.getElementById('cropViewport');
+    if(c)c.style.cursor='grab';
+  });
+
+  // Touch
+  cv.addEventListener('touchstart',function(e){
+    e.preventDefault();
+    var t=e.touches[0];
+    _cropState.dragging=true;
+    _cropState.lastX=t.clientX;
+    _cropState.lastY=t.clientY;
+  },{passive:false});
+  cv.addEventListener('touchmove',function(e){
+    e.preventDefault();
+    if(!_cropState.dragging)return;
+    var t=e.touches[0];
+    var dx=t.clientX-_cropState.lastX;
+    var dy=t.clientY-_cropState.lastY;
+    _cropState.lastX=t.clientX;
+    _cropState.lastY=t.clientY;
+    _cropState.x+=dx;
+    _cropState.y+=dy;
+    constrainCrop();
+    updateCrop();
+  },{passive:false});
+  cv.addEventListener('touchend',function(){_cropState.dragging=false;});
+
+  // Wheel zoom
+  cv.addEventListener('wheel',function(e){
+    e.preventDefault();
+    var delta=e.deltaY>0?-0.02:0.02;
+    _cropState.zoom=Math.max(0.3,Math.min(2,_cropState.zoom+delta));
+    document.getElementById('cropZoom').value=_cropState.zoom;
+    constrainCrop();
+    updateCrop();
+  },{passive:false});
+}
+function constrainCrop(){
+  var iw=_cropState.imgW*_cropState.zoom;
+  var ih=_cropState.imgH*_cropState.zoom;
+  // Clamp so image always covers the 240px viewport
+  if(iw>=240){
+    _cropState.x=Math.min(0,Math.max(240-iw,_cropState.x));
+  } else {
+    // Image smaller than viewport — centre it
+    _cropState.x=(240-iw)/2;
+  }
+  if(ih>=240){
+    _cropState.y=Math.min(0,Math.max(240-ih,_cropState.y));
+  } else {
+    _cropState.y=(240-ih)/2;
+  }
+}
+function applyCrop(){
+  // Render cropped circle to canvas → base64 (compressed)
+  const canvas=document.createElement('canvas');
+  const SZ=200; // output size px
+  canvas.width=SZ;canvas.height=SZ;
+  const ctx=canvas.getContext('2d');
+  ctx.beginPath();ctx.arc(SZ/2,SZ/2,SZ/2,0,Math.PI*2);ctx.clip();
+  const img=document.getElementById('cropImg');
+  const scale=SZ/240;
+  ctx.drawImage(img,_cropState.x*scale,_cropState.y*scale,_cropState.imgW*_cropState.zoom*scale,_cropState.imgH*_cropState.zoom*scale);
+  const dataUrl=canvas.toDataURL('image/jpeg',0.82);
+  // Store offset metadata for re-adjust
+  const oxEl=document.getElementById('empPhotoOffsetX');
+  const oyEl=document.getElementById('empPhotoOffsetY');
+  if(oxEl){oxEl.value=50;oxEl.dataset.zoom=_cropState.zoom;oxEl.dataset.tx=_cropState.x;}
+  if(oyEl){oyEl.value=50;oyEl.dataset.ty=_cropState.y;}
+  // Update preview in modal
+  const prev=document.getElementById('empPhotoPreview');
+  if(prev){prev.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;">`;prev.style.background='transparent';}
+  // Store as pending base64
+  document.getElementById('empPhotoUrl').value='__pending__';
+  document.getElementById('empPhotoUrl').dataset.pending=dataUrl;
+  document.getElementById('empPhotoRemoveBtn').style.display='inline-flex';
+  document.getElementById('empPhotoAdjustBtn').style.display='inline-flex';
+  closeCropper();
+}
+function closeCropper(){
+  document.getElementById('photoCropperModal').classList.remove('open');
+  _cropState.dragging=false;
+}
+function removeEmpPhoto(){
+  if(document.getElementById('empPhotoFile'))document.getElementById('empPhotoFile').value='';
+  document.getElementById('empPhotoUrl').value='__removed__';
+  document.getElementById('empPhotoUrl').dataset.pending='';
+  const empId=document.getElementById('empId').value;
+  const emp=employees.find(e=>e.id===empId);
+  const prev=document.getElementById('empPhotoPreview');
+  if(prev){prev.innerHTML=`<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;">${inits(emp?.name||'?')}</span>`;prev.style.background=emp?avcol(emp.id):'var(--acc)';}
+  document.getElementById('empPhotoRemoveBtn').style.display='none';
+  document.getElementById('empPhotoAdjustBtn').style.display='none';
+}
+function loadEmpPhotoPreview(emp){
+  const prev=document.getElementById('empPhotoPreview');
+  const removeBtn=document.getElementById('empPhotoRemoveBtn');
+  const adjustBtn=document.getElementById('empPhotoAdjustBtn');
+  if(!prev)return;
+  document.getElementById('empPhotoUrl').value=emp.photo_url||'';
+  document.getElementById('empPhotoUrl').dataset.pending='';
+  if(document.getElementById('empPhotoFile'))document.getElementById('empPhotoFile').value='';
+  if(emp.photo_url){
+    prev.innerHTML=`<img src="${emp.photo_url}" style="width:100%;height:100%;object-fit:cover;">`;
+    prev.style.background='transparent';
+    if(removeBtn)removeBtn.style.display='inline-flex';
+    if(adjustBtn)adjustBtn.style.display='inline-flex';
+  } else {
+    prev.innerHTML=`<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;">${inits(emp.name)}</span>`;
+    prev.style.background=avcol(emp.id);
+    if(removeBtn)removeBtn.style.display='none';
+    if(adjustBtn)adjustBtn.style.display='none';
+  }
+}
+// uploadEmpPhoto now stores base64 directly — no Supabase Storage bucket needed
+async function uploadEmpPhoto(empId,dataUrl){
+  // dataUrl is already a compressed cropped JPEG from canvas — store directly
+  return dataUrl; // returned as-is, saved to employees.photo_url
+}
+// Sync new-employee rate inputs into hidden fields (used by saveEmployee)
+function syncNewRate(){
+  var pt=document.querySelector('.ptc.sel')?.id?.replace('pt-','')||'fixed';
+  if(pt==='fixed'){document.getElementById('eSalary').value=document.getElementById('eNewSalary').value||'';}
+  else if(pt==='daily'){document.getElementById('eDailyRate').value=document.getElementById('eNewDailyRate').value||'';}
+  else{document.getElementById('eHrRate').value=document.getElementById('eNewHrRate').value||'';}
   updateRateDisplay();
 }
 function updateRateDisplay(){
@@ -3967,22 +4485,22 @@ function updateRateDisplay(){
   var ch=parseFloat(document.getElementById('eContHrsD').value||document.getElementById('eContHrs').value)||8;
   var workDaysCount=document.querySelectorAll('.eWorkDay:checked').length||6;
   var C=cur();
+  var isNew=!document.getElementById('empId').value;
   var rate=0,label='';
   if(sel==='fixed'){
-    var sal=parseFloat(document.getElementById('eSalary').value)||0;
+    var sal=parseFloat(isNew?document.getElementById('eNewSalary').value:document.getElementById('eSalary').value)||0;
     if(sal<=0){disp.style.display='none';return;}
-    // Average working days per month = (workDaysCount/7) × (365/12)
     var avgWorkDaysPerMonth=(workDaysCount/7)*(365/12);
     var dailyEq=sal/avgWorkDaysPerMonth;
     rate=ch>0?dailyEq/ch:0;
     label='≈ '+C+dailyEq.toFixed(2)+'/day · '+C+rate.toFixed(2)+'/hour <span style="opacity:0.7;font-weight:400;">(based on '+workDaysCount+' work days/week, '+ch+'h/day)</span>';
   } else if(sel==='daily'){
-    var dr=parseFloat(document.getElementById('eDailyRate').value)||0;
+    var dr=parseFloat(isNew?document.getElementById('eNewDailyRate').value:document.getElementById('eDailyRate').value)||0;
     if(dr<=0){disp.style.display='none';return;}
     rate=ch>0?dr/ch:0;
     label='≈ '+C+rate.toFixed(2)+'/hour <span style="opacity:0.7;font-weight:400;">(based on '+ch+'h/day)</span>';
   } else if(sel==='hourly'){
-    var hr=parseFloat(document.getElementById('eHrRate').value)||0;
+    var hr=parseFloat(isNew?document.getElementById('eNewHrRate').value:document.getElementById('eHrRate').value)||0;
     if(hr<=0){disp.style.display='none';return;}
     var avgWorkDaysPerMonth2=(workDaysCount/7)*(365/12);
     var monthlyEq=hr*ch*avgWorkDaysPerMonth2;
@@ -4307,16 +4825,15 @@ async function loadSalaryHistory(empId){
   const el=document.getElementById('salaryHistList');if(!el)return;
   const hist=salaryHistory.filter(h=>h.employee_id===empId).sort((a,b)=>(b.effective_from||'').localeCompare(a.effective_from||''));
   const C=cur();
-  if(!hist.length){el.innerHTML='<div style="text-align:center;color:var(--txtm);padding:20px;font-size:13px;"><i class="fa-solid fa-clock-rotate-left" style="font-size:24px;display:block;margin-bottom:7px;"></i>No pay history yet.<br>History is recorded automatically when you change the rate.</div>';return;}
+  if(!hist.length){el.innerHTML='<div style="text-align:center;color:var(--txtm);padding:20px;font-size:13px;"><i class="fa-solid fa-clock-rotate-left" style="font-size:24px;display:block;margin-bottom:7px;"></i>No pay history yet.<br>History is recorded automatically when you save a pay change.</div>';return;}
   const today=dateKey(new Date());
   el.innerHTML=hist.map((h,i)=>{
     const isFuture=h.effective_from>today;
-    // "To" date = the day before the next (more recent) entry's effective_from, or "Present" if this is the current rate
     let toLabel;
     if(i===0){
       toLabel=isFuture?'until superseded':'Present';
     } else {
-      const nextFrom=hist[i-1].effective_from; // hist[i-1] is more recent (sorted desc)
+      const nextFrom=hist[i-1].effective_from;
       const toDate=new Date(nextFrom+'T00:00:00');
       toDate.setDate(toDate.getDate()-1);
       toLabel=fmtDate(dateKey(toDate));
@@ -4325,12 +4842,13 @@ async function loadSalaryHistory(empId){
       :isFuture?'<span style="position:absolute;top:10px;right:10px;background:var(--ambl);color:var(--amb);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;">Future</span>'
       :'<span style="position:absolute;top:10px;right:10px;background:var(--card2);color:var(--txtm);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;border:1px solid var(--bdr);">Past</span>';
     const diff=h.old_rate>0?(parseFloat(h.new_rate)-parseFloat(h.old_rate)):0;
+    const arrow=diff>0?'<i class="fa-solid fa-arrow-trend-up" style="color:var(--grn);margin-right:3px;font-size:10px;"></i>':diff<0?'<i class="fa-solid fa-arrow-trend-down" style="color:var(--red);margin-right:3px;font-size:10px;"></i>':'';
     return `<div style="background:var(--card2);border:1px solid var(--bdr);border-radius:var(--r);padding:12px 14px;margin-bottom:9px;position:relative;">
       ${badge}
-      <div style="font-size:13px;font-weight:700;margin-bottom:4px;padding-right:60px;">${h.pay_type==='fixed'?'Monthly Salary':h.pay_type==='daily'?'Daily Rate':'Hourly Rate'}: <span style="color:var(--grn);">${C}${parseFloat(h.new_rate).toFixed(2)}</span></div>
-      ${h.old_rate>0?`<div style="font-size:12px;color:var(--txtm);">Previously: ${C}${parseFloat(h.old_rate).toFixed(2)} · ${diff>=0?'Increase':'Decrease'}: <span style="color:${diff>=0?'var(--grn)':'var(--red)'};font-weight:600;">${diff>=0?'+':''}${C}${diff.toFixed(2)}</span></div>`:'<div style="font-size:12px;color:var(--txtm);">Initial rate</div>'}
-      <div style="font-size:11px;color:var(--txtm);margin-top:4px;"><i class="fa-solid fa-calendar" style="margin-right:3px;"></i>${fmtDate(h.effective_from)} → <strong>${toLabel}</strong>${h.adjustment?` · <span style="color:var(--amb);">Bonus/Adj: ${C}${parseFloat(h.adjustment).toFixed(2)}</span>`:''}</div>
-      ${h.notes?`<div style="font-size:11px;color:var(--txtm);margin-top:2px;">${h.notes}</div>`:''}
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px;padding-right:70px;">${h.pay_type==='fixed'?'Monthly Salary':h.pay_type==='daily'?'Daily Rate':'Hourly Rate'}: <span style="color:var(--grn);">${C}${parseFloat(h.new_rate).toFixed(2)}</span></div>
+      ${h.old_rate>0?`<div style="font-size:12px;color:var(--txtm);">From: ${C}${parseFloat(h.old_rate).toFixed(2)} ${arrow}<span style="color:${diff>=0?'var(--grn)':'var(--red)'};font-weight:600;">${diff>=0?'+':''}${C}${Math.abs(diff).toFixed(2)}</span> ${diff>=0?'increase':'decrease'}</div>`:'<div style="font-size:12px;color:var(--txtm);">Initial rate</div>'}
+      <div style="font-size:11px;color:var(--txtm);margin-top:4px;"><i class="fa-solid fa-calendar" style="margin-right:3px;"></i>${fmtDate(h.effective_from)} → <strong>${toLabel}</strong></div>
+      ${h.notes?`<div style="font-size:11px;color:var(--txt2);margin-top:3px;font-style:italic;">${h.notes}</div>`:''}
       <div style="display:flex;gap:6px;margin-top:8px;">
         <button onclick="editSalaryHistEntry('${h.id}')" style="font-size:11px;padding:4px 10px;border:1px solid var(--bdr);border-radius:6px;background:var(--card);color:var(--txt2);cursor:pointer;"><i class="fa-solid fa-pen" style="margin-right:4px;"></i>Edit</button>
         <button onclick="deleteSalaryHistEntry('${h.id}')" style="font-size:11px;padding:4px 10px;border:1px solid rgba(220,38,38,0.3);border-radius:6px;background:var(--card);color:var(--red);cursor:pointer;"><i class="fa-solid fa-trash" style="margin-right:4px;"></i>Delete</button>
@@ -4338,6 +4856,93 @@ async function loadSalaryHistory(empId){
     </div>`;
   }).join('');
 }
+
+// ── PAY RISE MODAL ──
+function openPayRiseModal(){
+  const empId=document.getElementById('empId').value;
+  if(!empId){toast('Save the employee first before adding a pay change','e');return;}
+  const emp=employees.find(e=>e.id===empId);if(!emp)return;
+  const pt=emp.pay_type||'fixed';
+  const currentRate=pt==='fixed'?parseFloat(emp.salary)||0:pt==='daily'?parseFloat(emp.daily_rate)||0:parseFloat(emp.hourly_rate)||0;
+  const C=cur();
+  document.getElementById('prEmpName').textContent=emp.name;
+  document.getElementById('prCurrentRate').textContent=C+currentRate.toFixed(2);
+  document.getElementById('prPayType').textContent=pt==='fixed'?'Monthly Salary':pt==='daily'?'Daily Rate':'Hourly Rate';
+  document.getElementById('prNewRate').value='';
+  document.getElementById('prEffectiveFrom').value=dateKey(new Date());
+  document.getElementById('prReason').value='';
+  document.getElementById('prNotes').value='';
+  document.getElementById('prPreview').style.display='none';
+  document.getElementById('payRiseModal').classList.add('open');
+}
+function updatePayRisePreview(){
+  const empId=document.getElementById('empId').value;
+  const emp=employees.find(e=>e.id===empId);if(!emp)return;
+  const pt=emp.pay_type||'fixed';
+  const C=cur();
+  const currentRate=pt==='fixed'?parseFloat(emp.salary)||0:pt==='daily'?parseFloat(emp.daily_rate)||0:parseFloat(emp.hourly_rate)||0;
+  const newRate=parseFloat(document.getElementById('prNewRate').value)||0;
+  const prev=document.getElementById('prPreview');
+  const txt=document.getElementById('prPreviewText');
+  if(newRate<=0){prev.style.display='none';return;}
+  const diff=newRate-currentRate;
+  const pct=currentRate>0?Math.round(diff/currentRate*100):0;
+  const up=diff>=0;
+  prev.style.display='block';
+  prev.style.background=up?'var(--grnl)':'var(--redl)';
+  prev.style.borderColor=up?'rgba(22,163,74,0.2)':'rgba(220,38,38,0.2)';
+  txt.innerHTML=`<i class="fa-solid fa-arrow-trend-${up?'up':'down'}" style="color:var(--${up?'grn':'red'});margin-right:6px;"></i>
+    <strong style="color:var(--${up?'grn':'red'});">${up?'+':''}${C}${diff.toFixed(2)} (${pct>0?'+':''}${pct}%)</strong>
+    &nbsp;·&nbsp;${C}${currentRate.toFixed(2)} → <strong>${C}${newRate.toFixed(2)}</strong>`;
+}
+async function savePayRise(){
+  const empId=document.getElementById('empId').value;
+  const emp=employees.find(e=>e.id===empId);if(!emp)return;
+  const newRate=parseFloat(document.getElementById('prNewRate').value)||0;
+  const effectiveFrom=document.getElementById('prEffectiveFrom').value;
+  const reason=document.getElementById('prReason').value;
+  const notesExtra=document.getElementById('prNotes').value.trim();
+  if(!newRate||newRate<=0){toast('Enter the new rate amount','e');return;}
+  if(!effectiveFrom){toast('Select an effective date','e');return;}
+  const pt=emp.pay_type||'fixed';
+  const C=cur();
+  const oldRate=pt==='fixed'?parseFloat(emp.salary)||0:pt==='daily'?parseFloat(emp.daily_rate)||0:parseFloat(emp.hourly_rate)||0;
+  const notes=reason?(reason+(notesExtra?': '+notesExtra:'')):notesExtra||`Rate changed from ${C}${oldRate.toFixed(2)} to ${C}${newRate.toFixed(2)}`;
+  // Save to salary_history
+  const histRow={employee_id:empId,pay_type:pt,old_rate:oldRate,new_rate:newRate,effective_from:effectiveFrom,adjustment:null,notes};
+  const hr=await sb.from('salary_history').insert(histRow).select().single();
+  if(hr.error){toast(hr.error.message,'e');return;}
+  salaryHistory.unshift(hr.data);
+  // Update employee current rate field
+  const rateField=pt==='fixed'?'salary':pt==='daily'?'daily_rate':'hourly_rate';
+  const r=await sb.from('employees').update({[rateField]:newRate}).eq('id',empId).select().single();
+  if(!r.error&&r.data){
+    const idx=employees.findIndex(e=>e.id===empId);
+    if(idx>=0)employees[idx]={...employees[idx],...r.data};
+    // Update the salary input in the pay tab too
+    if(pt==='fixed')document.getElementById('eSalary').value=newRate;
+    else if(pt==='daily')document.getElementById('eDailyRate').value=newRate;
+    else document.getElementById('eHrRate').value=newRate;
+    updateRateDisplay();
+  }
+  document.getElementById('payRiseModal').classList.remove('open');
+  // Refresh history list
+  loadSalaryHistory(empId);
+  // Update current rate display in modal
+  const crv=document.getElementById('currentRateValue');const crs=document.getElementById('currentRateSince');
+  if(crv)crv.textContent=C+newRate.toFixed(2);
+  if(crs)crs.textContent='Since '+fmtDate(effectiveFrom);
+  // Also update hidden rate field so further saves carry correct value
+  const rateHiddenId=pt==='fixed'?'eSalary':pt==='daily'?'eDailyRate':'eHrRate';
+  const rh=document.getElementById(rateHiddenId);if(rh)rh.value=newRate;
+  // Recalc payroll from effective date
+  recalcMonthsFrom(empId,effectiveFrom);
+  const diff=newRate-oldRate;
+  toast(`Pay ${diff>=0?'rise':'cut'} saved! ${C}${oldRate.toFixed(2)} → ${C}${newRate.toFixed(2)} from ${effectiveFrom}`,'s');
+}
+
+// watchSalaryInputs removed — salary is now read-only in Pay tab; changes go via Pay Rise modal
+
 
 async function editSalaryHistEntry(histId){
   const h=salaryHistory.find(x=>x.id===histId);if(!h)return;
