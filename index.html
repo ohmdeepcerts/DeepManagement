@@ -2534,30 +2534,40 @@ function renderLedger(){
   const emp=employees.find(e=>e.id===ledgerStaff);if(!emp)return;
   const isEx=emp.status==='ex';
   const C=cur();
-  // Filter expenses for this employee/month/year
+  // Filter expenses for this employee/month/year — blank rows always sorted last
+  const isBlank=function(r){return !r.merchant&&!r.description&&(!r.amount||parseFloat(r.amount)===0)&&!r.category;};
   const data=expenses.filter(e=>{
     const d=new Date(e.date+'T00:00:00');
     return e.employee_id===ledgerStaff&&d.getFullYear()===ledgerYear&&String(d.getMonth()+1).padStart(2,'0')===ledgerMonth;
-  }).sort((a,b)=>a.date.localeCompare(b.date));
-  const total=data.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+  }).sort((a,b)=>{
+    const aB=isBlank(a),bB=isBlank(b);
+    if(aB&&!bB)return 1;   // blank always after real
+    if(!aB&&bB)return -1;
+    return a.date.localeCompare(b.date); // real rows by date
+  });
+  const realData=data.filter(function(r){return !isBlank(r);});
+  const total=realData.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   document.getElementById('ledTitle').innerHTML=`${emp.name}${isEx?` <span style="color:var(--red);font-size:0.7em;background:var(--redl);padding:1px 6px;border-radius:4px;">EX</span>`:''} | ${MONTHS[parseInt(ledgerMonth)-1]} ${ledgerYear}`;
   document.getElementById('ledTotal').textContent=C+total.toFixed(2);
-  document.getElementById('ledRowCt').textContent=`${data.length} row${data.length!==1?'s':''}`;
-  // Tag summary
-  const tagT={};data.forEach(r=>(r.tags||[]).forEach(t=>{tagT[t]=(tagT[t]||0)+(parseFloat(r.amount)||0);}));
+  document.getElementById('ledRowCt').textContent=`${realData.length} row${realData.length!==1?'s':''}`;
+  // Tag summary (from real rows only)
+  const tagT={};realData.forEach(r=>(r.tags||[]).forEach(t=>{tagT[t]=(tagT[t]||0)+(parseFloat(r.amount)||0);}));
   document.getElementById('ledTagSum').innerHTML=Object.entries(tagT).map(([t,v])=>{const def=getTagDef(t);const col=def?.color||'#4f46e5';return`<span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;background:${h2rgba(col,0.12)};color:${col};">${t} ${C}${v.toFixed(2)}</span>`;}).join('');
   // Table
   const tbody=document.getElementById('ledBody'),empty=document.getElementById('ledEmpty');
   if(data.length===0){
-    tbody.innerHTML='';empty.style.display='none';renderLedRight(data,C);
+    tbody.innerHTML='';empty.style.display='none';renderLedRight(realData,C);
     // Auto-add first empty row so user can start typing immediately
     if(ledgerStaff)addLedRowSilent();
   } else {
     empty.style.display='none';
-    let running=0;const totalRows=data.length;
-    tbody.innerHTML=data.map((row,i)=>{running+=(parseFloat(row.amount)||0);return buildLedRow(row,i,running,C,isEx,totalRows);}).join('');
+    let running=0;let realIdx=0;const totalRows=data.length;
+    tbody.innerHTML=data.map((row,i)=>{
+      const blank=isBlank(row);
+      if(!blank)running+=(parseFloat(row.amount)||0);
+      return buildLedRow(row,blank?-1:realIdx++,running,C,isEx,totalRows,blank);
+    }).join('');
     // Ensure exactly ONE blank row exists — never accumulate blanks
-    const isBlank=function(r){return !r.merchant&&!r.description&&(!r.amount||parseFloat(r.amount)===0)&&!r.category;};
     const blanks=data.filter(isBlank);
     if(blanks.length===0){
       if(!_autoAddingRow)addLedRowSilent();
@@ -2574,9 +2584,9 @@ function renderLedger(){
       }
     }
   }
-  renderLedRight(data,C);
+  renderLedRight(realData,C);
 }
-function buildLedRow(row,i,running,C,isEx,totalRows){
+function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
   const tagsHtml=buildTagsCell(row.tags||[],row.id);
   const catStyle=getCatStyle(row.category);
   const st=row.status||'draft';
@@ -2584,6 +2594,24 @@ function buildLedRow(row,i,running,C,isEx,totalRows){
   const stBadge=st==='approved'?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:#dcfce7;color:#15803d;">✓</span>':
                 st==='rejected'?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:#fee2e2;color:#b91c1c;">✗</span>':
                 st==='pending'?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:#fef3c7;color:#b45309;">⏳</span>':'';
+  // Blank new-entry row — dimmed, no row number, no running total, no action buttons
+  if(isBlankRow){
+    return`<tr style="opacity:0.45;">
+      <td style="text-align:center;width:24px;"><span style="font-size:10px;color:var(--txtm);">+</span></td>
+      <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)" onfocus="this.closest('tr').style.opacity='1'" onblur="this.closest('tr').style.opacity=this.value?'1':'0.45'"></td>
+      <td>
+        <input type="text" class="shi" placeholder="Type to add new expense..." value="" ${isEx?'disabled':''} oninput="updateExp('${row.id}','merchant',this.value);this.closest('tr').style.opacity='1';checkAutoNextRow('${row.id}',${i<0?0:i},${totalRows||1})">
+        <div style="display:flex;align-items:center;gap:4px;margin-top:3px;"><label title="Attach receipt" style="width:22px;height:22px;border-radius:5px;border:1px dashed var(--bdr);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--txtm);font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label></div>
+      </td>
+      <td><input type="text" class="shi cat-inp" list="ledCatList" placeholder="Category" value="" style="" ${isEx?'disabled':''} oninput="updateExp('${row.id}','category',this.value)" onfocus="this.closest('tr').style.opacity='1'"></td>
+      <td><div class="tc" id="tc-${row.id}">${tagsHtml}</div></td>
+      <td><input type="number" class="shi amt-i" placeholder="0.00" step="0.01" min="0" value="" ${isEx?'disabled':''} oninput="updateExp('${row.id}','amount',parseFloat(this.value)||0);this.closest('tr').style.opacity='1'" onblur="renderLedger()" onfocus="this.closest('tr').style.opacity='1'"></td>
+      <td class="run-t" style="color:transparent;">—</td>
+      <td style="text-align:center;white-space:nowrap;">
+        <button class="ra-btn del" onclick="deleteLedRow('${row.id}')" title="Delete" style="opacity:0.5;"><i class="fa-solid fa-trash-alt"></i></button>
+      </td>
+    </tr>`;
+  }
   return`<tr style="${row.flagged?'background:rgba(220,38,38,0.04);':''}">
     <td style="text-align:center;width:24px;"><span style="font-size:11px;color:var(--txtm);">${i+1}</span>${stBadge}</td>
     <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)"></td>
@@ -2743,9 +2771,10 @@ function updateLedgerFooterOnly(){
     const d=new Date(e.date+'T00:00:00');
     return e.employee_id===ledgerStaff&&d.getFullYear()===ledgerYear&&String(d.getMonth()+1).padStart(2,'0')===ledgerMonth;
   });
-  const total=data.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+  const realData=data.filter(function(r){return r.merchant||r.description||(r.amount&&parseFloat(r.amount)!==0)||r.category;});
+  const total=realData.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
   const el=document.getElementById('ledTotal');if(el)el.textContent=C+total.toFixed(2);
-  const ct=document.getElementById('ledRowCt');if(ct)ct.textContent=data.length+' row'+(data.length!==1?'s':'');
+  const ct=document.getElementById('ledRowCt');if(ct)ct.textContent=realData.length+' row'+(realData.length!==1?'s':'');
 }
 async function deleteLedRow(id){
   if(!confirm('Delete this expense row?'))return;
