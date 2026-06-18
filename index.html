@@ -1087,6 +1087,25 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div class="fgl"><label>Join Date</label><input type="date" id="eJoin"></div>
         <div class="fgl"><label>Left Date</label><input type="date" id="eLeft"></div>
         <div class="fgl" style="grid-column:1/-1"><label>Notes</label><textarea id="eNotes" placeholder="Any notes..."></textarea></div>
+        <div class="fgl" style="grid-column:1/-1">
+          <label style="margin-bottom:8px;display:block;">Employee Portal — What can they see?</label>
+          <div style="display:flex;flex-direction:column;gap:10px;background:var(--card2);border:1px solid var(--bdr);border-radius:var(--r);padding:13px 14px;">
+            <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;">
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--txt);">Show Pay Tab</div>
+                <div style="font-size:11px;color:var(--txtm);">Employee can see their Pay section in the mobile app</div>
+              </div>
+              <input type="checkbox" id="eShowPayTab" style="width:18px;height:18px;cursor:pointer;" onchange="document.getElementById('eRunningPayRow').style.display=this.checked?'flex':'none'">
+            </label>
+            <div id="eRunningPayRow" style="display:none;align-items:center;justify-content:space-between;gap:12px;padding-top:9px;border-top:1px solid var(--bdr);cursor:pointer;">
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--txt);">Show Running Pay Estimate</div>
+                <div style="font-size:11px;color:var(--txtm);">Live month-to-date calculation · turn off to show locked payroll figures only</div>
+              </div>
+              <input type="checkbox" id="eShowRunningPay" style="width:18px;height:18px;cursor:pointer;">
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="mo-sec" id="empTab-pay">
@@ -4021,6 +4040,10 @@ function openEmpModal(){
   // New employee: show initial rate entry box, hide current rate display
   document.getElementById('currentRateDisplay').style.display='none';
   document.getElementById('newEmpRateBox').style.display='block';
+  // Portal visibility — default both ON for new employees
+  document.getElementById('eShowPayTab').checked=true;
+  document.getElementById('eShowRunningPay').checked=true;
+  document.getElementById('eRunningPayRow').style.display='flex';
   document.getElementById('changeRateBtn').style.display='none';
   document.getElementById('eNewSalary').value='';
   document.getElementById('eNewDailyRate').value='';
@@ -4045,6 +4068,12 @@ function editEmpModal(id){
   document.getElementById('eJoin').value=emp.join_date||'';
   document.getElementById('eLeft').value=emp.left_date||'';
   document.getElementById('eNotes').value=emp.notes||'';
+  // Portal visibility toggles
+  const showPay=emp.show_pay_tab!==false; // default ON
+  const showRunning=emp.show_running_pay!==false; // default ON
+  document.getElementById('eShowPayTab').checked=showPay;
+  document.getElementById('eShowRunningPay').checked=showRunning;
+  document.getElementById('eRunningPayRow').style.display=showPay?'flex':'none';
   document.getElementById('eWStart').value=emp.work_start||'08:00';
   document.getElementById('eWEnd').value=emp.work_end||'17:00';
   selPayType(emp.pay_type||'fixed');
@@ -4148,6 +4177,8 @@ async function saveEmployee(){
     bank_amt:document.getElementById('eBankAmt').value?parseFloat(document.getElementById('eBankAmt').value):null,
     bank_name:bkName||null,
     pin:pin||null,
+    show_pay_tab:document.getElementById('eShowPayTab').checked,
+    show_running_pay:document.getElementById('eShowRunningPay').checked,
     work_days:(function(){var cbs=document.querySelectorAll('.eWorkDay:checked');return cbs.length?Array.from(cbs).map(function(c){return parseInt(c.value);}):null;})(),
     photo_url:(function(){
       var el=document.getElementById('empPhotoUrl');
@@ -4172,9 +4203,9 @@ async function saveEmployee(){
     }
   }
   let r=await trySave(data);
-  if(r.error&&r.error.message&&(r.error.message.includes('ot_threshold')||r.error.message.includes('column')||r.error.message.includes('photo_url'))){
+  if(r.error&&r.error.message&&(r.error.message.includes('ot_threshold')||r.error.message.includes('column')||r.error.message.includes('photo_url')||r.error.message.includes('show_pay')||r.error.message.includes('show_running'))){
     // Schema cache issue or missing column — retry stripping unknown columns
-    const {ot_threshold,photo_url,...dataStripped}=data;
+    const {ot_threshold,photo_url,show_pay_tab,show_running_pay,...dataStripped}=data;
     r=await trySave(dataStripped);
     // If photo_url column missing, show SQL hint
     if(r.error===null&&data.photo_url){
