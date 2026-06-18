@@ -454,6 +454,43 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
 </div>
 
 <!-- CHANGE PIN MODAL -->
+<!-- PHOTO CROP MODAL -->
+<div id="photoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:flex-end;justify-content:center;">
+  <div style="background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:20px 18px calc(40px + max(env(safe-area-inset-bottom),10px));max-height:92vh;overflow-y:auto;">
+    <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr);margin:0 auto 18px;"></div>
+    <div style="font-size:17px;font-weight:800;margin-bottom:4px;">Change Photo</div>
+    <div style="font-size:12px;color:var(--txtm);margin-bottom:14px;">Drag to reposition · scroll or pinch to zoom</div>
+    <!-- Circle crop viewport -->
+    <div style="display:flex;justify-content:center;margin-bottom:14px;">
+      <div id="empCropViewport" style="width:240px;height:240px;border-radius:50%;overflow:hidden;border:3px solid var(--acc);position:relative;cursor:grab;background:#000;flex-shrink:0;">
+        <img id="empCropImg" style="position:absolute;transform-origin:0 0;user-select:none;-webkit-user-select:none;pointer-events:none;" draggable="false">
+      </div>
+    </div>
+    <!-- Zoom slider -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+      <button onclick="_empCrop.zoom=Math.max(0.3,parseFloat((_empCrop.zoom-0.05).toFixed(2)));document.getElementById('empCropZoom').value=_empCrop.zoom;empConstrainCrop();empUpdateCrop();" style="width:28px;height:28px;border:1px solid var(--bdr);border-radius:6px;background:var(--card2);color:var(--txt);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">−</button>
+      <input type="range" id="empCropZoom" min="0.3" max="2" step="0.02" value="1" style="flex:1;" oninput="_empCrop.zoom=parseFloat(this.value);empConstrainCrop();empUpdateCrop()">
+      <button onclick="_empCrop.zoom=Math.min(2,parseFloat((_empCrop.zoom+0.05).toFixed(2)));document.getElementById('empCropZoom').value=_empCrop.zoom;empConstrainCrop();empUpdateCrop();" style="width:28px;height:28px;border:1px solid var(--bdr);border-radius:6px;background:var(--card2);color:var(--txt);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>
+    </div>
+    <!-- Upload / Camera buttons -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;border:1px solid var(--bdr);border-radius:10px;background:var(--card2);font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;">
+        <i class="fa-solid fa-image" style="color:var(--txtm);"></i>Upload Photo
+        <input type="file" accept="image/*" style="display:none;" onchange="empPickPhoto(this)">
+      </label>
+      <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;border:1px solid var(--bdr);border-radius:10px;background:var(--card2);font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;">
+        <i class="fa-solid fa-camera" style="color:var(--txtm);"></i>Camera
+        <input type="file" accept="image/*" capture="user" style="display:none;" onchange="empPickPhoto(this)">
+      </label>
+    </div>
+    <div id="photoErr" style="font-size:12px;color:var(--red);margin-bottom:10px;min-height:16px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-o" style="flex:1;" onclick="closePhotoModal()">Cancel</button>
+      <button class="btn btn-p" style="flex:1;" id="empCropSaveBtn" onclick="empSavePhoto()" disabled><i class="fa-solid fa-check" style="margin-right:6px;"></i>Save Photo</button>
+    </div>
+  </div>
+</div>
+
 <div id="changePinModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:flex-end;justify-content:center;">
   <div style="background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:20px 18px calc(40px + max(env(safe-area-inset-bottom),10px));max-height:88vh;overflow-y:auto;">
     <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr);margin:0 auto 18px;"></div>
@@ -489,7 +526,9 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
 
       <!-- LEFT: Identity pill -->
       <div id="idPill" onclick="togglePillMenu()" style="display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--bdr);border-radius:40px;padding:6px 12px 6px 6px;cursor:pointer;flex-shrink:1;min-width:0;max-width:70%;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--bdr)'">
-        <div id="tbAv" style="width:36px;height:36px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;">?</div>
+        <div id="tbAvWrap" style="width:38px;height:38px;border-radius:50%;padding:2px;background:linear-gradient(135deg,var(--acc),#7c3aed);flex-shrink:0;">
+          <div id="tbAv" style="width:100%;height:100%;border-radius:50%;overflow:hidden;border:2px solid var(--card);background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;">?</div>
+        </div>
         <div style="min-width:0;">
           <div id="tbName" style="font-size:14px;font-weight:800;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;">Loading...</div>
           <div id="tbRole" style="font-size:11px;color:var(--txtm);margin-top:1px;">Employee Portal</div>
@@ -508,6 +547,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
     <!-- Pill dropdown -->
     <div id="pillMenu" style="display:none;position:absolute;top:62px;left:14px;z-index:300;background:var(--card);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.18);min-width:190px;overflow:hidden;">
       <div onclick="showPg('home');togglePillMenu()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-house" style="width:16px;color:var(--txtm);"></i>Home</div>
+      <div onclick="openChangePhoto();togglePillMenu()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-image" style="width:16px;color:var(--txtm);"></i>Change Photo</div>
       <div onclick="openChangePin()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-key" style="width:16px;color:var(--txtm);"></i>Change PIN</div>
       <div onclick="sessionStorage.removeItem('dam_page_sig');location.reload();" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-arrows-rotate" style="width:16px;color:var(--txtm);"></i>Reload App</div>
       <div onclick="toggleTheme()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-circle-half-stroke" style="width:16px;color:var(--txtm);"></i>Toggle Theme</div>
@@ -792,7 +832,8 @@ async function checkForUpdateAndReload(isFirstCheck){
       const userTyping=activeEl&&(activeEl.tagName==='INPUT'||activeEl.tagName==='TEXTAREA'||activeEl.tagName==='SELECT');
       const markOpen=document.getElementById('markModal')&&document.getElementById('markModal').style.display==='flex';
       const changePinOpen=document.getElementById('changePinModal')&&document.getElementById('changePinModal').style.display==='flex';
-      if(userTyping||markOpen||changePinOpen)return; // try again on the next check
+      const photoOpen=document.getElementById('photoModal')&&document.getElementById('photoModal').style.display==='flex';
+      if(userTyping||markOpen||changePinOpen||photoOpen)return; // try again on the next check
       sessionStorage.removeItem('dam_page_sig');
       location.reload();
     }
@@ -821,6 +862,181 @@ function openChangePin(){
   document.getElementById('cpConfirm').value='';
   document.getElementById('cpErr').textContent='';
   document.getElementById('changePinModal').style.display='flex';
+}
+
+// ── PHOTO CHANGE ──
+var _empCrop={src:null,x:0,y:0,zoom:1,minZoom:0.3,dragging:false,lastX:0,lastY:0,imgW:0,imgH:0};
+
+function applyPortalVisibility(e){
+  // show_pay_tab: default true if not set
+  const showPay=e.show_pay_tab!==false;
+  const payBtn=document.getElementById('nb-pay');
+  const payPg=document.getElementById('pg-pay');
+  if(payBtn)payBtn.style.display=showPay?'':'none';
+  // If Pay tab hidden and currently on pay, redirect to home
+  if(!showPay&&payPg&&payPg.classList.contains('on'))showPg('home');
+  // Also hide/show the salary card on home screen
+  const salCard=document.getElementById('hmSalCard');
+  if(salCard)salCard.style.display=showPay?'':'none';
+}
+function setTopbarPhoto(e){
+  const av=document.getElementById('tbAv');
+  if(!av)return;
+  if(e.photo_url){
+    av.style.background='transparent';
+    av.innerHTML='<img src="'+e.photo_url+'" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.parentElement.innerHTML=\''+ini(e.name)+'\';this.parentElement.style.background=\''+avc(e.id)+'\';">';
+  }else{
+    av.innerHTML=ini(e.name);
+    av.style.background=avc(e.id);
+  }
+}
+function openChangePhoto(){
+  document.getElementById('photoErr').textContent='';
+  document.getElementById('empCropSaveBtn').disabled=true;
+  // If already has a photo, load it into crop viewport
+  if(emp&&emp.photo_url){
+    _empCrop.src=emp.photo_url;
+    // Reset zoom/position — empInitCropper will compute proper minZoom on image load
+    _empCrop.zoom=1;_empCrop.x=0;_empCrop.y=0;_empCrop.minZoom=0.3;
+    empInitCropper(emp.photo_url,false);
+  }else{
+    // Clear viewport
+    const img=document.getElementById('empCropImg');
+    if(img)img.src='';
+    _empCrop.src=null;
+  }
+  document.getElementById('photoModal').style.display='flex';
+}
+function closePhotoModal(){
+  document.getElementById('photoModal').style.display='none';
+  _empCrop.dragging=false;
+}
+function empPickPhoto(input){
+  if(!input.files||!input.files[0])return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    _empCrop.src=e.target.result;
+    _empCrop.zoom=1;_empCrop.x=0;_empCrop.y=0;_empCrop.minZoom=0.3;
+    empInitCropper(e.target.result,false);
+    document.getElementById('empCropSaveBtn').disabled=false;
+  };
+  reader.readAsDataURL(input.files[0]);
+  input.value='';
+}
+function empInitCropper(src,restore){
+  const img=document.getElementById('empCropImg');
+  if(!img)return;
+  img.onload=function(){
+    _empCrop.imgW=img.naturalWidth;
+    _empCrop.imgH=img.naturalHeight;
+    // Minimum zoom = image just fills the 240px circle
+    const minDim=Math.min(_empCrop.imgW,_empCrop.imgH);
+    _empCrop.minZoom=Math.max(0.3, 240/minDim);
+    if(!restore){
+      // Start zoomed so image exactly fills the circle, centred
+      _empCrop.zoom=_empCrop.minZoom;
+      _empCrop.x=(240-_empCrop.imgW*_empCrop.zoom)/2;
+      _empCrop.y=(240-_empCrop.imgH*_empCrop.zoom)/2;
+    }
+    // Clamp slider min to match
+    const slider=document.getElementById('empCropZoom');
+    slider.min=_empCrop.minZoom.toFixed(2);
+    slider.value=_empCrop.zoom;
+    empUpdateCrop();
+    empSetupCropDrag();
+  };
+  img.src=src;
+}
+function empUpdateCrop(){
+  const img=document.getElementById('empCropImg');
+  if(!img||!_empCrop.src)return;
+  const iw=_empCrop.imgW*_empCrop.zoom;
+  const ih=_empCrop.imgH*_empCrop.zoom;
+  img.style.position='absolute';
+  img.style.width=iw+'px';
+  img.style.height=ih+'px';
+  img.style.left=_empCrop.x+'px';
+  img.style.top=_empCrop.y+'px';
+  img.style.transform='none';
+  img.style.maxWidth='none';
+}
+function empSetupCropDrag(){
+  const vp=document.getElementById('empCropViewport');
+  if(!vp)return;
+  var newVp=vp.cloneNode(true);
+  vp.parentNode.replaceChild(newVp,vp);
+  var cv=document.getElementById('empCropViewport');
+  cv.addEventListener('mousedown',function(e){
+    e.preventDefault();
+    _empCrop.dragging=true;_empCrop.lastX=e.clientX;_empCrop.lastY=e.clientY;
+    cv.style.cursor='grabbing';
+  });
+  window.addEventListener('mousemove',function(e){
+    if(!_empCrop.dragging)return;
+    _empCrop.x+=e.clientX-_empCrop.lastX;_empCrop.y+=e.clientY-_empCrop.lastY;
+    _empCrop.lastX=e.clientX;_empCrop.lastY=e.clientY;
+    empConstrainCrop();empUpdateCrop();
+  });
+  window.addEventListener('mouseup',function(){
+    _empCrop.dragging=false;
+    var c=document.getElementById('empCropViewport');if(c)c.style.cursor='grab';
+  });
+  cv.addEventListener('touchstart',function(e){
+    e.preventDefault();var t=e.touches[0];
+    _empCrop.dragging=true;_empCrop.lastX=t.clientX;_empCrop.lastY=t.clientY;
+  },{passive:false});
+  cv.addEventListener('touchmove',function(e){
+    e.preventDefault();if(!_empCrop.dragging)return;
+    var t=e.touches[0];
+    _empCrop.x+=t.clientX-_empCrop.lastX;_empCrop.y+=t.clientY-_empCrop.lastY;
+    _empCrop.lastX=t.clientX;_empCrop.lastY=t.clientY;
+    empConstrainCrop();empUpdateCrop();
+  },{passive:false});
+  cv.addEventListener('touchend',function(){_empCrop.dragging=false;});
+  cv.addEventListener('wheel',function(e){
+    e.preventDefault();
+    var delta=e.deltaY>0?-0.05:0.05;
+    _empCrop.zoom=Math.max(_empCrop.minZoom,Math.min(2,parseFloat((_empCrop.zoom+delta).toFixed(2))));
+    document.getElementById('empCropZoom').value=_empCrop.zoom;
+    empConstrainCrop();empUpdateCrop();
+  },{passive:false});
+}
+function empConstrainCrop(){
+  // Enforce minimum zoom (image must cover circle)
+  if(_empCrop.zoom<_empCrop.minZoom)_empCrop.zoom=_empCrop.minZoom;
+  var iw=_empCrop.imgW*_empCrop.zoom;
+  var ih=_empCrop.imgH*_empCrop.zoom;
+  // Clamp so image always covers the 240px viewport
+  if(iw>=240){_empCrop.x=Math.min(0,Math.max(240-iw,_empCrop.x));}
+  else{_empCrop.x=(240-iw)/2;}
+  if(ih>=240){_empCrop.y=Math.min(0,Math.max(240-ih,_empCrop.y));}
+  else{_empCrop.y=(240-ih)/2;}
+}
+async function empSavePhoto(){
+  if(!_empCrop.src){document.getElementById('photoErr').textContent='Please select a photo first.';return;}
+  document.getElementById('photoErr').textContent='';
+  const btn=document.getElementById('empCropSaveBtn');
+  btn.disabled=true;btn.textContent='Saving…';
+  // Render cropped circle to canvas → base64 JPEG
+  const canvas=document.createElement('canvas');
+  const SZ=200;canvas.width=SZ;canvas.height=SZ;
+  const ctx=canvas.getContext('2d');
+  ctx.beginPath();ctx.arc(SZ/2,SZ/2,SZ/2,0,Math.PI*2);ctx.clip();
+  const img=document.getElementById('empCropImg');
+  const scale=SZ/240;
+  ctx.drawImage(img,_empCrop.x*scale,_empCrop.y*scale,_empCrop.imgW*_empCrop.zoom*scale,_empCrop.imgH*_empCrop.zoom*scale);
+  const dataUrl=canvas.toDataURL('image/jpeg',0.82);
+  // Save to Supabase employees.photo_url
+  const r=await SB.from('employees').update({photo_url:dataUrl}).eq('id',emp.id).select().single();
+  if(r.error){
+    document.getElementById('photoErr').textContent='Could not save. Check connection.';
+    btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-check" style="margin-right:6px;"></i>Save Photo';
+    return;
+  }
+  emp.photo_url=dataUrl;
+  setTopbarPhoto(emp);
+  closePhotoModal();
+  toast('Photo updated','s');
 }
 function closeChangePin(){
   document.getElementById('changePinModal').style.display='none';
@@ -900,10 +1116,11 @@ async function enterApp(e){
   localStorage.setItem('dam_emp_ts',Date.now());
   document.getElementById('auth').style.display='none';
   document.getElementById('app').style.display='flex';
-  document.getElementById('tbAv').textContent=ini(e.name);
-  document.getElementById('tbAv').style.background=avc(e.id);
+  setTopbarPhoto(e);
   document.getElementById('tbName').textContent=e.name;
   document.getElementById('tbRole').textContent=e.role||'Employee';
+  // Apply portal visibility settings
+  applyPortalVisibility(e);
   document.getElementById('expDate').value=dk(new Date());
   await loadAll();
   buildTabs();
@@ -945,7 +1162,7 @@ function doLogout(){
     'todayMarkSection'];
   clearIds.forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='';});
   // Reset topbar
-  const av=document.getElementById('tbAv');if(av)av.textContent='?';
+  const av=document.getElementById('tbAv');if(av){av.innerHTML='?';av.style.backgroundImage='';av.style.background='';}
   const nm=document.getElementById('tbName');if(nm)nm.textContent='Loading...';
   const rl=document.getElementById('tbRole');if(rl)rl.textContent='Employee Portal';
   // Remove Sunday theme + particles
@@ -995,11 +1212,24 @@ async function silentSync(){
   setSyncUI('syncing');
   try{
   // Check if office has revoked access (PIN cleared or employee deactivated) — force logout if so
-  const meCheck=await SB.from('employees').select('pin,status').eq('id',emp.id).single();
+  const meCheck=await SB.from('employees').select('pin,status,photo_url,show_pay_tab,show_running_pay').eq('id',emp.id).single();
   if(!meCheck.error&&meCheck.data&&(!meCheck.data.pin||meCheck.data.status!=='Active')){
     toast('Your access was reset by the office. Please log in again.','e');
     doLogout();
     return;
+  }
+  // Refresh photo if office changed it
+  if(!meCheck.error&&meCheck.data&&meCheck.data.photo_url!==emp.photo_url){
+    emp.photo_url=meCheck.data.photo_url;
+    setTopbarPhoto(emp);
+  }
+  // Refresh portal visibility if office changed it
+  if(!meCheck.error&&meCheck.data){
+    const prevShowPay=emp.show_pay_tab;
+    const prevShowRunning=emp.show_running_pay;
+    if(meCheck.data.show_pay_tab!==undefined)emp.show_pay_tab=meCheck.data.show_pay_tab;
+    if(meCheck.data.show_running_pay!==undefined)emp.show_running_pay=meCheck.data.show_running_pay;
+    if(emp.show_pay_tab!==prevShowPay||emp.show_running_pay!==prevShowRunning)applyPortalVisibility(emp);
   }
   const [attR,expR,msgR,batR,payStR,attReqR2,prSumR2]=await Promise.all([
     SB.from('attendance').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
@@ -1025,7 +1255,7 @@ async function silentSync(){
   const userTyping=activeEl&&(activeEl.tagName==='INPUT'||activeEl.tagName==='TEXTAREA'||activeEl.tagName==='SELECT');
   // Don't re-render if mark modal is open
   const markOpen=document.getElementById('markModal')&&document.getElementById('markModal').style.display==='flex';
-  if(!userTyping&&!markOpen){
+  if(!userTyping&&!markOpen&&document.getElementById('photoModal').style.display!=='flex'){
     if(cur==='home')renderHome();
     else if(cur==='pay')renderPay();
     else if(cur==='exp')renderExpenses();
@@ -1150,6 +1380,10 @@ function showPg(id){
 // ── HOME ──
 function renderHome(){
   if(!emp)return;
+  const showPay=emp.show_pay_tab!==false;
+  const showRunning=emp.show_running_pay!==false;
+  const salCard=document.getElementById('hmSalCard');
+  if(salCard)salCard.style.display=showPay?'':'none';
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
   const mRecs=myAtt.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;});
   const activeR=mRecs.filter(r=>isP(r.status));
@@ -1166,10 +1400,12 @@ function renderHome(){
   const hrs=pr?parseFloat(pr.total_hours)||0:mRecs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
   const otHrs=pr?parseFloat(pr.overtime_hours)||0:mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
 
+  const isLocked=!!pr?.locked||pr?.status==='final';
+  const canShowAmount=showRunning||isLocked;
   document.getElementById('hmMonth').textContent=MONTHS[m]+' '+y;
-  document.getElementById('hmAmount').textContent=pr?fmt(total):'—';
-  document.getElementById('hmBase').textContent=pr?fmt(base):'—';
-  document.getElementById('hmOT').textContent=pr?(ot>0?fmt(ot):(otHrs>0?otHrs.toFixed(1)+'h':fmt(0))):'—';
+  document.getElementById('hmAmount').textContent=(pr&&canShowAmount)?fmt(total):'—';
+  document.getElementById('hmBase').textContent=(pr&&canShowAmount)?fmt(base):'—';
+  document.getElementById('hmOT').textContent=(pr&&canShowAmount)?(ot>0?fmt(ot):(otHrs>0?otHrs.toFixed(1)+'h':fmt(0))):'—';
   // Bonus: only show if employee has any bonus ever
   const lifetimeBonus=myAtt.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
   const bonusEl=document.getElementById('hmBonusWrap');
@@ -1180,9 +1416,9 @@ function renderHome(){
   var expWrap=document.getElementById('hmExpWrap');
   var expAmtEl=document.getElementById('hmExpAmt');
   var subEl=document.getElementById('hmPaySub');
-  if(!pr){
+  if(!pr||(!showRunning&&!isLocked)){
     if(expWrap)expWrap.style.display='none';
-    if(subEl)subEl.textContent='Pay estimate not calculated yet · check later';
+    if(subEl)subEl.textContent=!showRunning&&!isLocked?'Pay will show once confirmed by office':'Pay estimate not calculated yet · check later';
   } else if(mExpNetTotal!==0&&expWrap&&expAmtEl){
     expWrap.style.display='';
     expAmtEl.textContent=fmt(mExpNetTotal);
@@ -1193,10 +1429,10 @@ function renderHome(){
     if(subEl)subEl.textContent='Estimated pay · tap Pay tab for details';
   }
 
-  // Payment status this month
+  // Payment status this month — only show if we're allowed to show pay amounts
   const payStM=myPaySt.find(p=>p.month===m&&p.year===y);
   const pmEl=document.getElementById('hmPayStatus');
-  if(total>0){
+  if(total>0&&canShowAmount){
     const bankSet=parseFloat(emp.bank_amt)||0;
     const cashSet=Math.max(0,total-bankSet);
     if(payStM&&(payStM.bank_paid||payStM.cash_paid)){
@@ -1609,18 +1845,42 @@ async function toggleFlag(id){
 function renderPay(){
   const m=payM,y=payY;
   const pr=myPayroll.find(p=>p.month===m&&p.year===y);
+  const showRunning=emp&&emp.show_running_pay!==false;
 
   if(!pr){
-    document.getElementById('payCards').innerHTML=`
-      <div class="sal-card">
-        <div class="sal-month">${MONTHS[m]} ${y}</div>
-        <div class="sal-amount" style="font-size:18px;color:var(--txtm);">—</div>
-        <div class="sal-sub">Pay estimate not calculated yet.<br>Please check later.</div>
-      </div>`;
+    // No payroll record at all
+    if(!showRunning){
+      document.getElementById('payCards').innerHTML=`
+        <div class="sal-card">
+          <div class="sal-month">${MONTHS[m]} ${y}</div>
+          <div class="sal-amount" style="font-size:18px;color:var(--txtm);">—</div>
+          <div class="sal-sub">Pay for this month hasn't been confirmed yet.</div>
+        </div>`;
+    } else {
+      document.getElementById('payCards').innerHTML=`
+        <div class="sal-card">
+          <div class="sal-month">${MONTHS[m]} ${y}</div>
+          <div class="sal-amount" style="font-size:18px;color:var(--txtm);">—</div>
+          <div class="sal-sub">Pay estimate not calculated yet.<br>Please check later.</div>
+        </div>`;
+    }
     document.getElementById('payHistory').innerHTML='<div class="empty-s"><i class="fa-solid fa-clock-rotate-left"></i><p>No payments recorded yet</p></div>';
     document.getElementById('lifetimeStats').innerHTML='';
     return;
   }
+
+  const isLocked=!!pr.locked||pr.status==='final';
+
+  // If running pay is hidden AND month is not locked, show a simple "not confirmed" card
+  if(!showRunning&&!isLocked){
+    document.getElementById('payCards').innerHTML=`
+      <div class="sal-card">
+        <div class="sal-month">${MONTHS[m]} ${y}</div>
+        <div class="sal-amount" style="font-size:18px;color:var(--txtm);">—</div>
+        <div class="sal-sub" style="color:var(--txtm);">Pay for this month will be shown once it's been confirmed by the office.</div>
+      </div>`;
+    // Still show payment history and lifetime stats below
+  } else {
 
   const isLocked=!!pr.locked||pr.status==='final';
   const total=parseFloat(pr.net_pay)||0;
@@ -1700,6 +1960,7 @@ function renderPay(){
       <div class="row-div"><span>Overtime Hours</span><strong style="color:var(--amb);">${otHrs.toFixed(1)}h</strong></div>
       ${bonus>0?`<div class="row-div" style="background:var(--grnl);border-radius:8px;padding:9px 11px;margin:5px 0;"><span style="font-weight:700;color:var(--grn);">Bonus this month</span><strong style="color:var(--grn);">${fmt(bonus)}</strong></div>`:''}
     </div></div>`;
+  } // end else (showRunning || isLocked)
 
   // Pay history — list locked/paid months from payroll_summary, newest first
   const histMonths=myPayroll.filter(p=>(p.locked||p.bank_paid||p.cash_paid)&&!(p.month===m&&p.year===y&&!p.locked&&!p.bank_paid&&!p.cash_paid))
