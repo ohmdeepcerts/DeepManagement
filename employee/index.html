@@ -684,7 +684,11 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
       <div class="sec">Add Expense</div>
       <div class="card"><div class="card-b">
         <div class="fg"><label>Date *</label><input type="date" id="expDate"></div>
-        <div class="fg"><label>Description *</label><input type="text" id="expMerchant" placeholder="e.g. Screwfix, Costa Coffee, Fuel"></div>
+        <div class="fg" style="position:relative;">
+          <label>Description *</label>
+          <input type="text" id="expMerchant" placeholder="e.g. Screwfix, Costa Coffee, Fuel" autocomplete="off" oninput="expMerchantInput(this.value)" onblur="setTimeout(()=>hideExpAC(),200)" onfocus="expMerchantInput(this.value)">
+          <div id="expAC" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:200;max-height:220px;overflow-y:auto;margin-top:3px;"></div>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="fg"><label>Category</label><select id="expCat"><option value="">— Select —</option></select></div>
           <div class="fg"><label>Amount (£) *</label><input type="number" id="expAmt" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
@@ -1689,6 +1693,66 @@ function renderAtt(){
 function populateCats(){
   const sel=document.getElementById('expCat');
   (cfg.categories||['Travel','Meals','Equipment','Software','Utilities','Accommodation']).forEach(c=>{sel.appendChild(new Option(c,c));});
+}
+
+// Build a deduplicated merchant→category map from expense history
+function buildExpHistory(){
+  const map={};// merchant.lower → {merchant, category, count}
+  (myExp||[]).forEach(function(e){
+    if(!e.merchant)return;
+    const key=e.merchant.trim().toLowerCase();
+    if(!map[key]){map[key]={merchant:e.merchant.trim(),category:e.category||'',count:0};}
+    map[key].count++;
+    // Prefer most-used category
+    if(e.category)map[key].category=e.category;
+  });
+  return Object.values(map).sort((a,b)=>b.count-a.count);
+}
+function expMerchantInput(val){
+  const ac=document.getElementById('expAC');
+  if(!ac)return;
+  const q=(val||'').trim().toLowerCase();
+  if(!q){ac.style.display='none';return;}
+  const hist=buildExpHistory();
+  // Match: starts with query OR any word starts with query OR description contains query
+  const matches=hist.filter(function(h){
+    const m=h.merchant.toLowerCase();
+    return m.startsWith(q)||m.includes(' '+q)||m.includes(q);
+  }).slice(0,8);
+  // Also add category matches
+  const catMatches=(cfg.categories||[]).filter(function(c){
+    return c.toLowerCase().startsWith(q)&&!matches.find(m=>m.merchant.toLowerCase()===c.toLowerCase());
+  }).map(function(c){return {merchant:c,category:c,count:0,isCat:true};});
+  const all=[...matches,...catMatches].slice(0,8);
+  if(!all.length){ac.style.display='none';return;}
+  ac.innerHTML=all.map(function(h){
+    const hi=h.merchant.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<strong>$1</strong>');
+    return '<div onclick="pickExpAC(\''+h.merchant.replace(/'/g,"\\'")+'\',' +
+      '\''+((h.category||'').replace(/'/g,"\\'"))+'\')" '+
+      'style="padding:10px 13px;cursor:pointer;border-bottom:0.5px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;gap:8px;" '+
+      'onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'\'">' +
+      '<span style="font-size:13px;font-weight:600;color:var(--txt);">'+hi+'</span>'+
+      (h.category?'<span style="font-size:11px;color:var(--txtm);background:var(--card2);padding:2px 7px;border-radius:8px;white-space:nowrap;">'+h.category+'</span>':'')+
+      '</div>';
+  }).join('');
+  ac.style.display='block';
+}
+function pickExpAC(merchant,category){
+  const inp=document.getElementById('expMerchant');
+  if(inp)inp.value=merchant;
+  // Auto-fill category if we have one and it exists in the dropdown
+  if(category){
+    const sel=document.getElementById('expCat');
+    if(sel){
+      const opt=Array.from(sel.options).find(o=>o.value.toLowerCase()===category.toLowerCase());
+      if(opt)sel.value=opt.value;
+    }
+  }
+  hideExpAC();
+}
+function hideExpAC(){
+  const ac=document.getElementById('expAC');
+  if(ac)ac.style.display='none';
 }
 let _rcptFile=null;
 function rcptChosen(input){
