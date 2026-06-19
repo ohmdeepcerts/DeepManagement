@@ -4122,8 +4122,14 @@ function openEmpModal(){
   switchEmpTab('details',document.querySelector('.mo-tab'));
   document.getElementById('empModal').classList.add('open');
 }
-function editEmpModal(id){
-  const emp=employees.find(e=>e.id===id);if(!emp)return;
+async function editEmpModal(id){
+  // Fetch fresh employee data from Supabase so PIN is always current
+  const freshR=await sb.from('employees').select('*').eq('id',id).single();
+  const emp=(!freshR.error&&freshR.data)?freshR.data:employees.find(e=>e.id===id);
+  if(!emp)return;
+  // Update local cache with fresh data
+  const localIdx=employees.findIndex(e=>e.id===id);
+  if(localIdx>=0&&!freshR.error)employees[localIdx]=emp;
   document.getElementById('empMTitle').textContent='Edit — '+emp.name;
   document.getElementById('empId').value=emp.id;
   document.getElementById('eName').value=emp.name;
