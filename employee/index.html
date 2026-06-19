@@ -546,7 +546,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
       <!-- Salary card -->
       <div class="sal-card" id="hmSalCard">
         <div class="sal-month" id="hmMonth">This Month</div>
-        <div class="sal-amount" id="hmAmount">£—</div>
+        <div class="sal-amount" id="hmAmount">—</div>
         <div class="sal-sub" id="hmPaySub">Estimated pay · tap Pay tab for details</div>
         <div class="sal-grid" id="hmSalGrid">
           <div class="sal-it"><div class="sal-it-l">Base</div><div class="sal-it-v" id="hmBase">—</div></div>
@@ -1080,7 +1080,7 @@ async function checkPin(){
 }
 async function enterApp(e){
   emp=e;
-  syncEmpWorkHours(); // sync work hours from employee record
+  syncEmpWorkHours();
   // Persist session for 7 days
   localStorage.setItem('dam_emp_id',e.id);
   localStorage.setItem('dam_emp_ts',Date.now());
@@ -1100,7 +1100,7 @@ async function enterApp(e){
   setSyncUI('live');
   applyAutoTheme();
   setInterval(applyAutoTheme, 3600000);
-  setInterval(silentSync, 30000);
+  setInterval(silentSync, 11000);
   // Silently reload if a newer version of the app has been deployed
   setInterval(checkForUpdateAndReload, 5*60000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkForUpdateAndReload();});
@@ -2122,6 +2122,8 @@ function syncEmpWorkHours(){
   const [sh,sm]=STD_START.split(':').map(Number);
   const [eh,em]=STD_END.split(':').map(Number);
   STD_HOURS=parseFloat(((eh*60+em-sh*60-sm)/60).toFixed(1));
+  markSt={h:String(sh).padStart(2,'0'),m:String(sm).padStart(2,'0')};
+  markEn={h:String(eh).padStart(2,'0'),m:String(em).padStart(2,'0')};
 }
 
 function buildHomeTodayMark(){
@@ -2319,6 +2321,7 @@ async function submitAttRequest(){
   // Check existing request for this date
   const existing=myAttReqs.find(r=>r.date===date);
   let r;
+  try{
   if(existing){
     r=await SB.from('attendance_requests').update({sign_in:startStr,sign_out:endStr,hours,employee_note:note,status:'pending',office_note:null,reviewed_at:null}).eq('id',existing.id).select().single();
     if(!r.error){const idx=myAttReqs.findIndex(x=>x.id===existing.id);if(idx>=0)myAttReqs[idx]=r.data;}
@@ -2332,6 +2335,7 @@ async function submitAttRequest(){
   renderAtt();
   // Also show on home
   buildTodayMarkSection();
+  }catch(_attErr){toast('Could not save. Check your connection.','e');_submittingAtt=false;}
 }
 
 
