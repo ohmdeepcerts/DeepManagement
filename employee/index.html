@@ -432,27 +432,6 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
   </div>
 </div>
 
-<!-- TRIAL APP INFO MODAL -->
-<div id="trialInfoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:700;align-items:flex-end;justify-content:center;">
-  <div style="background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:24px 20px calc(40px + max(env(safe-area-inset-bottom),10px));max-height:88vh;overflow-y:auto;">
-    <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr);margin:0 auto 18px;"></div>
-    <div style="text-align:center;margin-bottom:14px;">
-      <div style="width:56px;height:56px;border-radius:16px;background:#fce7f3;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
-        <i class="fa-solid fa-flask" style="color:#be185d;font-size:24px;"></i>
-      </div>
-      <div style="font-size:17px;font-weight:800;">This app is in trial</div>
-    </div>
-    <div style="font-size:13px;color:var(--txt2);line-height:1.6;margin-bottom:16px;">
-      Attendance, hours and pay shown here are <strong>estimates only</strong>, generated automatically while this system is being tested.
-      <br><br>
-      Your <strong>official wages will continue to be calculated and confirmed by the office as usual</strong> — the figures in this app do not replace that process.
-      <br><br>
-      Please do not use this app, or any screenshot of it, as proof of attendance, hours worked, or pay owed. If you spot anything that looks wrong, let the office know directly.
-    </div>
-    <button class="btn btn-p" style="width:100%;" onclick="closeTrialInfo()">Got it</button>
-  </div>
-</div>
-
 <!-- CHANGE PIN MODAL -->
 <!-- PHOTO CROP MODAL -->
 <div id="photoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:flex-end;justify-content:center;">
@@ -845,20 +824,6 @@ async function checkForUpdateAndReload(isFirstCheck){
     // Silent — ignore (e.g. offline)
   }
 }
-function openTrialInfo(){
-  document.getElementById('trialInfoModal').style.display='flex';
-}
-function closeTrialInfo(){
-  document.getElementById('trialInfoModal').style.display='none';
-  try{sessionStorage.setItem('dam_trial_seen','1');}catch(e){}
-}
-function maybeShowTrialInfo(){
-  let seen=false;
-  try{seen=sessionStorage.getItem('dam_trial_seen')==='1';}catch(e){}
-  if(!seen){
-    setTimeout(()=>openTrialInfo(),700);
-  }
-}
 function openChangePin(){
   const m=document.getElementById('pillMenu');if(m)m.style.display='none';
   document.getElementById('cpCurrent').value='';
@@ -1136,7 +1101,6 @@ async function enterApp(e){
   applyAutoTheme();
   setInterval(applyAutoTheme, 3600000);
   setInterval(silentSync, 30000);
-  maybeShowTrialInfo();
   // Silently reload if a newer version of the app has been deployed
   setInterval(checkForUpdateAndReload, 5*60000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkForUpdateAndReload();});
