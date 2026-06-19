@@ -787,7 +787,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
             </table>
             <div id="ledEmpty" class="es" style="display:none;"><i class="fa-solid fa-receipt"></i><h3>No expenses yet</h3><p>Click Add Row or use Quick Entry</p></div>
           </div>
-          <div class="led-foot"><div id="ledTagSum" style="display:flex;gap:5px;flex-wrap:wrap;"></div><div style="display:flex;align-items:center;gap:9px;"><span style="font-size:12px;color:var(--txtm);" id="ledRowCt"></span><span style="font-size:13px;font-weight:600;">Total:</span><span class="led-tot" id="ledTotal">£0.00</span></div></div>
+          <div class="led-foot"><div id="ledTagSum" style="display:flex;gap:5px;flex-wrap:wrap;"></div><div style="display:flex;align-items:center;gap:9px;"><span style="font-size:12px;color:var(--txtm);" id="ledRowCt"></span><span style="font-size:13px;font-weight:600;">Total:</span><span class="led-tot" id="ledTotal">0.00</span></div></div>
         </div>
         <div class="led-right" id="ledRight"></div>
       </div>
@@ -1997,6 +1997,17 @@ async function loadAllData(){
     initSelectors();
     navigate('dashboard');
     updateBadges();
+    // Background sync every 11 seconds
+    if(window._bgSyncInterval)clearInterval(window._bgSyncInterval);
+    window._bgSyncInterval=setInterval(async()=>{
+      if(!isLoggedIn)return;
+      try{
+        await loadAllDataSilent();
+        const page=currentPage||'dashboard';
+        if(typeof window['render'+page.charAt(0).toUpperCase()+page.slice(1).replace(/-([a-z])/g,(_,c)=>c.toUpperCase())]!=='function')return;
+        updateBadges();
+      }catch(e){/* silent */}
+    },11000);
     // employeeDocuments already loaded above - no separate call needed
   }catch(e){
     setSyncStatus('err');
@@ -2633,6 +2644,8 @@ async function saveAttSilent(){
       return;
     }
     if(!status)return;
+    const _si=g('sign_in'),_so=g('sign_out');
+    if(_si&&_so&&_si>=_so){toast('Check times: end must be after start','e');return;}
     const h=g('hours'),ot=g('overtime');
     toSave.push({employee_id:empId,date:key,status,sign_in:g('sign_in')||null,sign_out:g('sign_out')||null,hours:h?parseFloat(h):null,overtime:ot?parseFloat(ot):null,bonus:g('bonus')?parseFloat(g('bonus')):null,jobs:g('jobs')?parseInt(g('jobs')):null,notes:g('notes')||null});
   });
@@ -2649,8 +2662,12 @@ async function saveAttSilent(){
   results.forEach(r=>{if(r.data)recalcEmployeeMonth(r.data.employee_id,affMonth,affYear);});
 }
 async function saveAllAttendance(){
+  const _now=new Date();_now.setHours(0,0,0,0);
+  const _md=new Date(markDate);_md.setHours(0,0,0,0);
+  if(_md>_now){toast('Cannot save attendance for a future date','e');return;}
   const isLocked=(cfg.locked_months||[]).includes(`${markDate.getFullYear()}_${markDate.getMonth()}`);
   if(isLocked){toast(`${MONTHS[markDate.getMonth()]} ${markDate.getFullYear()} is locked`,'e');return;}
+  let _attSaveOk=true;
   const key=dateKey(markDate);const toSave=[];const clearedEmpIds=[];
   document.querySelectorAll('#markBody tr').forEach(row=>{
     const empId=row.querySelector('[data-eid]')?.dataset.eid;if(!empId)return;
@@ -2691,7 +2708,7 @@ async function doClearDay(){
   const key=dateKey(markDate);
   const affected=attendance.filter(a=>a.date===key).map(a=>a.employee_id);
   const r=await sb.from('attendance').delete().eq('date',key);
-  if(r.error){toast(r.error.message,'e');return;}
+  if(r.error){toast(r.error.message,'e');_resetSaveBtn();return;}
   attendance=attendance.filter(a=>a.date!==key);
   _touched.clear();buildMarkTable();toast('Day cleared','i');
   // Recalculate payroll for every employee who had attendance on this day
@@ -2942,7 +2959,16 @@ async function updateExp(id,field,val){
   exp[field]=val;
   deb('exp-save-'+id,async()=>{
     await sb.from('expenses').update({[field]:val}).eq('id',id);
-    if(field==='amount'){const d=new Date(exp.date+'T00:00:00');recalcEmployeeMonth(exp.employee_id,d.getMonth(),d.getFullYear());}
+    // Recalc payroll on any meaningful field change
+    if(field==='amount'||field==='date'||field==='category'){
+      const d=new Date((field==='date'?val:exp.date)+'T00:00:00');
+      recalcEmployeeMonth(exp.employee_id,d.getMonth(),d.getFullYear());
+      // If date changed, also recalc the old month
+      if(field==='date'&&val!==exp.date){
+        const dOld=new Date(exp.date+'T00:00:00');
+        recalcEmployeeMonth(exp.employee_id,dOld.getMonth(),dOld.getFullYear());
+      }
+    }
   },900);
 }
 var _autoAddingRow=false;
@@ -2963,7 +2989,7 @@ function checkAutoNextRow(rowId,rowIdx,totalRows){
 async function addLedRow(){
   if(!ledgerStaff){toast('Select a staff member first','e');return;}
   const today=dateKey(new Date());
-  const dateToUse=today.startsWith(`${ledgerYear}-${ledgerMonth}`)?today:`${ledgerYear}-${ledgerMonth}-01`;
+  const dateToUse=today.startsWith(`${ledgerYear}-${ledgerMonth}`)?today:`${ledgerYear}-${ledgerMonth}-${String(dim(parseInt(ledgerYear),parseInt(ledgerMonth)-1)).padStart(2,'0')}`;
   setSyncStatus('saving');
   const r=await sb.from('expenses').insert({
     employee_id:ledgerStaff,date:dateToUse,merchant:'',category:'',amount:0,tags:[],status:'draft'
@@ -3298,7 +3324,12 @@ function shiftEmpReport(n){
   if(dm)dm.textContent=MONTHS[mo];if(dy)dy.textContent=yr;
   renderEmpReport();
 }
-function renderEmpReport(){
+async function renderEmpReport(){
+  // Ensure salary history is loaded before calculating pay
+  if(!salaryHistory||salaryHistory.length===0){
+    const _sh=await sb.from('salary_history').select('*').order('effective_from',{ascending:false});
+    if(!_sh.error)salaryHistory=_sh.data||[];
+  }
   const empId=document.getElementById('erEmp')?.value;
   const month=parseInt(document.getElementById('erMonth')?.value);
   const year=parseInt(document.getElementById('erYear')?.value);
@@ -3686,6 +3717,16 @@ function renderYearly(){
   const C=cur();
   const rows=emps.map(emp=>{
     const recs=att.filter(r=>r.employee_id===emp.id);
+    // Only count working days from join_date onward (or year start if joined before)
+    const joinD=emp.join_date?new Date(emp.join_date+'T00:00:00'):new Date(year,0,1);
+    const yearStart=new Date(year,0,1);
+    const countFrom=joinD>yearStart?joinD:yearStart;
+    const empYWD=Array.from({length:12},(_,m)=>{
+      return Array.from({length:dim(year,m)},(_,d)=>{
+        const dt=new Date(year,m,d+1);
+        return dt>=countFrom&&isWDFor(emp,dt)?1:0;
+      }).reduce((s,v)=>s+v,0);
+    }).reduce((s,v)=>s+v,0);
     const present=recs.filter(r=>isP(r.status)&&isWD(new Date(r.date+'T00:00:00'))).length;
     const absent=recs.filter(r=>r.status==='A').length;
     const totalH=recs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
@@ -3694,7 +3735,7 @@ function renderYearly(){
     const suns=recs.filter(r=>isSun(new Date(r.date+'T00:00:00'))&&isP(r.status)).length;
     const recPay=recs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).total,0);
     const gross=recPay+bonus; // fixed salary already included in recPay
-    const pct=yWD>0?Math.round(present/yWD*100):0;const pc=pct>=80?'var(--grn)':pct>=60?'var(--amb)':'var(--red)';
+    const pct=empYWD>0?Math.round(present/empYWD*100):0;const pc=pct>=80?'var(--grn)':pct>=60?'var(--amb)':'var(--red)';
     const mB=MONTHS.map((_,mi)=>recs.filter(r=>new Date(r.date+'T00:00:00').getMonth()===mi&&isWD(new Date(r.date+'T00:00:00'))&&isP(r.status)).length);
     return`<tr><td><span class="ava" style="background:${avcol(emp.id)}">${inits(emp.name)}</span>${emp.name}</td>${mB.map(n=>`<td style="text-align:center;font-size:11px;color:${n>20?'var(--grn)':n>0?'var(--txt2)':'var(--txtm)'}">${n||'—'}</td>`).join('')}<td style="font-weight:700;color:var(--grn);">${present}</td><td style="font-weight:700;color:var(--red);">${absent}</td><td style="font-weight:700;">${totalH.toFixed(0)}h</td><td style="font-weight:700;color:var(--amb);">${ot.toFixed(0)}h</td><td style="color:#4338ca;font-weight:700;">${suns}</td><td style="font-weight:700;color:var(--grn);">${emp.pay_type||emp.hourly_rate?C+gross.toFixed(0):'—'}</td><td style="font-weight:700;color:${pc};">${pct}%</td></tr>`;
   }).join('');
@@ -4123,13 +4164,11 @@ function openEmpModal(){
   document.getElementById('empModal').classList.add('open');
 }
 async function editEmpModal(id){
-  // Fetch fresh employee data from Supabase so PIN is always current
-  const freshR=await sb.from('employees').select('*').eq('id',id).single();
-  const emp=(!freshR.error&&freshR.data)?freshR.data:employees.find(e=>e.id===id);
+  const _fr=await sb.from('employees').select('*').eq('id',id).single();
+  const emp=(!_fr.error&&_fr.data)?_fr.data:employees.find(e=>e.id===id);
   if(!emp)return;
-  // Update local cache with fresh data
-  const localIdx=employees.findIndex(e=>e.id===id);
-  if(localIdx>=0&&!freshR.error)employees[localIdx]=emp;
+  const _li=employees.findIndex(e=>e.id===id);
+  if(_li>=0&&!_fr.error)employees[_li]=emp;
   document.getElementById('empMTitle').textContent='Edit — '+emp.name;
   document.getElementById('empId').value=emp.id;
   document.getElementById('eName').value=emp.name;
@@ -4207,17 +4246,24 @@ async function deleteEmployee(){
   });
 }
 async function _doDeleteEmployee(id,empName){
+  const _delTables=['salary_history','attendance_requests','payroll_summary','employee_documents'];
+  for(const t of _delTables){await sb.from(t).delete().eq('employee_id',id);}
+  await sb.from('messages').delete().or(`sender.eq.${id},receiver.eq.${id}`);
   const r=await sb.from('employees').delete().eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   employees=employees.filter(e=>e.id!==id);
   attendance=attendance.filter(a=>a.employee_id!==id);
   expenses=expenses.filter(e=>e.employee_id!==id);
+  attRequests=(attRequests||[]).filter(a=>a.employee_id!==id);
   closeEmpModal();renderEmployees();toast(empName+' deleted','i');
 }
 function sanitizeEmployee(data){return {...data,name:(data.name||"").trim().toUpperCase(),salary:Math.max(0,parseFloat(data.salary)||0),hourly_rate:Math.max(0,parseFloat(data.hourly_rate)||0),status:["Active","ex"].includes(data.status)?data.status:"Active"};}
 async function saveEmployee(){
+  const _saveBtn=document.querySelector('.mo-foot .btn-p');
+  if(_saveBtn){_saveBtn.disabled=true;_saveBtn.innerHTML='<i class="fa-solid fa-rotate fa-spin"></i> Saving...';}
+  const _resetSaveBtn=()=>{if(_saveBtn){_saveBtn.disabled=false;_saveBtn.innerHTML='<i class="fa-solid fa-floppy-disk"></i>Save Employee';}};
   const name=document.getElementById('eName').value.trim().toUpperCase();
-  if(!name){toast('Please enter a name','e');return;}
+  if(!name){toast('Please enter a name','e');_resetSaveBtn();return;}
   const pin=document.getElementById('ePin').value;
   const pinC=document.getElementById('ePinConfirm').value;
   if(pin&&pin!==pinC){toast('PINs do not match','e');return;}
@@ -4313,6 +4359,7 @@ async function saveEmployee(){
   } else {
     toast(`${name} saved!`,'s');
   }
+  _resetSaveBtn();
 
   // Load salary history in modal if open
   const empIdNow=saved.id||id;
@@ -4354,6 +4401,8 @@ var _cropState={src:null,x:0,y:0,zoom:1,dragging:false,lastX:0,lastY:0,imgW:0,im
 
 function openPhotoCropper(input){
   if(!input.files||!input.files[0])return;
+  const _maxMB=5;
+  if(input.files[0].size>_maxMB*1024*1024){toast(`Photo must be under ${_maxMB}MB`,'e');input.value='';return;}
   const reader=new FileReader();
   reader.onload=function(e){
     _cropState.src=e.target.result;
@@ -5287,7 +5336,9 @@ function renderAttRequests(){
     const emp=employees.find(e=>e.id===req.employee_id);
     const dt=new Date(req.date+'T00:00:00');
     const existing=attendance.find(a=>a.employee_id===req.employee_id&&a.date===req.date);
-    const stdStart='09:00',stdEnd='17:00';
+    const _reqEmp=employees.find(e=>e.id===req.employee_id);
+    const stdStart=(_reqEmp&&_reqEmp.work_start)||cfg.work_start||'09:00';
+    const stdEnd=(_reqEmp&&_reqEmp.work_end)||cfg.work_end||'17:00';
     const lateBy=req.sign_in&&req.sign_in>stdStart?`Started late (${req.sign_in} vs ${stdStart})`:'';
     const earlyBy=req.sign_out&&req.sign_out<stdEnd?`Left early (${req.sign_out} vs ${stdEnd})`:'';
     const isPending=req.status==='pending';
@@ -5327,8 +5378,12 @@ async function reviewAttReq(id,status,officeNote){
   if(status==='approved'&&req){
     const emp=employees.find(e=>e.id===req.employee_id);
     // Calculate if late/early to determine status
-    const startMins=req.sign_in?parseInt(req.sign_in.split(':')[0])*60+parseInt(req.sign_in.split(':')[1]):540;
-    const attStatus=startMins>9*60+15?'LA':'P';
+    const _aEmp=employees.find(e=>e.id===req.employee_id);
+    const _wsStr=(_aEmp&&_aEmp.work_start)||cfg.work_start||'09:00';
+    const [_wsH,_wsM]=_wsStr.split(':').map(Number);
+    const _wsMins=_wsH*60+_wsM;
+    const startMins=req.sign_in?parseInt(req.sign_in.split(':')[0])*60+parseInt(req.sign_in.split(':')[1]):_wsMins;
+    const attStatus=startMins>_wsMins+15?'LA':'P';
     const attRec={employee_id:req.employee_id,date:req.date,status:attStatus,sign_in:req.sign_in,sign_out:req.sign_out,hours:req.hours,overtime:(function(){var e=employees.find(function(x){return x.id===req.employee_id;});var t=e&&e.ot_threshold!=null&&parseFloat(e.ot_threshold)>0?parseFloat(e.ot_threshold):(parseFloat(cfg.ot_threshold)||8);return Math.max(0,parseFloat(req.hours||0)-t);})()
 ,notes:req.employee_note};
     const ua=await sb.from('attendance').upsert(attRec,{onConflict:'employee_id,date'}).select().single();
@@ -5602,7 +5657,7 @@ window.addEventListener('offline', ()=>{
   if(typeof setSyncUI==='function')setSyncUI('offline');
 });
 function safeRender(fn,fallback){try{return fn();}catch(e){console.error("DAM render error:",e);return fallback||'<div style="padding:20px;text-align:center;color:var(--red)"><i class="fa-solid fa-triangle-exclamation"></i> Error loading. <button onclick="location.reload()" style="margin-left:8px;padding:4px 10px;border-radius:6px;border:1px solid var(--bdr);cursor:pointer;background:none;">Retry</button></div>';}}
-function checkMorningPrompt(){const h=new Date().getHours(),d=new Date().getDay();if(h>=6&&h<9&&d>0&&d<6){const today=dateKey(new Date());if(attendance.filter(a=>a.date===today).length===0&&employees.filter(e=>e.status==="Active").length>0){setTimeout(()=>toast("Good morning! Ready to mark attendance?","i",0),2000);}}}
+function checkMorningPrompt(){}
 window.addEventListener("popstate",function(e){if(e.state&&e.state.page)navigate(e.state.page);});
 
 // ══════════════════════════════════════════════════════
