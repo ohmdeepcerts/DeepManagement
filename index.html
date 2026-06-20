@@ -638,7 +638,6 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       <!-- FILTER BAR -->
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--sh);">
         <div style="flex:1;"><h1 style="font-size:20px;font-weight:800;line-height:1;">Dashboard</h1><p style="font-size:12px;color:var(--txt2);margin-top:3px;" id="dashDate"></p></div>
-        <!-- Filter pills -->
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
           <select id="dashStaff" onchange="renderDashboard()" style="padding:6px 10px;border:1.5px solid var(--bdr);border-radius:20px;font-size:12px;font-weight:600;color:var(--txt2);background:var(--card);font-family:inherit;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;padding-right:24px;background-image:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M0 0l5 6 5-6z" fill="%2394a3b8"/></svg>');background-repeat:no-repeat;background-position:right 8px center;"><option value="All">All Staff</option></select>
           <div class="nav-pills">
@@ -660,7 +659,6 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
           <select id="dashMonth" style="display:none;"></select>
           <select id="dashYear" style="display:none;"></select>
         </div>
-        <!-- Quick actions -->
         <div style="display:flex;gap:7px;flex-wrap:wrap;">
           <button class="btn btn-p btn-sm" onclick="navigate('mark')"><i class="fa-solid fa-pen-to-square"></i>Mark Today</button>
           <button class="btn btn-o btn-sm" onclick="navigate('ledger')"><i class="fa-solid fa-receipt"></i>Expense</button>
@@ -669,46 +667,143 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       </div>
       <div id="alertBanner"></div>
       <div id="docReminderBanner"></div>
-      <!-- NOT MARKED TODAY -->
       <div class="card" id="nmCard" style="display:none;margin-bottom:14px;">
         <div class="ch"><div><div class="ct"><i class="fa-solid fa-circle-exclamation" style="color:var(--amb);margin-right:5px;"></i>Not Yet Marked Today</div><div class="cs" id="nmSub"></div></div><button class="btn btn-p btn-sm" onclick="markDate=new Date();navigate('mark');renderMark()"><i class="fa-solid fa-pen-to-square"></i>Mark Now</button></div>
         <div class="cb" id="nmList"></div>
       </div>
-      <!-- ROW 1: 8 KPI CARDS -->
-      <div id="dashEOW"></div>
       <div id="dashAnniversaries"></div>
+
+      <!-- ROW 1: 4 ATTENDANCE KPI CARDS -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;" id="kpiRow"></div>
-      <!-- ROW 2: DAILY PRESENCE (scrollable) + PAYROLL TREND -->
-      <div style="display:grid;grid-template-columns:320px 1fr;gap:14px;margin-bottom:14px;">
-        <div class="card" style="display:flex;flex-direction:column;">
-          <div class="ch"><div class="ct"><i class="fa-solid fa-users" style="color:var(--blu);margin-right:5px;"></i>Today's Team</div><div class="cs" id="todayDate2"></div></div>
-          <div id="todayPresenceList" style="overflow-y:auto;max-height:260px;padding:0 14px;flex:1;"></div>
+      <!-- ROW 2: 4 EXPENSE KPI CARDS -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:10px;" id="kpiRow2"></div>
+
+      <!-- FULL WIDTH: SMART INSIGHTS -->
+      <div style="margin-bottom:14px;">
+        <div class="card"><div class="ch"><div class="ct"><i class="fa-solid fa-lightbulb" style="color:var(--tel);margin-right:5px;"></i>Smart Insights</div><div class="cs" id="insightsSub"></div></div><div class="cb" id="smartInsights"></div></div>
+      </div>
+
+      <!-- ZONE HEADERS -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:7px;padding:6px 10px;background:var(--blul);border-radius:var(--r);border:1px solid rgba(37,99,235,0.15);">
+          <i class="fa-solid fa-calendar-check" style="color:var(--blu);font-size:13px;"></i>
+          <span style="font-size:12px;font-weight:700;color:var(--blu);letter-spacing:0.04em;">ATTENDANCE</span>
         </div>
-        <div class="card"><div class="ch"><div class="ct"><i class="fa-solid fa-chart-bar" style="color:var(--pur);margin-right:5px;"></i>Monthly Cost Breakdown</div><div class="cs">Last 6 months</div></div><div style="padding:14px;height:240px;"><canvas id="payrollTrendChart"></canvas></div></div>
+        <div style="display:flex;align-items:center;gap:7px;padding:6px 10px;background:var(--ambl);border-radius:var(--r);border:1px solid rgba(217,119,6,0.15);">
+          <i class="fa-solid fa-receipt" style="color:var(--amb);font-size:13px;"></i>
+          <span style="font-size:12px;font-weight:700;color:var(--amb);letter-spacing:0.04em;">EXPENSES</span>
+        </div>
       </div>
-      <!-- ROW 3: ATTENDANCE HEATMAP (full width) -->
+
+      <!-- MAIN SPLIT: LEFT=ATTENDANCE, RIGHT=EXPENSES -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+
+        <!-- LEFT: ATTENDANCE COLUMN -->
+        <div style="display:flex;flex-direction:column;gap:14px;">
+
+          <!-- Today's Team -->
+          <div class="card" style="display:flex;flex-direction:column;">
+            <div class="ch"><div class="ct"><i class="fa-solid fa-users" style="color:var(--blu);margin-right:5px;"></i>Today's Team</div><div class="cs" id="todayDate2"></div></div>
+            <div id="todayPresenceList" style="overflow-y:auto;max-height:240px;padding:0 14px;flex:1;"></div>
+          </div>
+
+          <!-- Month Calendar -->
+          <div class="card">
+            <div class="ch"><div class="ct"><i class="fa-solid fa-calendar-days" style="color:var(--grn);margin-right:5px;"></i>Month Calendar</div><div class="cs" id="calSub"></div></div>
+            <div style="padding:0 14px 14px;" id="monthCal"></div>
+          </div>
+
+          <!-- Staff Performance Rings -->
+          <div class="card">
+            <div class="ch"><div class="ct"><i class="fa-solid fa-medal" style="color:var(--amb);margin-right:5px;"></i>Staff Performance</div><div class="cs" id="perfSub"></div></div>
+            <div class="cb" id="staffPerfRings"></div>
+          </div>
+
+          <!-- OT Hotspot -->
+          <div class="card">
+            <div class="ch"><div class="ct"><i class="fa-solid fa-fire" style="color:var(--red);margin-right:5px;"></i>OT Hotspot</div><div class="cs" id="otSub">Top 5 this month</div></div>
+            <div id="otHotspot" style="max-height:200px;overflow-y:auto;padding:0 14px;"></div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT: EXPENSES COLUMN -->
+        <div style="display:flex;flex-direction:column;gap:14px;">
+
+          <!-- Expense KPI mini-cards -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="card" style="padding:12px 14px;cursor:pointer;" onclick="navigate('ledger')">
+              <div style="font-size:10px;font-weight:600;color:var(--txtm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Total spent (YTD)</div>
+              <div style="font-size:20px;font-weight:800;color:var(--amb);" id="expYTD">—</div>
+              <div style="font-size:10px;color:var(--txtm);" id="expYTDSub">this year</div>
+            </div>
+            <div class="card" style="padding:12px 14px;cursor:pointer;" onclick="navigate('ledger')">
+              <div style="font-size:10px;font-weight:600;color:var(--txtm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Monthly average</div>
+              <div style="font-size:20px;font-weight:800;color:var(--tel);" id="expAvg">—</div>
+              <div style="font-size:10px;color:var(--txtm);">per active month</div>
+            </div>
+            <div class="card" style="padding:12px 14px;cursor:pointer;" onclick="navigate('ledger')">
+              <div style="font-size:10px;font-weight:600;color:var(--txtm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Top merchant</div>
+              <div style="font-size:16px;font-weight:800;color:var(--txt);" id="expTopMerchant">—</div>
+              <div style="font-size:10px;color:var(--txtm);" id="expTopMerchantSub">this month</div>
+            </div>
+            <div class="card" style="padding:12px 14px;cursor:pointer;" onclick="navigate('ledger')">
+              <div style="font-size:10px;font-weight:600;color:var(--txtm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Active months</div>
+              <div style="font-size:20px;font-weight:800;color:var(--pur);" id="expActiveMonths">—</div>
+              <div style="font-size:10px;color:var(--txtm);">with recorded expenses</div>
+            </div>
+          </div>
+
+          <!-- Expenditure Trend Line -->
+          <div class="card">
+            <div class="ch"><div class="ct"><i class="fa-solid fa-chart-line" style="color:var(--pur);margin-right:5px;"></i>Expenditure Trend</div><div class="cs" id="expTrendSub"></div></div>
+            <div style="padding:14px;height:200px;"><canvas id="expTrendChart"></canvas></div>
+          </div>
+
+          <!-- Top Merchants + Category Donut side by side -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="card">
+              <div class="ch"><div class="ct"><i class="fa-solid fa-store" style="color:var(--blu);margin-right:5px;"></i>Top Merchants</div><div class="cs" id="topMerchantSub">Top 5</div></div>
+              <div id="topMerchantList" style="padding:0 14px 8px;"></div>
+            </div>
+            <div class="card">
+              <div class="ch"><div class="ct"><i class="fa-solid fa-chart-pie" style="color:var(--tel);margin-right:5px;"></i>Categories</div><div class="cs" id="donutSub"></div></div>
+              <div style="padding:6px;height:170px;display:flex;align-items:center;justify-content:center;"><canvas id="expDonutChart"></canvas></div>
+            </div>
+          </div>
+
+          <!-- Staff Annual Matrix -->
+          <div class="card">
+            <div class="ch"><div class="ct"><i class="fa-solid fa-table" style="color:var(--grn);margin-right:5px;"></i>Staff Expense Matrix</div><div class="cs" id="matrixSub">Monthly breakdown</div></div>
+            <div style="overflow-x:auto;padding:0 14px 14px;" id="expMatrix"></div>
+          </div>
+
+          <!-- Expense by Employee -->
+          <div class="card">
+            <div class="ch"><div class="ct"><i class="fa-solid fa-ranking-star" style="color:var(--amb);margin-right:5px;"></i>By Employee</div><div class="cs" id="expEmpSub"></div></div>
+            <div id="expByEmp" style="max-height:200px;overflow-y:auto;padding:0 14px;"></div>
+          </div>
+
+          <!-- Pending Batches -->
+          <div class="card">
+            <div class="ch"><div class="ct"><i class="fa-solid fa-inbox" style="color:var(--blu);margin-right:5px;"></i>Pending Approvals</div><div class="cs" id="pendingBatchSub"></div></div>
+            <div id="pendingBatchList" style="max-height:180px;overflow-y:auto;padding:0 14px;"></div>
+          </div>
+
+          <!-- VAT Tracker + Incomplete -->
+          <div class="card">
+            <div class="ch"><div class="ct"><i class="fa-solid fa-tag" style="color:#0f766e;margin-right:5px;"></i>VAT &amp; Data Quality</div><div class="cs" id="vatSub"></div></div>
+            <div id="vatTracker" style="padding:0 14px 8px;"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- FULL WIDTH: DOCUMENT EXPIRY -->
       <div style="margin-bottom:14px;">
-        <div class="card"><div class="ch"><div class="ct"><i class="fa-solid fa-calendar-days" style="color:var(--grn);margin-right:5px;"></i>Attendance Heatmap</div><div class="cs">Last 12 weeks · click any day to mark</div></div><div style="padding:14px;overflow-x:auto;" id="attHeatmap"></div></div>
-      </div>
-      <!-- ROW 4: EXPENSE DONUT + OT HOTSPOT (scrollable top 5) -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-        <div class="card"><div class="ch"><div class="ct"><i class="fa-solid fa-chart-pie" style="color:var(--amb);margin-right:5px;"></i>Expense Categories</div><div class="cs" id="donutSub"></div></div><div style="padding:10px;height:200px;display:flex;align-items:center;justify-content:center;"><canvas id="expDonutChart"></canvas></div></div>
-        <div class="card"><div class="ch"><div class="ct"><i class="fa-solid fa-fire" style="color:var(--red);margin-right:5px;"></i>OT Hotspot</div><div class="cs">Top 5 this month</div></div><div id="otHotspot" style="max-height:200px;overflow-y:auto;padding:0 14px;"></div></div>
-      </div>
-      <!-- ROW 5: STAFF PERFORMANCE (scrollable grid) -->
-      <div style="margin-bottom:14px;">
-        <div class="card"><div class="ch"><div class="ct"><i class="fa-solid fa-medal" style="color:var(--amb);margin-right:5px;"></i>Staff Performance</div><div class="cs" id="perfSub"></div></div><div class="cb" id="staffPerfRings"></div></div>
-      </div>
-      <!-- ROW 6: TOP EARNERS (top 5 scrollable) + SMART INSIGHTS -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-        <div class="card"><div class="ch"><div class="ct"><i class="fa-solid fa-ranking-star" style="color:var(--grn);margin-right:5px;"></i>Top Earners</div><div class="cs">This month · top 5</div></div><div id="topEarners" style="max-height:220px;overflow-y:auto;padding:0 14px;"></div></div>
-        <div class="card"><div class="ch"><div class="ct"><i class="fa-solid fa-lightbulb" style="color:var(--tel);margin-right:5px;"></i>Smart Insights</div></div><div class="cb" id="smartInsights"></div></div>
-      </div>
-      <!-- ROW 7: ATTENDANCE WARNINGS (scrollable) + DOCUMENT EXPIRY -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-        <div class="card"><div class="ch"><div class="ct"><i class="fa-solid fa-triangle-exclamation" style="color:var(--amb);margin-right:5px;"></i>Attendance Warnings</div><span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;background:var(--ambl);color:var(--amb);" id="warnThresh">Below 80%</span></div><div id="warnTable" style="max-height:220px;overflow-y:auto;padding:0 12px;"></div></div>
         <div class="card"><div class="ch"><div class="ct"><i class="fa-solid fa-file-circle-exclamation" style="color:var(--red);margin-right:5px;"></i>Document Expiry</div></div><div id="docExpiryTimeline" style="max-height:220px;overflow-y:auto;padding:0 14px;"></div></div>
       </div>
+
     </div>
     <!-- ATTENDANCE REQUESTS -->
     <div class="page" id="page-att-requests">
@@ -782,7 +877,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
           </div>
           <div class="led-scroll">
             <table class="led-table">
-              <thead><tr><th style="width:26px"></th><th style="width:108px">Date</th><th>Description</th><th style="width:135px">Category</th><th style="width:155px">Tags</th><th style="width:88px;text-align:right">Amount</th><th style="width:75px;text-align:right">Running</th><th style="width:65px"></th></tr></thead>
+              <thead><tr><th style="width:26px"></th><th style="width:108px">Date</th><th>Merchant</th><th style="width:135px">Category</th><th style="width:155px">Tags</th><th style="width:88px;text-align:right">Amount</th><th style="width:75px;text-align:right">Running</th><th style="width:65px"></th></tr></thead>
               <tbody id="ledBody"></tbody>
             </table>
             <div id="ledEmpty" class="es" style="display:none;"><i class="fa-solid fa-receipt"></i><h3>No expenses yet</h3><p>Click Add Row or use Quick Entry</p></div>
@@ -1640,8 +1735,8 @@ function calcPay(emp,rec){
     const dt2=new Date(rec.date+'T00:00:00');
     const yr=dt2.getFullYear(), mo=dt2.getMonth();
     const workDays=workDaysInMonth(emp,yr,mo);
-    const dailyEquiv=workDays>0?monthlySalary/workDays:0;
-    const hrlyEquiv=ch>0?dailyEquiv/ch:0;
+    const dailyEquiv=workDays>0?parseFloat((monthlySalary/workDays).toFixed(2)):0;
+    const hrlyEquiv=ch>0?parseFloat((dailyEquiv/ch).toFixed(4)):0;
     const workedH=parseFloat(rec.hours)||0;
     if(rec.status==='HD'){
       basePay=parseFloat((dailyEquiv*0.5*wkM).toFixed(2));
@@ -2159,284 +2254,540 @@ function shiftDash(n){
 
 function renderDashboard(){
   if(!employees||employees.length===0){
-    // Data not loaded yet - show loading state
     const k=document.getElementById('kpiRow');
-    if(k)k.innerHTML=`
-    ${'<div class="skeleton" style="height:88px;margin-bottom:10px;"></div>'.repeat(2)}
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
-      ${'<div class="skeleton" style="height:82px;"></div>'.repeat(4)}
-    </div>`;
+    if(k)k.innerHTML='<div class="skeleton" style="height:82px;"></div>'.repeat(4);
     return;
   }
   const now=new Date();
-  if(document.getElementById('todayDate2'))document.getElementById('todayDate2').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
-
   const month=parseInt(document.getElementById('dashMonth')?.value??now.getMonth());
   const year=parseInt(document.getElementById('dashYear')?.value??now.getFullYear());
   const staffF=document.getElementById('dashStaff')?.value||'All';
+  const isSingle=staffF!=='All';
   const C=cur();
 
-  // Employee of week + pulse
-  (function(){
-    var eow=getEmployeeOfWeek();
-    var pulse=getTeamPulse();
-    var el=document.getElementById('dashEOW');
-    if(el&&eow){
-      var trend=getAttendanceTrend(7);
-      el.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">'+
-        '<div style="background:linear-gradient(135deg,var(--ambl),rgba(254,243,199,0.3));border:1px solid rgba(217,119,6,0.2);border-radius:var(--r);padding:14px;">'+
-          '<div style="font-size:11px;font-weight:700;color:var(--amb);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">⭐ Employee of Month</div>'+
-          '<div style="font-size:14px;font-weight:800;">'+eow.emp.name+'</div>'+
-          '<div style="font-size:12px;color:var(--txt2);margin-top:4px;">'+eow.present+' days present · '+eow.hrs.toFixed(0)+'h worked'+(eow.streak>=5?' · '+(eow.streak>=20?'💎':eow.streak>=10?'🔥🔥':'🔥')+eow.streak+'d streak':'')+'</div>'+
-        '</div>'+
-        '<div style="background:linear-gradient(135deg,var(--accl),rgba(219,234,254,0.3));border:1px solid rgba(37,99,235,0.15);border-radius:var(--r);padding:14px;">'+
-          '<div style="font-size:11px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">'+pulse.emoji+' Team Pulse</div>'+
-          '<div style="font-size:22px;font-weight:800;color:var(--acc);">'+pulse.score+'%</div>'+
-          '<div style="font-size:12px;color:var(--txt2);margin-top:2px;">'+pulse.label+''+makeSparkline(trend,'#2563eb')+'</div>'+
-        '</div>'+
-      '</div>';
-    }
-    // Anniversaries
-    var ann=checkAnniversaries();
-    if(ann.length){
-      var annEl=document.getElementById('dashAnniversaries');
-      if(annEl){annEl.innerHTML='<div style="background:var(--purl);border:1px solid rgba(124,58,237,0.2);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;">'+
-        '<div style="font-size:11px;font-weight:700;color:var(--pur);margin-bottom:6px;">🎉 Work Anniversaries This Week</div>'+
-        ann.map(function(a){return'<div style="font-size:13px;font-weight:600;">'+a.name+' — '+a.years+' year'+(a.years!==1?'s':'')+' '+(a.daysUntil===0?'<span style="color:var(--pur);">Today!</span>':'in '+a.daysUntil+' days')+'</div>';}).join('')+
-      '</div>';}
-    }
-  })();
-
-  // Update display
-  const dashDm=document.getElementById('dashDisp_m'),dashDy=document.getElementById('dashDisp_y');
-  if(dashDm)dashDm.textContent=MONTHS[month];if(dashDy)dashDy.textContent=year;
-  document.getElementById('dashDate').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-
-  // Populate staff selector (only on first load)
+  // Populate staff selector
   const dss=document.getElementById('dashStaff');
-  if(dss&&dss.options.length<=1){employees.forEach(e=>{dss.appendChild(new Option(e.name,e.id));});}
+  if(dss&&dss.options.length<=1){employees.filter(e=>e.status==='Active').forEach(e=>{dss.appendChild(new Option(e.name,e.id));});}
 
-  const emps=employees.filter(e=>e.status==='Active');
+  // Date display
+  document.getElementById('dashDate').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const dm=document.getElementById('dashDisp_m'),dy=document.getElementById('dashDisp_y');
+  if(dm)dm.textContent=MONTHS[month];if(dy)dy.textContent=year;
+  if(document.getElementById('todayDate2'))document.getElementById('todayDate2').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+
+  // ── CORE DATA ─────────────────────────────────────────────
+  const allActiveEmps=employees.filter(e=>e.status==='Active');
+  const scopeEmps=isSingle?allActiveEmps.filter(e=>e.id===staffF):allActiveEmps;
+  const scopeEmp=isSingle?allActiveEmps.find(e=>e.id===staffF):null;
   const todayKey=dateKey(now);
   const todayRecs=attendance.filter(r=>r.date===todayKey);
-  const days=dim(year,month);
-  const wDays=Array.from({length:days},(_,i)=>{const dow=new Date(year,month,i+1).getDay();return dow!==0;}).filter(Boolean).length;
-  // Per-employee work days are used in per-employee calcs; wDays here is used only for team-level alert threshold
+  const scopeTodayRecs=isSingle?todayRecs.filter(r=>r.employee_id===staffF):todayRecs;
   const mRecs=attendance.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===month&&d.getFullYear()===year;});
-  const mStr=String(month+1).padStart(2,'0');
-  const presentToday=todayRecs.filter(r=>isP(r.status)).length;
-  const absentToday=todayRecs.filter(r=>r.status==='A').length;
-  const leaveToday=todayRecs.filter(r=>['L','S','H','UL'].includes(r.status)).length;
-  const monthHrs=mRecs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
-  const mExpenses=expenses.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===month&&d.getFullYear()===year&&(staffF==='All'||r.employee_id===staffF);});
-  const totalExp=mExpenses.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
-  const vatTotal=mExpenses.filter(r=>r.tags?.includes('VAT')).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
-  const pendingCount=batches.filter(b=>b.status==='pending').length;
+  const scopeMRecs=isSingle?mRecs.filter(r=>r.employee_id===staffF):mRecs;
+  let pm=month-1,py=year;if(pm<0){pm=11;py--;}
+  const prevMRecs=attendance.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===pm&&d.getFullYear()===py;});
+  const scopePrevMRecs=isSingle?prevMRecs.filter(r=>r.employee_id===staffF):prevMRecs;
+  const days=dim(year,month);
+  const scopeWDSingle=scopeEmp?Array.from({length:days},(_,i)=>isWDFor(scopeEmp,new Date(year,month,i+1))?1:0).reduce((a,b)=>a+b,0):0;
 
-  // Payroll estimate
-  let payrollEst=0,baseTotal=0,otTotal=0,bonusTotal=0;
-  emps.forEach(emp=>{
-    const recs=mRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
-    recs.forEach(r=>{const p=calcPay(emp,r);baseTotal+=p.base;otTotal+=p.ot;payrollEst+=p.total;});
-    const empBonus=mRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-    bonusTotal+=empBonus;
-    payrollEst+=empBonus;
-    const empExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===emp.id&&d.getMonth()===month&&d.getFullYear()===year;});
-    payrollEst+=empExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+  // Today counts
+  const presentToday=scopeTodayRecs.filter(r=>isP(r.status)).length;
+  const absentToday=scopeTodayRecs.filter(r=>r.status==='A').length;
+  const leaveToday=scopeTodayRecs.filter(r=>['L','S','H','UL'].includes(r.status)).length;
+  const absentNames=scopeEmps.filter(e=>{const r=todayRecs.find(x=>x.employee_id===e.id);return r&&r.status==='A';}).map(e=>e.name);
+  const leaveNames=scopeEmps.filter(e=>{const r=todayRecs.find(x=>x.employee_id===e.id);return r&&['L','S','H','UL'].includes(r.status);}).map(e=>{
+    const r=todayRecs.find(x=>x.employee_id===e.id);
+    return e.name+({'L':' (Leave)','S':' (Sick)','H':' (Holiday)','UL':' (Unpaid)'}[r?.status]||'');
   });
+
+  // Hours
+  const scopeMonthHrs=scopeMRecs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
+  const prevMonthHrs=scopePrevMRecs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
+  const contractedHrs=isSingle&&scopeEmp?(scopeWDSingle*(parseFloat(scopeEmp.contracted_hours)||0)):null;
+  const scopeOTH=scopeMRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
+  const prevOTH=scopePrevMRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
+
+  // Expenses
+  const scopeExpenses=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===month&&d.getFullYear()===year&&(isSingle?e.employee_id===staffF:true);});
+  const prevScopeExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===pm&&d.getFullYear()===py&&(isSingle?e.employee_id===staffF:true);});
+  const totalExp=scopeExpenses.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+  const prevTotalExp=prevScopeExp.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+  const vatTotal=scopeExpenses.filter(r=>r.tags?.includes('VAT')).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+
+  // Payroll
+  let payrollEst=0,baseTotal=0,otTotal=0,bonusTotal=0,prevPayrollEst=0;
+  scopeEmps.forEach(emp=>{
+    const recs=scopeMRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
+    recs.forEach(r=>{const p=calcPay(emp,r);baseTotal+=p.base;otTotal+=p.ot;payrollEst+=p.total;});
+    const bn=scopeMRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
+    bonusTotal+=bn;payrollEst+=bn;
+    payrollEst+=scopeExpenses.filter(e=>e.employee_id===emp.id).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+    const pR=scopePrevMRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
+    pR.forEach(r=>{const p=calcPay(emp,r);prevPayrollEst+=p.total;});
+    prevPayrollEst+=scopePrevMRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
+    prevPayrollEst+=prevScopeExp.filter(e=>e.employee_id===emp.id).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+  });
+
+  const pendingExp=batches.filter(b=>b.status==='pending').length;
+  const pendingTime=(attRequests||[]).filter(r=>r.status==='pending').length;
+  const pendingTotal=pendingExp+pendingTime;
 
   // Not marked today
   const markedIds=new Set(todayRecs.map(r=>r.employee_id));
-  const notMarked=emps.filter(e=>!markedIds.has(e.id));
+  const notMarked=allActiveEmps.filter(e=>!markedIds.has(e.id));
   const nmCard=document.getElementById('nmCard');
-  if(notMarked.length>0){nmCard.style.display='';document.getElementById('nmSub').textContent=`${notMarked.length} not yet logged`;document.getElementById('nmList').innerHTML=notMarked.map(e=>`<span class="nm-chip"><span class="ava" style="background:${avcol(e.id)};width:18px;height:18px;font-size:8px;margin-right:0;">${inits(e.name)}</span>${e.name}</span>`).join('');}
-  else nmCard.style.display='none';
+  if(notMarked.length>0){
+    nmCard.style.display='';
+    document.getElementById('nmSub').textContent=`${notMarked.length} not yet logged`;
+    document.getElementById('nmList').innerHTML=notMarked.map(e=>`<span class="nm-chip"><span class="ava" style="background:${avcol(e.id)};width:18px;height:18px;font-size:8px;margin-right:0;">${inits(e.name)}</span>${e.name}</span>`).join('');
+  }else nmCard.style.display='none';
 
   // Alert banner
   const thr=cfg.threshold||80;
-  const warns=emps.filter(emp=>{const recs=mRecs.filter(r=>r.employee_id===emp.id);const pw=recs.filter(r=>isP(r.status)&&new Date(r.date+'T00:00:00').getDay()!==0).length;return wDays>0&&Math.round(pw/wDays*100)<thr;});
-  const alertEl=document.getElementById('alertBanner');
-  if(warns.length>0)alertEl.innerHTML=`<div style="background:var(--ambl);border:1px solid var(--amb);border-left:4px solid var(--amb);border-radius:var(--r);padding:9px 13px;margin-bottom:14px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;"><i class="fa-solid fa-bell" style="color:var(--amb);"></i><span style="font-size:13px;font-weight:600;color:var(--amb);">${warns.length} employee${warns.length>1?'s':''} below ${thr}% attendance</span><button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--txtm);font-size:14px;"><i class="fa-solid fa-xmark"></i></button></div>`;
-  else alertEl.innerHTML='';
+  const warnDays=Array.from({length:days},(_,i)=>new Date(year,month,i+1).getDay()!==0).filter(Boolean).length;
+  const warns=allActiveEmps.filter(emp=>{
+    const recs=(isSingle&&emp.id!==staffF)?[]:mRecs.filter(r=>r.employee_id===emp.id);
+    const pw=recs.filter(r=>isP(r.status)&&new Date(r.date+'T00:00:00').getDay()!==0).length;
+    return warnDays>0&&Math.round(pw/warnDays*100)<thr;
+  });
+  document.getElementById('alertBanner').innerHTML=warns.length>0?`<div style="background:var(--ambl);border:1px solid var(--amb);border-left:4px solid var(--amb);border-radius:var(--r);padding:9px 13px;margin-bottom:14px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;"><i class="fa-solid fa-bell" style="color:var(--amb);"></i><span style="font-size:13px;font-weight:600;color:var(--amb);">${warns.length} employee${warns.length>1?'s':''} below ${thr}% attendance</span><button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--txtm);font-size:14px;"><i class="fa-solid fa-xmark"></i></button></div>`:'';
 
-  // ── 1. KPI CARDS ──────────────────────────────────────
-  const kpiData=[
-    {label:'Present Today',val:presentToday,sub:`of ${emps.length} active`,icon:'fa-user-check',color:'var(--grn)',bg:'var(--grnl)',click:"navigate('mark')"},
-    {label:'Absent Today',val:absentToday,sub:leaveToday>0?`${leaveToday} on leave`:'',icon:'fa-user-xmark',color:'var(--red)',bg:'var(--redl)',click:"navigate('daily')"},
-    {label:'Month Hours',val:monthHrs.toFixed(0)+'h',sub:`${MONTHS[month]} ${year}`,icon:'fa-clock',color:'var(--blu)',bg:'var(--blul)',click:"navigate('monthly')"},
-    {label:'OT Hours',val:mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0).toFixed(1)+'h',sub:'overtime this month',icon:'fa-hourglass-half',color:'var(--amb)',bg:'var(--ambl)',click:"navigate('payroll')"},
-    {label:'Total Expenses',val:C+totalExp.toFixed(0),sub:`${MONTHS[month]} ${year}`,icon:'fa-receipt',color:'var(--tel)',bg:'var(--tell)',click:"navigate('ledger')"},
-    {label:'Est. Payroll',val:C+payrollEst.toFixed(0),sub:'base+OT+exp+bonus',icon:'fa-sterling-sign',color:'var(--pur)',bg:'var(--purl)',click:"navigate('payroll')"},
-    {label:'Pending Approvals',val:pendingCount,sub:'expense batches',icon:'fa-circle-check',color:'var(--amb)',bg:'var(--ambl)',click:"navigate('approvals')"},
-    {label:'VAT Tagged',val:C+vatTotal.toFixed(0),sub:`Est. reclaimable: ${C}${(vatTotal/6).toFixed(0)}`,icon:'fa-tag',color:'#0f766e',bg:'var(--tell)',click:"navigate('tags')"},
+  // Anniversaries
+  (function(){
+    var ann=checkAnniversaries();
+    var annEl=document.getElementById('dashAnniversaries');
+    if(annEl){
+      if(ann.length){annEl.innerHTML='<div style="background:var(--purl);border:1px solid rgba(124,58,237,0.2);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:var(--pur);margin-bottom:6px;">🎉 Work Anniversaries This Week</div>'+ann.map(function(a){return'<div style="font-size:13px;font-weight:600;">'+a.name+' — '+a.years+' year'+(a.years!==1?'s':'')+' '+(a.daysUntil===0?'<span style="color:var(--pur);">Today!</span>':'in '+a.daysUntil+' days')+'</div>';}).join('')+'</div>';}
+      else annEl.innerHTML='';
+    }
+  })();
+
+  // ── DELTA HELPER ──────────────────────────────────────────
+  function delta(curr,prev,prefix,suffix,higherIsBetter){
+    if(!prev)return'';
+    const d=curr-prev,pct=Math.round(Math.abs(d)/Math.abs(prev)*100),up=d>=0;
+    const good=higherIsBetter?up:!up,col=good?'var(--grn)':'var(--red)',arrow=up?'↑':'↓';
+    return`<span style="font-size:10px;font-weight:700;color:${col};margin-left:5px;">${arrow}${prefix||''}${Math.abs(d)<10?Math.abs(d).toFixed(1):Math.abs(d).toFixed(0)}${suffix||''} vs last month</span>`;
+  }
+
+  // ── ROW 1: ATTENDANCE KPI CARDS ───────────────────────────
+  const kpi1=[
+    {label:'Present Today',val:presentToday,sub:isSingle?(presentToday?'At work today':'Not marked today'):`of ${scopeEmps.length} active`,icon:'fa-user-check',color:'var(--grn)',bg:'var(--grnl)',click:"navigate('mark')",
+      extra:leaveToday>0?`<div style="font-size:10px;color:var(--txtm);margin-top:3px;">${leaveNames.slice(0,2).join(', ')}${leaveNames.length>2?' +'+( leaveNames.length-2)+' more':''}</div>`:''},
+    {label:'Absent Today',val:absentToday,sub:absentNames.length?absentNames.slice(0,2).join(', ')+(absentNames.length>2?` +${absentNames.length-2} more`:''):'None absent',icon:'fa-user-xmark',color:'var(--red)',bg:'var(--redl)',click:"navigate('daily')"},
+    {label:isSingle&&contractedHrs?'Hours vs Contracted':'Month Hours',val:scopeMonthHrs.toFixed(0)+'h',sub:isSingle&&contractedHrs?`of ${contractedHrs.toFixed(0)}h contracted`:MONTHS[month]+' '+year,icon:'fa-clock',color:'var(--blu)',bg:'var(--blul)',click:"navigate('monthly')",dlt:delta(scopeMonthHrs,prevMonthHrs,'','h',true)},
+    {label:'OT Hours',val:scopeOTH.toFixed(1)+'h',sub:'overtime this month',icon:'fa-hourglass-half',color:'var(--amb)',bg:'var(--ambl)',click:"navigate('payroll')",dlt:delta(scopeOTH,prevOTH,'','h',false)},
   ];
-  document.getElementById('kpiRow').innerHTML=kpiData.map((k,i)=>`
+  document.getElementById('kpiRow').innerHTML=kpi1.map(k=>`
     <div onclick="${k.click}" style="background:var(--card);border:1px solid var(--bdr);border-radius:var(--rl);padding:16px 18px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='var(--shm)';this.style.borderColor='${k.color}50'" onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='var(--bdr)'">
       <div style="position:absolute;top:12px;right:14px;width:36px;height:36px;border-radius:10px;background:${k.bg};display:flex;align-items:center;justify-content:center;"><i class="fa-solid ${k.icon}" style="color:${k.color};font-size:15px;"></i></div>
       <div style="font-size:11px;font-weight:600;color:var(--txtm);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">${k.label}</div>
-      <div style="font-size:24px;font-weight:800;color:${k.color};line-height:1;margin-bottom:4px;">${k.val}</div>
+      <div style="font-size:24px;font-weight:800;color:${k.color};line-height:1;margin-bottom:4px;">${k.val}${k.dlt||''}</div>
+      <div style="font-size:11px;color:var(--txtm);">${k.sub}</div>${k.extra||''}
+    </div>`).join('');
+
+  // ── ROW 2: EXPENSE KPI CARDS ──────────────────────────────
+  const kpi2=[
+    {label:'Total Expenses',val:C+totalExp.toFixed(0),sub:MONTHS[month]+' '+year,icon:'fa-receipt',color:'var(--amb)',bg:'var(--ambl)',click:"navigate('ledger')",dlt:delta(totalExp,prevTotalExp,C,'',false)},
+    {label:'Est. Payroll',val:C+payrollEst.toFixed(0),sub:'base+OT+exp+bonus',icon:'fa-sterling-sign',color:'var(--pur)',bg:'var(--purl)',click:"navigate('payroll')",dlt:delta(payrollEst,prevPayrollEst,C,'',false)},
+    {label:'Pending Approvals',val:pendingTotal,sub:`${pendingTime} time · ${pendingExp} expense`,icon:'fa-circle-check',color:pendingTotal>0?'var(--amb)':'var(--grn)',bg:pendingTotal>0?'var(--ambl)':'var(--grnl)',click:"navigate('approvals')"},
+    {label:'VAT Tagged',val:C+vatTotal.toFixed(0),sub:`Est. reclaimable: ${C}${(vatTotal/6).toFixed(0)}`,icon:'fa-tag',color:'#0f766e',bg:'var(--tell)',click:"navigate('tags')"},
+  ];
+  document.getElementById('kpiRow2').innerHTML=kpi2.map(k=>`
+    <div onclick="${k.click}" style="background:var(--card);border:1px solid var(--bdr);border-radius:var(--rl);padding:16px 18px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='var(--shm)';this.style.borderColor='${k.color}50'" onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='var(--bdr)'">
+      <div style="position:absolute;top:12px;right:14px;width:36px;height:36px;border-radius:10px;background:${k.bg};display:flex;align-items:center;justify-content:center;"><i class="fa-solid ${k.icon}" style="color:${k.color};font-size:15px;"></i></div>
+      <div style="font-size:11px;font-weight:600;color:var(--txtm);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">${k.label}</div>
+      <div style="font-size:24px;font-weight:800;color:${k.color};line-height:1;margin-bottom:4px;">${k.val}${k.dlt||''}</div>
       <div style="font-size:11px;color:var(--txtm);">${k.sub}</div>
     </div>`).join('');
 
-  // ── 2. TODAY'S TEAM (live presence list) ──────────────
-  const teamEmps=staffF==='All'?emps:[emps.find(e=>e.id===staffF)].filter(Boolean);
-  const presenceHtml=teamEmps.map(emp=>{
+  // ── LEFT COL A: TODAY'S TEAM ──────────────────────────────
+  document.getElementById('todayPresenceList').innerHTML=scopeEmps.map(emp=>{
     const rec=todayRecs.find(r=>r.employee_id===emp.id);
     const st=rec?.status;
-    const stColor=st==='P'||st==='LA'||st==='HD'?'var(--grn)':st==='A'?'var(--red)':st?'var(--amb)':'var(--txtm)';
-    const stLabel=st?({'P':'Present','A':'Absent','L':'Annual Leave','S':'Sick','H':'Bank Holiday','HD':'Half Day','LA':'Late','UL':'Unpaid Leave'}[st]||st):'Not marked';
-    const timeStr=rec?.sign_in?`${rec.sign_in}${rec.sign_out?'–'+rec.sign_out:''}`:'';
+    const stColor=isP(st)?'var(--grn)':st==='A'?'var(--red)':st?'var(--amb)':'var(--txtm)';
+    const stLabel=st?({'P':'Present','A':'Absent','L':'Annual Leave','S':'Sick','H':'Bank Holiday','HD':'Half Day','LA':'Late Arrival','UL':'Unpaid Leave'}[st]||st):'Not marked';
+    const timeStr=rec?.sign_in?`${rec.sign_in}${rec.sign_out?'–'+rec.sign_out:''}`:'' ;
     return`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:0.5px solid var(--bdr);">
       <span class="ava" style="background:${avcol(emp.id)};flex-shrink:0;">${inits(emp.name)}</span>
       <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${emp.name}</div><div style="font-size:11px;color:var(--txtm);">${emp.role||''}</div></div>
       <div style="text-align:right;flex-shrink:0;"><div style="font-size:12px;font-weight:700;color:${stColor};">${stLabel}</div><div style="font-size:10px;color:var(--txtm);">${timeStr}</div></div>
     </div>`;
-  }).join('');
-  document.getElementById('todayPresenceList').innerHTML=presenceHtml||'<div style="text-align:center;color:var(--txtm);padding:14px;font-size:13px;">No employees yet</div>';
+  }).join('')||'<div style="text-align:center;color:var(--txtm);padding:14px;font-size:13px;">No employees yet</div>';
 
-  // ── 3. PAYROLL TREND CHART (stacked bar, 6 months) ────
-  const months6=[];const labels6=[];
-  for(let i=5;i>=0;i--){let m2=month-i,y2=year;if(m2<0){m2+=12;y2--;}months6.push({m:m2,y:y2});labels6.push(MONTHS[m2].slice(0,3)+' '+String(y2).slice(2));}
-  const trend={base:[],ot:[],exp:[],bonus:[]};
-  months6.forEach(({m:m2,y:y2})=>{let b=0,o=0,e=0,bn=0;
-    const mR=attendance.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===m2&&d.getFullYear()===y2;});
-    emps.forEach(emp=>{
-      mR.filter(r=>r.employee_id===emp.id&&isP(r.status)).forEach(r=>{const p=calcPay(emp,r);b+=p.base;o+=p.ot;});
-      bn+=mR.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-      const eR=expenses.filter(ex=>{const d=new Date(ex.date+'T00:00:00');return ex.employee_id===emp.id&&d.getMonth()===m2&&d.getFullYear()===y2;});
-      e+=eR.reduce((s,ex)=>s+(parseFloat(ex.amount)||0),0);
-    });
-    trend.base.push(parseFloat(b.toFixed(2)));trend.ot.push(parseFloat(o.toFixed(2)));trend.exp.push(parseFloat(e.toFixed(2)));trend.bonus.push(parseFloat(bn.toFixed(2)));
-  });
-  const ctxP=document.getElementById('payrollTrendChart');
-  if(ctxP){if(window._chartPayT){window._chartPayT.destroy();window._chartPayT=null;}
-  window._chartPayT=new Chart(ctxP,{type:'bar',data:{labels:labels6,datasets:[
-    {label:'Base Pay',data:trend.base,backgroundColor:'rgba(37,99,235,0.75)',borderRadius:4,stack:'s'},
-    {label:'Overtime',data:trend.ot,backgroundColor:'rgba(217,119,6,0.75)',borderRadius:4,stack:'s'},
-    {label:'Expenses',data:trend.exp,backgroundColor:'rgba(8,145,178,0.75)',borderRadius:4,stack:'s'},
-    {label:'Bonus',data:trend.bonus,backgroundColor:'rgba(22,163,74,0.75)',borderRadius:4,stack:'s'},
-  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:12,font:{size:10,family:'Plus Jakarta Sans'},usePointStyle:true}},tooltip:{backgroundColor:'#1e293b',padding:11,cornerRadius:8,callbacks:{label:ctx=>`${ctx.dataset.label}: ${C}${ctx.raw.toFixed(2)}`}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:11,family:'Plus Jakarta Sans'},color:'#64748b'}},y:{stacked:true,beginAtZero:true,grid:{color:'rgba(0,0,0,0.04)',borderDash:[4,4]},ticks:{font:{family:'JetBrains Mono',size:10},color:'#94a3b8',callback:v=>C+(v>=1000?(v/1000).toFixed(1)+'k':v)}}}}})}
-
-  // ── 4. ATTENDANCE HEATMAP (12 weeks) ──────────────────
-  const heatEl=document.getElementById('attHeatmap');
-  if(heatEl){
-    const weeks=12;const totalDays=weeks*7;let html='<div style="display:flex;gap:3px;overflow-x:auto;padding-bottom:4px;">';
-    // Day labels
-    html+='<div style="display:flex;flex-direction:column;gap:2px;margin-right:2px;">'+'<div style="height:14px;"></div>'+['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<div style="height:14px;width:18px;font-size:9px;color:var(--txtm);display:flex;align-items:center;">${d}</div>`).join('')+'</div>';
-    // Weeks
-    for(let w=weeks-1;w>=0;w--){
-      html+='<div style="display:flex;flex-direction:column;gap:2px;">';
-      const weekStart=new Date(now);weekStart.setDate(weekStart.getDate()-(w*7+now.getDay()));
-      // Month label
-      const wlabel=w===weeks-1||weekStart.getDate()<=7?weekStart.toLocaleDateString('en-GB',{month:'short'}):'';
-      html+=`<div style="height:14px;font-size:9px;color:var(--txtm);white-space:nowrap;">${wlabel}</div>`;
-      for(let d=0;d<7;d++){
-        const day=new Date(weekStart);day.setDate(weekStart.getDate()+d);
-        if(day>now){html+='<div style="width:14px;height:14px;border-radius:3px;background:var(--card2);"></div>';continue;}
-        const key=dateKey(day);
-        const dayRecs=attendance.filter(r=>r.date===key&&isP(r.status));
-        const pct=emps.length>0?dayRecs.length/emps.length:0;
-        const isSunday=day.getDay()===0;
-        const bg=isSunday?'rgba(165,180,252,0.35)':pct===0?'var(--bdr)':pct<0.25?'#bbf7d0':pct<0.5?'#4ade80':pct<0.75?'#16a34a':'#15803d';
-        const isT=key===todayKey;
-        html+=`<div onclick="jumpToMark('${key}')" title="${day.toLocaleDateString('en-GB')}: ${dayRecs.length}/${emps.length} present" style="width:14px;height:14px;border-radius:3px;background:${bg};cursor:pointer;transition:0.15s;${isT?'outline:2px solid var(--acc);outline-offset:1px;':''}" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"></div>`;
+  // ── LEFT COL B: MONTH CALENDAR ────────────────────────────
+  (function(){
+    const calEl=document.getElementById('monthCal');
+    if(!calEl)return;
+    const calSub=document.getElementById('calSub');
+    if(calSub)calSub.textContent=isSingle?scopeEmp?.name+' · '+MONTHS[month]+' '+year:MONTHS[month]+' '+year+' · click day to mark';
+    const daysInM=dim(year,month);
+    const firstDow=new Date(year,month,1).getDay(); // 0=Sun
+    const startOffset=firstDow===0?6:firstDow-1; // shift so Mon=0
+    const dayLabels=['M','T','W','T','F','S','Su'];
+    let h='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px;">';
+    dayLabels.forEach(d=>{h+=`<div style="text-align:center;font-size:9px;font-weight:700;color:var(--txtm);padding:2px 0;">${d}</div>`;});
+    h+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">';
+    for(let i=0;i<startOffset;i++)h+='<div></div>';
+    for(let d=1;d<=daysInM;d++){
+      const dt=new Date(year,month,d);
+      const key=dateKey(dt);
+      const dow=dt.getDay(); // 0=Sun
+      const isSun=dow===0;
+      const isFut=dt>now&&key!==todayKey;
+      const isToday=key===todayKey;
+      let bg='var(--card2)',txt='var(--txtm)',label='',border='';
+      if(isSun){bg='rgba(165,180,252,0.2)';txt='var(--txtm)';}
+      else if(!isFut){
+        if(isSingle){
+          const rec=attendance.find(r=>r.date===key&&r.employee_id===staffF);
+          if(rec){
+            if(isP(rec.status)){bg='var(--grnl)';txt='var(--grn)';label=rec.sign_in?rec.sign_in.slice(0,5):rec.status;}
+            else if(rec.status==='A'){bg='var(--redl)';txt='var(--red)';label='A';}
+            else if(['L','S','H','UL','HD'].includes(rec.status)){bg='var(--ambl)';txt='var(--amb)';label=rec.status;}
+          }
+        }else{
+          const dayRecs=attendance.filter(r=>r.date===key&&isP(r.status));
+          const total=allActiveEmps.length;
+          const pct=total>0?dayRecs.length/total:0;
+          if(pct===0)bg='var(--bdr)';
+          else if(pct<0.5){bg='#dcfce7';txt='#16a34a';}
+          else if(pct<0.8){bg='#bbf7d0';txt='#15803d';}
+          else{bg='#86efac';txt='#14532d';}
+          label=dayRecs.length>0?`${dayRecs.length}/${total}`:'';
+        }
       }
-      html+='</div>';
+      if(isToday)border='outline:2px solid var(--acc);outline-offset:1px;';
+      h+=`<div onclick="jumpToMark('${key}')" title="${dt.toLocaleDateString('en-GB')}" style="border-radius:5px;background:${bg};color:${txt};font-size:9px;font-weight:700;text-align:center;padding:5px 2px;cursor:pointer;min-height:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;${border}" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'">
+        <span style="font-size:11px;font-weight:800;">${d}</span>
+        ${label?`<span style="font-size:8px;margin-top:1px;">${label}</span>`:''}
+      </div>`;
     }
-    html+='</div>';
-    html+=`<div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:10px;color:var(--txtm);flex-wrap:wrap;">
-      <span>Less</span>
-      <div style="width:11px;height:11px;border-radius:2px;background:var(--bdr);"></div>
-      <div style="width:11px;height:11px;border-radius:2px;background:#bbf7d0;"></div>
-      <div style="width:11px;height:11px;border-radius:2px;background:#4ade80;"></div>
-      <div style="width:11px;height:11px;border-radius:2px;background:#16a34a;"></div>
-      <div style="width:11px;height:11px;border-radius:2px;background:#15803d;"></div>
-      <span>More</span>
-      <span style="margin-left:8px;background:#e0e7ff;border-radius:2px;width:11px;height:11px;display:inline-block;"></span><span>Sunday</span>
-      <span style="margin-left:6px;font-size:10px;color:var(--txtm);">Click any day to mark attendance</span>
-    </div>`;
-    heatEl.innerHTML=html;
-  }
+    h+='</div>';
+    // Legend
+    if(isSingle){
+      h+=`<div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
+        <span style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--txtm);"><span style="width:10px;height:10px;border-radius:2px;background:var(--grnl);display:inline-block;"></span>Present</span>
+        <span style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--txtm);"><span style="width:10px;height:10px;border-radius:2px;background:var(--redl);display:inline-block;"></span>Absent</span>
+        <span style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--txtm);"><span style="width:10px;height:10px;border-radius:2px;background:var(--ambl);display:inline-block;"></span>Leave/Half</span>
+        <span style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--txtm);"><span style="width:10px;height:10px;border-radius:2px;background:var(--card2);display:inline-block;"></span>Not marked</span>
+      </div>`;
+    }else{
+      h+=`<div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:9px;color:var(--txtm);flex-wrap:wrap;">
+        <span>Fewer present</span>
+        <span style="display:flex;gap:2px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:var(--bdr);display:inline-block;"></span>
+          <span style="width:10px;height:10px;border-radius:2px;background:#dcfce7;display:inline-block;"></span>
+          <span style="width:10px;height:10px;border-radius:2px;background:#bbf7d0;display:inline-block;"></span>
+          <span style="width:10px;height:10px;border-radius:2px;background:#86efac;display:inline-block;"></span>
+        </span>
+        <span>More present</span>
+        <span style="margin-left:4px;">Click any day to mark</span>
+      </div>`;
+    }
+    calEl.innerHTML=h;
+  })();
 
-  // ── 5. EXPENSE CATEGORY DONUT ─────────────────────────
-  const catT={};mExpenses.forEach(r=>{if(r.category){catT[r.category]=(catT[r.category]||0)+(parseFloat(r.amount)||0);}else{catT['Other']=(catT['Other']||0)+(parseFloat(r.amount)||0);}});
+  // ── LEFT COL C: STAFF PERFORMANCE RINGS ──────────────────
+  document.getElementById('perfSub').textContent=`${MONTHS[month]} ${year}${isSingle?' · '+scopeEmp?.name:' · all staff'}`;
+  const perfEl=document.getElementById('staffPerfRings');
+  if(perfEl){perfEl.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;">${scopeEmps.map(emp=>{
+    const recs=scopeMRecs.filter(r=>r.employee_id===emp.id);
+    const empWD=Array.from({length:days},(_,i)=>isWDFor(emp,new Date(year,month,i+1))?1:0).reduce((a,b)=>a+b,0);
+    const pw=recs.filter(r=>isP(r.status)&&isWDFor(emp,new Date(r.date+'T00:00:00'))).length;
+    const pct=empWD>0?Math.round(pw/empWD*100):0;
+    const ot=recs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
+    const hrs=recs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
+    const pc=pct>=80?'#16a34a':pct>=60?'#d97706':'#dc2626';
+    const circum=2*Math.PI*26;const dash=circum*(pct/100);const gap=circum-dash;
+    return`<div style="background:var(--card2);border:1px solid var(--bdr);border-radius:var(--r);padding:10px;text-align:center;cursor:pointer;transition:0.2s;" onclick="editEmpModal('${emp.id}')" onmouseover="this.style.boxShadow='var(--shm)'" onmouseout="this.style.boxShadow=''">
+      <div style="position:relative;width:56px;height:56px;margin:0 auto 6px;">
+        <svg width="56" height="56" style="transform:rotate(-90deg)"><circle cx="28" cy="28" r="26" fill="none" stroke="var(--bdr)" stroke-width="4"/><circle cx="28" cy="28" r="26" fill="none" stroke="${pc}" stroke-width="4" stroke-dasharray="${dash.toFixed(1)} ${gap.toFixed(1)}" stroke-linecap="round"/></svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:${pc};">${pct}%</div>
+      </div>
+      <div style="font-size:11px;font-weight:700;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${emp.name.split(' ')[0]}</div>
+      <div style="font-size:10px;color:var(--txtm);">${hrs.toFixed(0)}h${ot>0?` OT:${ot.toFixed(1)}h`:''}</div>
+    </div>`;
+  }).join('')}</div>`;}
+
+  // ── LEFT COL E: OT HOTSPOT ────────────────────────────────
+  const otData=scopeEmps.map(emp=>{
+    const recs=scopeMRecs.filter(r=>r.employee_id===emp.id);
+    const ot=recs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
+    const otPay=recs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).ot,0);
+    return{emp,ot,otPay};
+  }).filter(x=>x.ot>0).sort((a,b)=>b.ot-a.ot);
+  const maxOT=otData.length>0?otData[0].ot:1;
+  const otSub=document.getElementById('otSub');
+  if(otSub)otSub.textContent=isSingle?scopeEmp?.name+' · this month':'Top 5 this month';
+  document.getElementById('otHotspot').innerHTML=otData.slice(0,isSingle?10:5).length?otData.slice(0,isSingle?10:5).map(({emp,ot,otPay})=>`
+    <div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:0.5px solid var(--bdr);">
+      <span class="ava" style="background:${avcol(emp.id)};flex-shrink:0;">${inits(emp.name)}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="font-weight:600;">${emp.name}</span><span style="color:var(--amb);font-weight:700;">${ot.toFixed(1)}h${otPay>0?' · '+C+otPay.toFixed(0):''}</span></div>
+        <div style="background:var(--bdr);border-radius:3px;height:4px;"><div style="height:100%;border-radius:3px;background:${ot>8?'var(--red)':ot>4?'var(--amb)':'var(--grn)'};width:${Math.min(100,Math.round(ot/maxOT*100))}%;"></div></div>
+      </div>
+    </div>`).join(''):'<div style="text-align:center;color:var(--txtm);padding:16px;font-size:13px;"><i class="fa-solid fa-check-circle" style="font-size:22px;color:var(--grn);display:block;margin-bottom:7px;"></i>No overtime this month</div>';
+
+  // ── RIGHT COL: EXPENSE KPI MINI-CARDS ───────────────────────
+  // YTD total (all expenses this year, scoped)
+  const ytdExps=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getFullYear()===year&&(isSingle?e.employee_id===staffF:true);});
+  const ytdTotal=ytdExps.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+  // Active months = months that have at least one expense record
+  const activeMonthSet=new Set(ytdExps.filter(e=>parseFloat(e.amount||0)>0).map(e=>e.date?.slice(0,7)));
+  const activeMonths=activeMonthSet.size;
+  const monthlyAvg=activeMonths>0?ytdTotal/activeMonths:0;
+  // Top merchant this month
+  const merchantTotals={};
+  scopeExpenses.filter(e=>parseFloat(e.amount||0)>0&&(e.merchant||e.description)).forEach(e=>{
+    const m=(e.merchant||e.description||'').trim();
+    if(m)merchantTotals[m]=(merchantTotals[m]||0)+(parseFloat(e.amount)||0);
+  });
+  const topMerchantEntry=Object.entries(merchantTotals).sort((a,b)=>b[1]-a[1])[0];
+  const _ytdEl=document.getElementById('expYTD');
+  const _avgEl=document.getElementById('expAvg');
+  const _tmEl=document.getElementById('expTopMerchant');
+  const _tmSubEl=document.getElementById('expTopMerchantSub');
+  const _amEl=document.getElementById('expActiveMonths');
+  const _ytdSubEl=document.getElementById('expYTDSub');
+  if(_ytdEl)_ytdEl.textContent=C+ytdTotal.toFixed(0);
+  if(_ytdSubEl)_ytdSubEl.textContent=(isSingle?scopeEmp?.name+' · ':'')+'Jan–Dec '+year;
+  if(_avgEl)_avgEl.textContent=C+monthlyAvg.toFixed(0);
+  if(_tmEl)_tmEl.textContent=topMerchantEntry?topMerchantEntry[0]:'None yet';
+  if(_tmSubEl)_tmSubEl.textContent=topMerchantEntry?`${C}${topMerchantEntry[1].toFixed(0)} this month`:'no data';
+  if(_amEl)_amEl.textContent=activeMonths;
+
+  // ── RIGHT COL: EXPENDITURE TREND LINE (12 months of this year) ──
+  const trendLabels=MONTHS.map(m=>m.slice(0,3));
+  const trendData=MONTHS.map((_,mi)=>{
+    const mExps=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===mi&&d.getFullYear()===year&&(isSingle?e.employee_id===staffF:true);});
+    return parseFloat(mExps.reduce((s,e)=>s+(parseFloat(e.amount)||0),0).toFixed(2));
+  });
+  const expTrendSub=document.getElementById('expTrendSub');
+  if(expTrendSub)expTrendSub.textContent=(isSingle?scopeEmp?.name+' · ':'')+year+' · monthly expenses';
+  const ctxET=document.getElementById('expTrendChart');
+  if(ctxET){if(window._chartExpT){window._chartExpT.destroy();window._chartExpT=null;}
+  window._chartExpT=new Chart(ctxET,{type:'line',data:{labels:trendLabels,datasets:[{label:'Expenses',data:trendData,borderColor:'rgba(217,119,6,0.9)',backgroundColor:'rgba(217,119,6,0.08)',borderWidth:2,pointBackgroundColor:'rgba(217,119,6,0.9)',pointRadius:3,tension:0.35,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e293b',padding:10,cornerRadius:8,callbacks:{label:ctx=>`${C}${ctx.raw.toFixed(2)}`}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'#64748b'}},y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.04)',borderDash:[4,4]},ticks:{font:{size:10},color:'#94a3b8',callback:v=>C+(v>=1000?(v/1000).toFixed(1)+'k':v)}}}}})}
+
+  // ── RIGHT COL: TOP MERCHANTS ────────────────────────────────
+  const allMerchantTotals={};
+  scopeExpenses.filter(e=>parseFloat(e.amount||0)>0&&(e.merchant||e.description)).forEach(e=>{
+    const m=(e.merchant||e.description||'').trim();
+    if(m)allMerchantTotals[m]=(allMerchantTotals[m]||0)+(parseFloat(e.amount)||0);
+  });
+  const topMerchants=Object.entries(allMerchantTotals).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const maxMerch=topMerchants[0]?.[1]||1;
+  const tmSub=document.getElementById('topMerchantSub');
+  if(tmSub)tmSub.textContent=`${MONTHS[month]} ${year}`;
+  document.getElementById('topMerchantList').innerHTML=topMerchants.length?topMerchants.map(([name,amt],i)=>`
+    <div style="padding:6px 0;border-bottom:0.5px solid var(--bdr);">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+        <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%;">${i+1}. ${name}</span>
+        <span style="font-weight:700;color:var(--amb);flex-shrink:0;">${C}${amt.toFixed(0)}</span>
+      </div>
+      <div style="background:var(--bdr);border-radius:3px;height:3px;"><div style="height:100%;border-radius:3px;background:var(--amb);width:${Math.round(amt/maxMerch*100)}%;"></div></div>
+    </div>`).join(''):'<div style="text-align:center;color:var(--txtm);padding:12px;font-size:12px;">No merchant data this month</div>';
+
+  // ── RIGHT COL: STAFF ANNUAL MATRIX ─────────────────────────
+  (function(){
+    const matEl=document.getElementById('expMatrix');
+    if(!matEl)return;
+    const matSub=document.getElementById('matrixSub');
+    // Show months Jan-Dec of selected year
+    const yearExps=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getFullYear()===year;});
+    const matEmps=isSingle?scopeEmps:allActiveEmps;
+    // Filter to employees who have any expense this year
+    const activeMatEmps=matEmps.filter(emp=>yearExps.some(e=>e.employee_id===emp.id));
+    if(!activeMatEmps.length){matEl.innerHTML='<div style="text-align:center;color:var(--txtm);padding:16px;font-size:12px;">No expense data for '+year+'</div>';return;}
+    if(matSub)matSub.textContent=(isSingle?scopeEmp?.name+' · ':'')+year+' by month';
+    // Build month columns only for months with data
+    const monthsWithData=[];
+    for(let mi=0;mi<12;mi++){
+      if(yearExps.some(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===mi;}))
+        monthsWithData.push(mi);
+    }
+    let h='<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:300px;">';
+    // Header
+    h+='<thead><tr><th style="text-align:left;padding:5px 8px;color:var(--txtm);font-weight:600;border-bottom:1px solid var(--bdr);white-space:nowrap;position:sticky;left:0;background:var(--card);">Employee</th>';
+    monthsWithData.forEach(mi=>{h+=`<th style="text-align:right;padding:5px 6px;color:var(--txtm);font-weight:600;border-bottom:1px solid var(--bdr);white-space:nowrap;">${MONTHS[mi].slice(0,3)}</th>`;});
+    h+='<th style="text-align:right;padding:5px 8px;color:var(--txt);font-weight:700;border-bottom:1px solid var(--bdr);white-space:nowrap;">Total</th></tr></thead>';
+    h+='<tbody>';
+    // Per-employee rows
+    const empTotals=activeMatEmps.map(emp=>{
+      const monthAmts=monthsWithData.map(mi=>{
+        const mExps=yearExps.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===emp.id&&d.getMonth()===mi;});
+        return mExps.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      });
+      const total=monthAmts.reduce((s,v)=>s+v,0);
+      return{emp,monthAmts,total};
+    }).sort((a,b)=>b.total-a.total);
+    const maxEmpTotal=empTotals[0]?.total||1;
+    empTotals.forEach(({emp,monthAmts,total},ri)=>{
+      const rowBg=ri%2===0?'':'background:var(--card2);';
+      h+=`<tr style="${rowBg}cursor:pointer;" onclick="navigate('ledger')" onmouseover="this.style.background='var(--blul)'" onmouseout="this.style.background='${ri%2===0?'':'var(--card2)'}'">`;
+      h+=`<td style="padding:5px 8px;font-weight:600;white-space:nowrap;position:sticky;left:0;background:inherit;">${emp.name.split(' ')[0]}</td>`;
+      monthAmts.forEach(amt=>{
+        const col=amt>0?'color:var(--amb);':'color:var(--txtm);';
+        h+=`<td style="text-align:right;padding:5px 6px;${col}font-weight:${amt>0?'600':'400'};">${amt>0?C+amt.toFixed(0):'—'}</td>`;
+      });
+      h+=`<td style="text-align:right;padding:5px 8px;font-weight:800;color:${total>0?'var(--amb)':'var(--txtm)'};">${total>0?C+total.toFixed(0):'—'}</td>`;
+      h+='</tr>';
+    });
+    // Totals row
+    const colTotals=monthsWithData.map((_,ci)=>empTotals.reduce((s,{monthAmts})=>s+monthAmts[ci],0));
+    const grandTotal=colTotals.reduce((s,v)=>s+v,0);
+    h+='<tr style="border-top:1.5px solid var(--bdr);">';
+    h+='<td style="padding:5px 8px;font-weight:700;color:var(--txtm);position:sticky;left:0;background:var(--card);">Total</td>';
+    colTotals.forEach(t=>{h+=`<td style="text-align:right;padding:5px 6px;font-weight:700;color:var(--amb);">${t>0?C+t.toFixed(0):'—'}</td>`;});
+    h+=`<td style="text-align:right;padding:5px 8px;font-weight:800;color:var(--amb);">${C}${grandTotal.toFixed(0)}</td>`;
+    h+='</tr></tbody></table>';
+    matEl.innerHTML=h;
+  })();
+
+  // ── RIGHT COL: EXPENSES BY EMPLOYEE ──────────────────────
+  const expEmpSub=document.getElementById('expEmpSub');
+  if(expEmpSub)expEmpSub.textContent=`${MONTHS[month]} ${year} · ${C}${totalExp.toFixed(0)} total`;
+  const empExpData=scopeEmps.map(emp=>{
+    const empExps=scopeExpenses.filter(e=>e.employee_id===emp.id);
+    const total=empExps.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+    return{emp,total,count:empExps.length};
+  }).filter(x=>x.total!==0).sort((a,b)=>Math.abs(b.total)-Math.abs(a.total));
+  const maxEmpExp=empExpData.length>0?Math.abs(empExpData[0].total):1;
+  document.getElementById('expByEmp').innerHTML=empExpData.length?empExpData.map(({emp,total,count})=>`
+    <div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:0.5px solid var(--bdr);cursor:pointer;" onclick="navigate('ledger')">
+      <span class="ava" style="background:${avcol(emp.id)};flex-shrink:0;">${inits(emp.name)}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+          <span style="font-weight:600;">${emp.name}</span>
+          <span style="font-weight:700;color:${total<0?'var(--red)':'var(--amb)'};">${total<0?'−':'+'}${C}${Math.abs(total).toFixed(0)}</span>
+        </div>
+        <div style="background:var(--bdr);border-radius:3px;height:4px;"><div style="height:100%;border-radius:3px;background:${total<0?'var(--red)':'var(--amb)'};width:${Math.min(100,Math.round(Math.abs(total)/maxEmpExp*100))}%;"></div></div>
+        <div style="font-size:10px;color:var(--txtm);margin-top:2px;">${count} record${count!==1?'s':''}</div>
+      </div>
+    </div>`).join(''):'<div style="text-align:center;color:var(--txtm);padding:16px;font-size:13px;">No expenses this month</div>';
+
+    // ── RIGHT COL B: EXPENSE CATEGORY DONUT ──────────────────
+  const catT={};
+  scopeExpenses.filter(e=>parseFloat(e.amount||0)>0).forEach(r=>{const cat=r.category||'Other';catT[cat]=(catT[cat]||0)+(parseFloat(r.amount)||0);});
   const sortedCats=Object.entries(catT).sort((a,b)=>b[1]-a[1]);
   document.getElementById('donutSub').textContent=`${MONTHS[month]} ${year} · ${C}${totalExp.toFixed(2)} total`;
   const ctxD=document.getElementById('expDonutChart');
   if(ctxD){if(window._chartDonut){window._chartDonut.destroy();window._chartDonut=null;}
   if(sortedCats.length>0){const DCOLS=['#2563eb','#16a34a','#d97706','#7c3aed','#0891b2','#dc2626','#059669','#9333ea','#ea580c','#0369a1'];
-  window._chartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:sortedCats.map(x=>x[0]),datasets:[{data:sortedCats.map(x=>parseFloat(x[1].toFixed(2))),backgroundColor:DCOLS.slice(0,sortedCats.length),borderWidth:2,borderColor:'var(--card)',hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{boxWidth:10,padding:9,font:{size:10,family:'Plus Jakarta Sans'},usePointStyle:true,formatter:(label,ctx)=>`${label} ${C}${ctx.parsed.toFixed(0)}`}},tooltip:{backgroundColor:'#1e293b',padding:11,cornerRadius:8,callbacks:{label:ctx=>`${ctx.label}: ${C}${ctx.raw.toFixed(2)} (${Math.round(ctx.raw/totalExp*100)}%)`}}}}})}
+  window._chartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:sortedCats.map(x=>x[0]),datasets:[{data:sortedCats.map(x=>parseFloat(x[1].toFixed(2))),backgroundColor:DCOLS.slice(0,sortedCats.length),borderWidth:2,borderColor:'var(--card)',hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{boxWidth:10,padding:8,font:{size:10,family:'Plus Jakarta Sans'},usePointStyle:true}},tooltip:{backgroundColor:'#1e293b',padding:10,cornerRadius:8,callbacks:{label:ctx=>`${ctx.label}: ${C}${ctx.raw.toFixed(2)} (${totalExp>0?Math.round(ctx.raw/totalExp*100):0}%)`}}}}});}
   else{ctxD.parentElement.innerHTML='<div style="text-align:center;color:var(--txtm);padding:30px;font-size:13px;"><i class="fa-solid fa-receipt" style="font-size:24px;display:block;margin-bottom:8px;"></i>No expenses this month</div>';}}
 
-  // ── 6. STAFF PERFORMANCE RINGS ─────────────────────────
-  const perfEl=document.getElementById('staffPerfRings');
-  document.getElementById('perfSub').textContent=`${MONTHS[month]} ${year} · attendance + OT`;
-  // Staff filtered by staffF
-  const perfEmps=staffF==='All'?emps:[emps.find(e=>e.id===staffF)].filter(Boolean);
-  if(perfEl){perfEl.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;">${perfEmps.map(emp=>{
-    const recs=mRecs.filter(r=>r.employee_id===emp.id);
-    const pw=recs.filter(r=>isP(r.status)&&new Date(r.date+'T00:00:00').getDay()!==0).length;
-    const pct=wDays>0?Math.round(pw/wDays*100):0;
-    const ot=recs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
-    const hrs=recs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
-    const pc=pct>=80?'#16a34a':pct>=60?'#d97706':'#dc2626';
-    const circum=2*Math.PI*28;const dash=circum*(pct/100);const gap=circum-dash;
-    return`<div style="background:var(--card2);border:1px solid var(--bdr);border-radius:var(--r);padding:12px;text-align:center;transition:0.2s;cursor:pointer;" onclick="editEmpModal('${emp.id}')" onmouseover="this.style.boxShadow='var(--shm)'" onmouseout="this.style.boxShadow=''">
-      <div style="position:relative;width:64px;height:64px;margin:0 auto 8px;">
-        <svg width="64" height="64" style="transform:rotate(-90deg)"><circle cx="32" cy="32" r="28" fill="none" stroke="var(--bdr)" stroke-width="5"/><circle cx="32" cy="32" r="28" fill="none" stroke="${pc}" stroke-width="5" stroke-dasharray="${dash.toFixed(1)} ${gap.toFixed(1)}" stroke-linecap="round"/></svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:${pc};">${pct}%</div>
-      </div>
-      <div style="font-size:11px;font-weight:700;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${emp.name.split(' ')[0]}</div>
-      <div style="font-size:10px;color:var(--txtm);">${hrs.toFixed(0)}h${ot>0?` · OT:${ot.toFixed(1)}h`:''}</div>
+  // ── RIGHT COL C: 6-MONTH EXPENSE TREND ───────────────────
+
+
+  // ── RIGHT COL D: PENDING BATCH APPROVALS ─────────────────
+  const pendingBatches=batches.filter(b=>b.status==='pending').sort((a,b)=>(b.submitted_at||'').localeCompare(a.submitted_at||''));
+  const pendingTimeReqs=(attRequests||[]).filter(r=>r.status==='pending');
+  const pbSub=document.getElementById('pendingBatchSub');
+  if(pbSub)pbSub.textContent=`${pendingTotal} pending · ${pendingTime} time, ${pendingExp} expense`;
+  let pbHtml='';
+  pendingBatches.slice(0,5).forEach(b=>{
+    const emp2=employees.find(e=>e.id===b.employee_id);
+    const amt=b.total_amount!=null?`${C}${parseFloat(b.total_amount).toFixed(0)}`:'';
+    const dt=b.submitted_at?new Date(b.submitted_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'';
+    pbHtml+=`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:0.5px solid var(--bdr);">
+      <span class="ava" style="background:${avcol(b.employee_id)};flex-shrink:0;">${inits(emp2?.name||'?')}</span>
+      <div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;">${emp2?.name||'Unknown'}</div><div style="font-size:10px;color:var(--txtm);">Expense batch · ${dt}</div></div>
+      <div style="text-align:right;flex-shrink:0;"><div style="font-size:13px;font-weight:700;color:var(--amb);">${amt}</div><button onclick="event.stopPropagation();navigate('approvals')" class="btn btn-p btn-sm" style="font-size:10px;padding:2px 8px;margin-top:2px;">Review</button></div>
     </div>`;
-  }).join('')}</div>`;}
+  });
+  pendingTimeReqs.slice(0,3).forEach(r=>{
+    const emp2=employees.find(e=>e.id===r.employee_id);
+    const dt=r.date?new Date(r.date+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'';
+    pbHtml+=`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:0.5px solid var(--bdr);">
+      <span class="ava" style="background:${avcol(r.employee_id)};flex-shrink:0;">${inits(emp2?.name||'?')}</span>
+      <div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;">${emp2?.name||'Unknown'}</div><div style="font-size:10px;color:var(--txtm);">Time request · ${dt} · ${r.sign_in||''}–${r.sign_out||''}</div></div>
+      <button onclick="event.stopPropagation();navigate('att-requests')" class="btn btn-a btn-sm" style="font-size:10px;padding:2px 8px;">Review</button>
+    </div>`;
+  });
+  document.getElementById('pendingBatchList').innerHTML=pbHtml||'<div style="text-align:center;color:var(--txtm);padding:16px;font-size:13px;"><i class="fa-solid fa-check-circle" style="font-size:22px;color:var(--grn);display:block;margin-bottom:7px;"></i>All caught up — no pending approvals</div>';
 
-  // ── 7. OT HOTSPOT TABLE ────────────────────────────────
-  const otData=emps.map(emp=>{
-    const recs=mRecs.filter(r=>r.employee_id===emp.id);
-    const ot=recs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
-    const otPay=recs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).ot,0);
-    return{emp,ot,otPay};
-  }).filter(x=>x.ot>0).sort((a,b)=>b.ot-a.ot);
-  const maxOT=otData[0]?.ot||1;
-  const otTop=staffF==='All'?otData.slice(0,5):otData.filter(x=>x.emp.id===staffF);
-  document.getElementById('otHotspot').innerHTML=otTop.length?otTop.map(({emp,ot,otPay})=>`
-    <div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:0.5px solid var(--bdr);">
-      <span class="ava" style="background:${avcol(emp.id)};flex-shrink:0;">${inits(emp.name)}</span>
-      <div style="flex:1;min-width:0;">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="font-weight:600;">${emp.name}</span><span style="color:var(--amb);font-weight:700;font-family:'JetBrains Mono';">${ot.toFixed(1)}h${otPay>0?' · '+C+otPay.toFixed(0):''}</span></div>
-        <div style="background:var(--bdr);border-radius:3px;height:5px;"><div style="height:100%;border-radius:3px;background:${ot>8?'var(--red)':ot>4?'var(--amb)':'var(--grn)'};width:${Math.min(100,Math.round(ot/maxOT*100))}%;"></div></div>
+  // ── RIGHT COL E: VAT TRACKER + DATA QUALITY ───────────────
+  const vatSub=document.getElementById('vatSub');
+  if(vatSub)vatSub.textContent=`${MONTHS[month]} ${year}`;
+  const incomplete=scopeExpenses.filter(e=>!e.category||!parseFloat(e.amount||0));
+  const vatItems=scopeExpenses.filter(r=>r.tags?.includes('VAT'));
+  const missingReceipt=scopeExpenses.filter(e=>parseFloat(e.amount||0)>50&&!e.tags?.includes('VAT')&&!e.tags?.includes('receipt'));
+  document.getElementById('vatTracker').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div style="background:var(--tell);border-radius:var(--r);padding:10px 12px;">
+        <div style="font-size:10px;color:var(--txtm);margin-bottom:3px;">VAT tagged</div>
+        <div style="font-size:18px;font-weight:800;color:#0f766e;">${C}${vatTotal.toFixed(0)}</div>
+        <div style="font-size:10px;color:var(--txtm);">${vatItems.length} item${vatItems.length!==1?'s':''}</div>
       </div>
-    </div>`).join(''):'<div style="text-align:center;color:var(--txtm);padding:18px;font-size:13px;"><i class="fa-solid fa-check-circle" style="font-size:22px;display:block;margin-bottom:7px;color:var(--grn);"></i>No overtime this month</div>';
-
-  // ── 8. TOP EARNERS ─────────────────────────────────────
-  const earnerData=emps.map(emp=>{
-    const recs=mRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
-    let pay=0;
-    recs.forEach(r=>{const p=calcPay(emp,r);pay+=p.base+p.ot;});
-    const bn=mRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-    const ex=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===emp.id&&d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
-    return{emp,pay:pay+bn+ex,base:pay,bonus:bn,expenses:ex};
-  }).sort((a,b)=>b.pay-a.pay);
-  const maxPay=earnerData[0]?.pay||1;
-  const topN=staffF==='All'?5:earnerData.length;
-  document.getElementById('topEarners').innerHTML=earnerData.slice(0,topN).map(({emp,pay,bonus,expenses:ex},i)=>`
-    <div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:0.5px solid var(--bdr);">
-      <div style="width:20px;height:20px;border-radius:50%;background:${i<3?['var(--amb)','var(--txtm)','#cd7f32'][i]:'var(--bdr)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:${i<3?'#fff':'var(--txtm)'};flex-shrink:0;">${i+1}</div>
-      <span class="ava" style="background:${avcol(emp.id)};flex-shrink:0;width:24px;height:24px;font-size:9px;">${inits(emp.name)}</span>
-      <div style="flex:1;min-width:0;">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="font-weight:600;">${emp.name}</span><span style="font-weight:700;font-family:'JetBrains Mono';color:var(--grn);">${C}${pay.toFixed(0)}</span></div>
-        <div style="background:var(--bdr);border-radius:3px;height:4px;"><div style="height:100%;border-radius:3px;background:linear-gradient(90deg,var(--grn),var(--tel));width:${Math.round(pay/maxPay*100)}%;"></div></div>
-        ${bonus>0||ex>0?`<div style="font-size:10px;color:var(--txtm);margin-top:2px;">${bonus>0?`+${C}${bonus.toFixed(0)} bonus`:''}${ex>0?` +${C}${ex.toFixed(0)} exp`:''}</div>`:''}
+      <div style="background:var(--grnl);border-radius:var(--r);padding:10px 12px;">
+        <div style="font-size:10px;color:var(--txtm);margin-bottom:3px;">Est. reclaimable</div>
+        <div style="font-size:18px;font-weight:800;color:var(--grn);">${C}${(vatTotal/6).toFixed(0)}</div>
+        <div style="font-size:10px;color:var(--txtm);">20% VAT estimate</div>
       </div>
-    </div>`).join('');
+    </div>
+    ${incomplete.length>0?`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:0.5px solid var(--bdr);">
+      <i class="fa-solid fa-circle-exclamation" style="color:var(--red);font-size:13px;"></i>
+      <span style="font-size:12px;font-weight:600;color:var(--red);">${incomplete.length} incomplete record${incomplete.length!==1?'s':''}</span>
+      <span style="font-size:11px;color:var(--txtm);">— missing category or amount</span>
+      <button onclick="navigate('ledger')" class="btn btn-o btn-sm" style="font-size:10px;margin-left:auto;">Fix</button>
+    </div>`:'<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:0.5px solid var(--bdr);"><i class="fa-solid fa-check" style="color:var(--grn);font-size:13px;"></i><span style="font-size:12px;color:var(--txtm);">All expense records complete</span></div>'}`;
 
-  // ── 9. DOCUMENT EXPIRY TIMELINE ────────────────────────
+  // ── FULL WIDTH: SMART INSIGHTS (fixed cost-per-day) ────────
+  // Working days worked so far this month = unique calendar days with at least 1 person present
+  // (not employee-days — we want business days, not sum across all staff)
+  const _workedDayKeys=new Set(scopeMRecs.filter(r=>{
+    const e=scopeEmps.find(x=>x.id===r.employee_id);
+    return isP(r.status)&&e&&isWDFor(e,new Date(r.date+'T00:00:00'));
+  }).map(r=>r.date));
+  const workedDaysToDate=_workedDayKeys.size;
+  // Cost per day = (wages earned so far + expenses so far) ÷ working days worked so far
+  // Wages = base pay + OT pay + bonuses for all present days this month
+  const wagesEarned=scopeEmps.reduce((s,emp)=>{
+    return s+scopeMRecs.filter(r=>r.employee_id===emp.id&&isP(r.status)).reduce((ss,r)=>{
+      const p=calcPay(emp,r);return ss+p.base+p.ot;
+    },0);
+  },0)+bonusTotal;
+  // Expenses = all expense records this month for this scope
+  const expensesThisMonth=totalExp;
+  const totalCostToDate=wagesEarned+expensesThisMonth;
+  const costPerDay=workedDaysToDate>0?totalCostToDate/workedDaysToDate:0;
+  const scopeAvgH=workedDaysToDate>0?scopeMonthHrs/workedDaysToDate:0;
+  const topAttender=scopeEmps.map(e=>({name:e.name,d:scopeMRecs.filter(r=>r.employee_id===e.id&&isP(r.status)).length})).sort((a,b)=>b.d-a.d)[0];
+  const insightSub=document.getElementById('insightsSub');
+  if(insightSub)insightSub.textContent=isSingle?(scopeEmp?.name||''):'All staff · '+MONTHS[month]+' '+year;
+  // Fixed 6 slots — same position always, value swaps between all-staff and individual
+  const _attPctSingle=scopeWDSingle>0?Math.round(scopeMRecs.filter(r=>r.employee_id===staffF&&isP(r.status)).length/scopeWDSingle*100):0;
+  const _presentDaysSingle=scopeMRecs.filter(r=>r.employee_id===staffF&&isP(r.status)).length;
+  const insightItems=[
+    {l:'Cost per day worked',v:C+costPerDay.toFixed(2),s:`wages+expenses ÷ ${workedDaysToDate} day${workedDaysToDate!==1?'s':''}`,ico:'fa-calculator'},
+    {l:'OT this month',v:scopeOTH.toFixed(1)+'h',s:otTotal>0?`${C}${otTotal.toFixed(0)} in OT pay`:'No overtime pay',ico:'fa-hourglass'},
+    isSingle
+      ?{l:'Attendance rate',v:_attPctSingle+'%',s:`${_presentDaysSingle} of ${scopeWDSingle} working days`,ico:'fa-percent'}
+      :{l:'Top attender',v:topAttender?.name.split(' ')[0]||'—',s:topAttender?`${topAttender.d} days present`:'no data',ico:'fa-medal'},
+    isSingle
+      ?{l:'Expenses this month',v:C+totalExp.toFixed(0),s:scopeExpenses.filter(e=>parseFloat(e.amount||0)>0).length+' records',ico:'fa-receipt'}
+      :{l:'Expenses vs payroll',v:payrollEst>0?Math.round(totalExp/payrollEst*100)+'%':'—',s:'expenses as % of total payroll',ico:'fa-percent'},
+    isSingle
+      ?{l:'Hours this month',v:scopeMonthHrs.toFixed(1)+'h',s:contractedHrs?`of ${contractedHrs.toFixed(0)}h contracted`:'total worked',ico:'fa-clock'}
+      :{l:'Avg hours / day worked',v:scopeAvgH>0?scopeAvgH.toFixed(1)+'h':'—',s:'per employee per day worked',ico:'fa-chart-line'},
+    isSingle
+      ?{l:'Avg hours / day',v:scopeAvgH>0?scopeAvgH.toFixed(1)+'h':'—',s:'per day worked this month',ico:'fa-chart-line'}
+      :{l:'Pending approvals',v:pendingTotal,s:`${pendingTime} time · ${pendingExp} expense`,ico:'fa-inbox'},
+  ];
+  document.getElementById('smartInsights').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0;">${insightItems.map(ins=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:0.5px solid var(--bdr);border-right:0.5px solid var(--bdr);">
+      <div style="width:30px;height:30px;border-radius:7px;background:var(--accl);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fa-solid ${ins.ico}" style="color:var(--acc);font-size:12px;"></i></div>
+      <div style="flex:1;min-width:0;"><div style="font-size:10px;color:var(--txtm);">${ins.l}</div><div style="font-size:14px;font-weight:800;">${ins.v}</div><div style="font-size:10px;color:var(--txtm);">${ins.s}</div></div>
+    </div>`).join('')}</div>`;
+
+  // ── DOCUMENT EXPIRY ────────────────────────────────────────
   const docEl=document.getElementById('docExpiryTimeline');
   if(docEl){
-    const urgent=renderDocReminders();
-    if(!urgent.length){docEl.innerHTML='<div style="text-align:center;color:var(--txtm);padding:18px;font-size:13px;"><i class="fa-solid fa-shield-check" style="font-size:24px;color:var(--grn);display:block;margin-bottom:8px;"></i>All documents valid</div>';
-    }else{
+    const urgentAll=renderDocReminders();
+    const urgent=isSingle?urgentAll.filter(d=>d.employee_id===staffF):urgentAll;
+    if(!urgent.length){docEl.innerHTML='<div style="text-align:center;color:var(--txtm);padding:18px;font-size:13px;"><i class="fa-solid fa-shield-check" style="font-size:24px;color:var(--grn);display:block;margin-bottom:8px;"></i>All documents valid</div>';}
+    else{
       const now2=new Date();
       docEl.innerHTML=urgent.map(doc=>{
         const emp2=employees.find(e=>e.id===doc.employee_id);
@@ -2455,65 +2806,18 @@ function renderDashboard(){
     }
   }
 
-  // ── 10. ATTENDANCE WARNINGS ────────────────────────────
-  document.getElementById('warnThresh').textContent=`Below ${thr}%`;
-  const warnFiltered=staffF==='All'?warns:warns.filter(e=>e.id===staffF);
-  const warnHtml=warnFiltered.map(emp=>{
-    const recs=mRecs.filter(r=>r.employee_id===emp.id);
-    const pw=recs.filter(r=>isP(r.status)&&new Date(r.date+'T00:00:00').getDay()!==0).length;
-    const pct=wDays>0?Math.round(pw/wDays*100):0;
-    const circum=2*Math.PI*16;const dash=circum*(pct/100);
-    return`<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:0.5px solid var(--bdr);">
-      <div style="position:relative;width:36px;height:36px;flex-shrink:0;">
-        <svg width="36" height="36" style="transform:rotate(-90deg)"><circle cx="18" cy="18" r="16" fill="none" stroke="var(--bdr)" stroke-width="4"/><circle cx="18" cy="18" r="16" fill="none" stroke="var(--red)" stroke-width="4" stroke-dasharray="${dash.toFixed(1)} ${(circum-dash).toFixed(1)}" stroke-linecap="round"/></svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--red);">${pct}%</div>
-      </div>
-      <div style="flex:1;"><div style="font-size:13px;font-weight:600;">${emp.name}</div><div style="font-size:11px;color:var(--txtm);">${pw}/${wDays} days · ${recs.filter(r=>r.status==='A').length} absences</div></div>
-      <button onclick="event.stopPropagation();jumpToMark(dateKey(new Date()))" class="btn btn-o btn-sm" style="font-size:11px;"><i class="fa-solid fa-pen"></i></button>
-    </div>`;
-  }).join('');
-  document.getElementById('warnTable').innerHTML='<div style="padding:4px 0;">'+warnHtml+'</div>'||'<div style="text-align:center;color:var(--txtm);padding:16px;font-size:13px;"><i class="fa-solid fa-party-horn" style="font-size:22px;color:var(--grn);display:block;margin-bottom:7px;"></i>All employees above threshold 🎉</div>';
-
-  // ── 11. SMART INSIGHTS ────────────────────────────────
-  const filteredMRecs=staffF==='All'?mRecs:mRecs.filter(r=>r.employee_id===staffF);
-  const totalPD=filteredMRecs.filter(r=>isP(r.status)&&new Date(r.date+'T00:00:00').getDay()!==0).length;
-  const cpd=totalPD>0?(payrollEst+totalExp)/totalPD:0;
-  const topEmp=emps.map(e=>({name:e.name,d:mRecs.filter(r=>r.employee_id===e.id&&isP(r.status)).length})).sort((a,b)=>b.d-a.d)[0];
-  const totalOTH=mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
-  const insightItems=[
-    {l:'Cost per working day',v:`${C}${cpd.toFixed(2)}`,s:'payroll + expenses',ico:'fa-calculator'},
-    {l:'Total OT this month',v:`${totalOTH.toFixed(1)}h`,s:`${C}${otTotal.toFixed(0)} in OT pay`,ico:'fa-hourglass'},
-    {l:'Top attender',v:topEmp?.name.split(' ')[0]||'—',s:topEmp?`${topEmp.d} days present`:'',ico:'fa-medal'},
-    {l:'Expense vs Payroll',v:payrollEst>0?Math.round(totalExp/payrollEst*100)+'%':'—',s:'expenses as % of payroll',ico:'fa-percent'},
-    {l:'Avg hours/day',v:totalPD>0?(monthHrs/totalPD).toFixed(1)+'h':'—',s:'per present employee',ico:'fa-chart-line'},
-    {l:'Pending approvals',v:pendingCount,s:'expense batches to review',ico:'fa-inbox'},
-  ];
-  document.getElementById('smartInsights').innerHTML=insightItems.map(ins=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--bdr);">
-      <div style="width:30px;height:30px;border-radius:7px;background:var(--accl);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fa-solid ${ins.ico}" style="color:var(--acc);font-size:12px;"></i></div>
-      <div style="flex:1;"><div style="font-size:11px;color:var(--txtm);">${ins.l}</div></div>
-      <div style="text-align:right;"><div style="font-size:14px;font-weight:800;">${ins.v}</div><div style="font-size:10px;color:var(--txtm);">${ins.s}</div></div>
-    </div>`).join('');
-
-  // Document reminder banner
+  // Doc reminder banner
   const urgentDocs=renderDocReminders();
   const banEl=document.getElementById('docReminderBanner');
   if(banEl){
     if(urgentDocs.length>0){
       const expired=urgentDocs.filter(d=>getDocStatus(d).status==='expired').length;
-      banEl.innerHTML=`<div style="background:var(--redl);border:1px solid rgba(220,38,38,0.25);border-left:4px solid var(--red);border-radius:var(--r);padding:9px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="navigate('employees')">
-        <i class="fa-solid fa-file-circle-exclamation" style="color:var(--red);font-size:16px;"></i>
-        <span style="font-size:13px;font-weight:600;color:var(--red);">${expired>0?expired+' document'+(expired>1?'s':'')+' expired · ':''}${urgentDocs.length} document${urgentDocs.length>1?'s':''} need attention</span>
-        <span style="margin-left:auto;font-size:12px;color:var(--red);font-weight:600;">View →</span>
-      </div>`;
+      banEl.innerHTML=`<div style="background:var(--redl);border:1px solid rgba(220,38,38,0.25);border-left:4px solid var(--red);border-radius:var(--r);padding:9px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="navigate('employees')"><i class="fa-solid fa-file-circle-exclamation" style="color:var(--red);font-size:16px;"></i><span style="font-size:13px;font-weight:600;color:var(--red);">${expired>0?expired+' document'+(expired>1?'s':'')+' expired · ':''}${urgentDocs.length} document${urgentDocs.length>1?'s':''} need attention</span><span style="margin-left:auto;font-size:12px;color:var(--red);font-weight:600;">View →</span></div>`;
     }else banEl.innerHTML='';
   }
 }
 
 
-// ═══════════════════════════════════════════════════
-// MARK ATTENDANCE
-// ═══════════════════════════════════════════════════
 function renderMark(){updateMarkNav();buildMarkTable();}
 function updateMarkNav(){
   const key=dateKey(markDate);
@@ -2881,7 +3185,7 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
     <td style="text-align:center;width:24px;"><span style="font-size:11px;color:var(--txtm);">${i+1}</span>${stBadge}</td>
     <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)"></td>
     <td>
-      <input type="text" class="shi" placeholder="Description..." value="${(row.merchant||'').replace(/"/g,'&quot;')}" ${isEx?'disabled':''} autocomplete="off" oninput="updateExp('${row.id}','merchant',this.value);checkAutoNextRow('${row.id}',${i},${totalRows||1});ledMerchantAC(this,'${row.id}')" onblur="setTimeout(hideLedAC,200)">
+      <input type="text" class="shi" placeholder="Merchant / Supplier..." value="${(row.merchant||'').replace(/"/g,'&quot;')}" ${isEx?'disabled':''} autocomplete="off" oninput="updateExp('${row.id}','merchant',this.value);checkAutoNextRow('${row.id}',${i},${totalRows||1});ledMerchantAC(this,'${row.id}')" onblur="setTimeout(hideLedAC,200)">
       <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">${row.receipt_url?`<div onclick="openLightbox('${row.receipt_url}')" style="width:30px;height:30px;border-radius:5px;border:1px solid var(--bdr);overflow:hidden;cursor:pointer;flex-shrink:0;background:var(--card2);display:flex;align-items:center;justify-content:center;position:relative;"><img src="${row.receipt_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;" onerror="this.style.display='none'"><i class="fa-solid fa-file-image" style="font-size:14px;color:var(--acc);"></i></div><a href="${row.receipt_url}" target="_blank" title="Open receipt" style="font-size:10px;color:var(--acc);"><i class="fa-solid fa-eye"></i></a>`:''}<label title="${row.receipt_url?'Replace receipt':'Attach receipt'}" style="width:22px;height:22px;border-radius:5px;border:1px dashed ${row.receipt_url?'var(--acc)':'var(--bdr)'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:${row.receipt_url?'var(--acc)':'var(--txtm)'};font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label></div>
       ${row.notes?`<div style="font-size:10px;color:var(--txtm);margin-top:1px;font-style:italic;">"${row.notes}"</div>`:''}
     </td>
@@ -3358,9 +3662,9 @@ async function renderEmpReport(){
     var ch=parseFloat(emp.contracted_hours)||8;
     var dr=parseFloat(emp.daily_rate)||0;
     var fullDayRecs=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';});
-    grossPay=fullDayRecs.length*dr+recOT+totalBonus;
+    grossPay=fullDayRecs.length*parseFloat(dr.toFixed(2))+recOT+totalBonus;
     var actualBase=fullDayRecs.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
-    totalHoursDeduction=Math.max(0,parseFloat((fullDayRecs.length*dr-actualBase).toFixed(2)));
+    totalHoursDeduction=Math.max(0,parseFloat((fullDayRecs.length*parseFloat(dr.toFixed(2))-actualBase).toFixed(2)));
   } else if(emp.pay_type==='fixed'&&emp.salary&&emp.contracted_hours){
     // Fixed salary: gross = what they'd earn if they worked all contracted hours for days present
     var ch=parseFloat(emp.contracted_hours)||8;
@@ -3369,9 +3673,10 @@ async function renderEmpReport(){
     var wDays=workDaysInMonth(emp,year,month);
     var dailyEq=wDays>0?monthlySal/wDays:0;
     var fullDayRecs2=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';});
-    grossPay=fullDayRecs2.length*dailyEq+recOT+totalBonus;
+    var roundedDailyEq=parseFloat(dailyEq.toFixed(2));
+    grossPay=fullDayRecs2.length*roundedDailyEq+recOT+totalBonus;
     var actualBase2=fullDayRecs2.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
-    totalHoursDeduction=Math.max(0,parseFloat((fullDayRecs2.length*dailyEq-actualBase2).toFixed(2)));
+    totalHoursDeduction=Math.max(0,parseFloat((grossPay-actualBase2-recOT-totalBonus).toFixed(2)));
   } else if(emp.pay_type==='hourly'&&emp.hourly_rate&&emp.contracted_hours){
     var ch2=parseFloat(emp.contracted_hours)||8;
     var hr=parseFloat(emp.hourly_rate)||0;
@@ -3620,7 +3925,7 @@ async function renderEmpReport(){
           <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Date</th>
           <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Merchant</th>
           <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Category</th>
-          <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Description</th>
+          <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Merchant</th>
           <th style="text-align:right;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Amount</th>
         </tr>
       </thead>
@@ -3631,7 +3936,7 @@ async function renderEmpReport(){
             +'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+e.date+'</td>'
             +'<td style="padding:7px 10px;font-weight:600;">'+( e.merchant||'—')+'</td>'
             +'<td style="padding:7px 10px;"><span style="background:var(--card2);padding:2px 7px;border-radius:4px;font-size:11px;">'+(e.category||'—')+'</span></td>'
-            +'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+(e.description||'—')+'</td>'
+            +'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+(e.merchant||e.description||'—')+'</td>'
             +'<td style="padding:7px 10px;text-align:right;font-weight:700;color:'+(neg?'var(--red)':'var(--tel)')+';">'+(neg?'−':'+')+C+Math.abs(parseFloat(e.amount)).toFixed(2)+(neg?'<div style=\'font-size:10px;font-weight:500;\'>deduction</div>':'')+'</td>'
             +'</tr>';
         }).join('')}
@@ -3688,13 +3993,13 @@ function printTimesheet(){
       +'<span style="font-size:11px;">'+MONTHS[month]+' '+year+'</span>'
       +'</div>'
       +'<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-      +'<thead><tr style="background:#f1f5f9;"><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Date</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Merchant</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Category</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Description</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Amount</th></tr></thead>'
+      +'<thead><tr style="background:#f1f5f9;"><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Date</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Merchant</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Category</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Merchant</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Amount</th></tr></thead>'
       +'<tbody>'+mExp.sort(function(a,b){return a.date.localeCompare(b.date);}).map(function(e){
         var neg=parseFloat(e.amount)<0;
         return'<tr><td style="padding:5px 7px;border:1px solid #ccc;">'+e.date+'</td>'
           +'<td style="padding:5px 7px;border:1px solid #ccc;font-weight:600;">'+(e.merchant||'—')+'</td>'
           +'<td style="padding:5px 7px;border:1px solid #ccc;">'+(e.category||'—')+'</td>'
-          +'<td style="padding:5px 7px;border:1px solid #ccc;">'+(e.description||'—')+'</td>'
+          +'<td style="padding:5px 7px;border:1px solid #ccc;">'+(e.merchant||e.description||'—')+'</td>'
           +'<td style="padding:5px 7px;border:1px solid #ccc;text-align:right;font-weight:700;color:'+(neg?'#dc2626':'#0d9488')+';">'+(neg?'−':'+')+C2+Math.abs(parseFloat(e.amount)).toFixed(2)+'</td></tr>';
       }).join('')+'</tbody>'
       +'<tfoot>'
@@ -5856,41 +6161,6 @@ async function sendBroadcast(){
 
 // ══════════════════════════════════════════════════════
 // EMPLOYEE OF THE WEEK + PULSE
-// ══════════════════════════════════════════════════════
-function getEmployeeOfWeek(){
-  var now=new Date(),m=now.getMonth(),y=now.getFullYear();
-  var scores=employees.filter(function(e){return e.status==='Active';}).map(function(e){
-    var mRecs=attendance.filter(function(a){var d=new Date(a.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y&&a.employee_id===e.id;});
-    var present=mRecs.filter(function(a){return a.status==='P'||a.status==='HD'||a.status==='LA';}).length;
-    var hrs=mRecs.reduce(function(s,a){return s+(parseFloat(a.hours)||0);},0);
-    var streak=typeof getStreak==='function'?getStreak(e.id):0;
-    return{emp:e,score:present*3+hrs*0.1+streak*2,present:present,hrs:hrs,streak:streak};
-  }).sort(function(a,b){return b.score-a.score;});
-  return scores[0]||null;
-}
-function getTeamPulse(){
-  var now=new Date(),m=now.getMonth(),y=now.getFullYear();
-  var active=employees.filter(function(e){return e.status==='Active';});
-  if(!active.length)return{label:'No Data',score:0,emoji:'❓'};
-  var mRecs=attendance.filter(function(a){var d=new Date(a.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;});
-  // Use actual working weekdays in the month (Mon-Sat, not Sundays)
-  var daysInM=dim(y,m);
-  var actualWD=Array.from({length:daysInM},function(_,i){return new Date(y,m,i+1).getDay()!==0;}).filter(Boolean).length;
-  var totalExpected=active.length*actualWD;
-  var present=mRecs.filter(function(a){return a.status==='P'||a.status==='HD';}).length;
-  var pct=totalExpected>0?Math.round(present/totalExpected*100):0;
-  if(pct>=90)return{label:'Excellent',score:pct,emoji:'🚀'};
-  if(pct>=75)return{label:'Good',score:pct,emoji:'😊'};
-  if(pct>=60)return{label:'Average',score:pct,emoji:'😐'};
-  return{label:'Low',score:pct,emoji:'😔'};
-}
-
-// ══════════════════════════════════════════════════════
-// AUDIT LOG
-// ══════════════════════════════════════════════════════
-
-// ══════════════════════════════════════════════════════
-// ADMIN TOPBAR MENU
 // ══════════════════════════════════════════════════════
 function toggleAdminMenu(){
   var m=document.getElementById('adminMenu');
