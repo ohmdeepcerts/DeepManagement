@@ -664,7 +664,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
       <div class="card"><div class="card-b">
         <div class="fg"><label>Date *</label><input type="date" id="expDate"></div>
         <div class="fg" style="position:relative;">
-          <label>Description *</label>
+          <label>Merchant / Supplier *</label>
           <input type="text" id="expMerchant" placeholder="e.g. Screwfix, Costa Coffee, Fuel" autocomplete="off" oninput="expMerchantInput(this.value)" onblur="setTimeout(()=>hideExpAC(),200)" onfocus="expMerchantInput(this.value)">
           <div id="expAC" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:200;max-height:220px;overflow-y:auto;margin-top:3px;"></div>
         </div>
@@ -1771,7 +1771,7 @@ async function submitExp(){
   const merchant=document.getElementById('expMerchant').value.trim();
   const amt=parseFloat(document.getElementById('expAmt').value);
   const date=document.getElementById('expDate').value;
-  if(!merchant||!amt||!date){_submittingExp=false;toast('Please fill date, description and amount','e');return;}
+  if(!merchant||!amt||!date){_submittingExp=false;toast('Please fill date, merchant and amount','e');return;}
   let fileUrl=null;
   if(_rcptFile){
     const ext=_rcptFile.name.split('.').pop()||'jpg';
@@ -1868,7 +1868,7 @@ async function editAndResendExp(id){
     btn.onclick=async()=>{
       const merchant=document.getElementById('expMerchant').value.trim();
       const amt=parseFloat(document.getElementById('expAmt').value);
-      if(!merchant||!amt){toast('Fill in description and amount','e');return;}
+      if(!merchant||!amt){toast('Fill in merchant and amount','e');return;}
       const r=await SB.from('expenses').update({merchant,amount:amt,category:document.getElementById('expCat').value||null,notes:document.getElementById('expNotes').value||null,status:'pending',flagged:false,flag_note:null,date:document.getElementById('expDate').value,tags:document.getElementById('expVAT')&&document.getElementById('expVAT').checked?['VAT']:[]}).eq('id',id);
       if(r.error){toast(r.error.message,'e');return;}
       const idx=myExp.findIndex(x=>x.id===id);if(idx>=0){myExp[idx]={...myExp[idx],merchant,amount:amt,status:'pending',flagged:false,flag_note:null,tags:document.getElementById('expVAT')&&document.getElementById('expVAT').checked?['VAT']:[]};}
