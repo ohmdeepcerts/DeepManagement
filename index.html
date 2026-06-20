@@ -25,7 +25,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">
+</script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 :root{
   --sb:#0f172a;--sbh:#1e293b;--sbb:#1e293b;--sbt:#94a3b8;
@@ -550,6 +552,9 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 .confirm-btns{display:flex;gap:10px;}
 .confirm-input{width:100%;padding:10px 13px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:14px;font-family:inherit;outline:none;margin-bottom:14px;color:var(--txt);background:var(--card2);box-sizing:border-box;}
 .confirm-input:focus{border-color:var(--red);}
+
+/* Force data tab content visibility */
+#settTab-data.active{display:block!important;visibility:visible!important;opacity:1!important;}
 </style>
 </head>
 <body>
@@ -1100,33 +1105,51 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       <div class="sett-sec" id="settTab-pay"><div class="card"><div class="cb"><div class="fg fg3"><div class="fgl"><label>Default OT Multiplier</label><input type="number" id="sOTMult" min="1" max="5" step="0.1" placeholder="1.5"></div><div class="fgl"><label>Saturday ×</label><input type="number" id="sSat" min="1" max="5" step="0.1" placeholder="1.0"></div><div class="fgl"><label>Sunday ×</label><input type="number" id="sSun" min="1" max="5" step="0.1" placeholder="1.0"></div></div><p style="font-size:12px;color:var(--txtm);margin-top:9px;">Each employee can override in their profile.</p></div></div></div>
       <div class="sett-sec" id="settTab-exp"><div class="card"><div class="ch"><div class="ct">Default Categories</div></div><div class="cb"><div id="catList" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:11px;"></div><div style="display:flex;gap:7px;"><input type="text" id="newCat" placeholder="e.g. Fuel" style="flex:1;padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;"><button class="btn btn-p btn-sm" onclick="addCat()"><i class="fa-solid fa-plus"></i>Add</button></div></div></div></div>
       <div class="sett-sec" id="settTab-admin"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl"><label>New Password (min 6 characters)</label><input type="password" id="newPin" placeholder="New password"></div><div class="fgl"><label>Confirm Password</label><input type="password" id="confirmPin" placeholder="New password"></div></div><button class="btn btn-p" style="margin-top:11px;" onclick="changePin()"><i class="fa-solid fa-key"></i>Update PIN</button><p style="font-size:12px;color:var(--txtm);margin-top:8px;">Default PIN: 1234 — change this immediately.</p></div></div>
+      </div>
 
       <div class="sett-sec" id="settTab-data">
-        <!-- EXPORT -->
         <div class="card" style="margin-bottom:14px;">
-          <div class="ch"><div class="ct"><i class="fa-solid fa-upload" style="color:var(--grn);margin-right:6px;"></i>Export All Data</div></div>
+          <div class="ch"><div><div class="ct"><i class="fa-solid fa-file-export" style="color:var(--grn);margin-right:6px;"></i>Export Data</div><div class="cs">Choose what to export and download</div></div></div>
           <div class="cb">
-            <p style="font-size:13px;color:var(--txt2);margin-bottom:14px;">Download a complete backup of all your data as a JSON file. Use this before moving to a new Supabase project.</p>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
-              <button class="btn btn-s" onclick="exportAllData('json')"><i class="fa-solid fa-file-code"></i>Export JSON</button>
-              <button class="btn btn-o" onclick="exportAllData('csv')"><i class="fa-solid fa-file-csv"></i>Export CSV (expenses)</button>
+            <div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">What to export</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;" id="exportCheckboxes">
+                <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--acc);border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:600;background:var(--accl);"><input type="checkbox" checked value="attendance" style="accent-color:var(--acc);pointer-events:none;"> <i class="fa-solid fa-calendar-check" style="color:var(--blu);"></i> Attendance</label>
+                <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--acc);border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:600;background:var(--accl);"><input type="checkbox" checked value="expenses" style="accent-color:var(--acc);pointer-events:none;"> <i class="fa-solid fa-receipt" style="color:var(--amb);"></i> Expenses</label>
+                <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--acc);border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:600;background:var(--accl);"><input type="checkbox" checked value="employees" style="accent-color:var(--acc);pointer-events:none;"> <i class="fa-solid fa-users" style="color:var(--grn);"></i> Employees</label>
+                <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--bdr);border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:600;"><input type="checkbox" value="payroll" style="accent-color:var(--acc);pointer-events:none;"> <i class="fa-solid fa-sterling-sign" style="color:var(--pur);"></i> Payroll</label>
+                <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--bdr);border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:600;"><input type="checkbox" value="messages" style="accent-color:var(--acc);pointer-events:none;"> <i class="fa-solid fa-message" style="color:var(--tel);"></i> Messages</label>
+                <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--bdr);border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:600;"><input type="checkbox" value="documents" style="accent-color:var(--acc);pointer-events:none;"> <i class="fa-solid fa-file" style="color:var(--red);"></i> Documents</label>
+              </div>
             </div>
-            <div id="exportStatus" style="margin-top:11px;font-size:12px;color:var(--txtm);"></div>
+            <div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Date range</div>
+              <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px;">
+                <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">From</label><input type="date" id="exportFrom" style="padding:7px 10px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;"></div>
+                <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">To</label><input type="date" id="exportTo" style="padding:7px 10px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;"></div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="btn btn-o btn-sm" onclick="setExportDateRange('thismonth')">This month</button>
+                <button class="btn btn-o btn-sm" onclick="setExportDateRange('lastmonth')">Last month</button>
+                <button class="btn btn-o btn-sm" onclick="setExportDateRange('thisyear')">This year</button>
+                <button class="btn btn-o btn-sm" onclick="setExportDateRange('lastyear')">Last year</button>
+                <button class="btn btn-o btn-sm" onclick="setExportDateRange('all')">All time</button>
+              </div>
+            </div>
+            <div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Employee</div>
+              <select id="exportEmployee" style="padding:8px 12px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;min-width:220px;"><option value="all">All employees</option></select>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--bdr);">
+              <button class="btn btn-p" onclick="doExportXLSX()" style="min-width:200px;background:linear-gradient(135deg,#16a34a,#15803d);border-color:#15803d;font-size:13px;"><i class="fa-solid fa-file-excel"></i> Export Full Excel Report</button>
+              <button class="btn btn-s" onclick="doExport('json')" style="min-width:150px;"><i class="fa-solid fa-file-code"></i> Export JSON backup</button>
+              <div id="exportStatus" style="font-size:12px;color:var(--txtm);"></div>
+            </div>
           </div>
         </div>
-        <!-- IMPORT -->
         <div class="card">
-          <div class="ch"><div class="ct"><i class="fa-solid fa-download" style="color:var(--acc);margin-right:6px;"></i>Import Data</div></div>
+          <div class="ch"><div class="ct"><i class="fa-solid fa-file-import" style="color:var(--acc);margin-right:6px;"></i>Import Data</div></div>
           <div class="cb">
-            <p style="font-size:13px;color:var(--txt2);margin-bottom:6px;">Import a JSON backup file into this Supabase project. This will <strong>add</strong> records — it won't delete existing data.</p>
-            <div style="background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--rs);padding:9px 12px;margin-bottom:13px;font-size:12px;color:var(--amb);">
-              <i class="fa-solid fa-triangle-exclamation" style="margin-right:5px;"></i>Only import into a <strong>fresh empty project</strong> to avoid duplicate data.
-            </div>
-            <div style="border:2px dashed var(--bdr);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;background:var(--card2);margin-bottom:11px;" onclick="document.getElementById('importFile').click()" id="importDropZone">
-              <i class="fa-solid fa-file-arrow-up" style="font-size:24px;color:var(--txtm);display:block;margin-bottom:8px;"></i>
-              <div style="font-size:13px;font-weight:600;">Click to choose JSON backup file</div>
-              <div style="font-size:11px;color:var(--txtm);margin-top:3px;" id="importFileName">No file selected</div>
-            </div>
+            <p style="font-size:13px;color:var(--txt2);margin-bottom:6px;">Import a JSON backup. This will <strong>add</strong> records.</p>
+            <div style="background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--rs);padding:9px 12px;margin-bottom:13px;font-size:12px;color:var(--amb);"><i class="fa-solid fa-triangle-exclamation" style="margin-right:5px;"></i>Only import into a <strong>fresh empty project</strong>.</div>
+            <div style="border:2px dashed var(--bdr);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;background:var(--card2);margin-bottom:11px;" onclick="document.getElementById('importFile').click()" id="importDropZone"><i class="fa-solid fa-file-arrow-up" style="font-size:24px;color:var(--txtm);display:block;margin-bottom:8px;"></i><div style="font-size:13px;font-weight:600;">Click to choose JSON backup file</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;" id="importFileName">No file selected</div></div>
             <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importFileChosen(this)">
             <button class="btn btn-p" onclick="importAllData()" id="importBtn" disabled style="opacity:0.5;"><i class="fa-solid fa-database"></i>Import into Supabase</button>
             <div id="importStatus" style="margin-top:11px;font-size:12px;"></div>
@@ -2888,6 +2911,10 @@ function qMark(empId,status){
 function tMore(id){const s=document.getElementById(`st-${id}`);if(s){s.focus();s.size=8;setTimeout(()=>s.size=1,3000);}}
 function onMC(el){
   const empId=el.dataset.eid,field=el.dataset.f;
+  // Auto-fill contracted hours if time field empty and has a default
+  if((field==='sign_in'||field==='sign_out')&&!el.value&&el.dataset.default){
+    el.value=el.dataset.default;
+  }
   _touched.add(empId);
   if(field==='sign_in'||field==='sign_out')recalcHOT(empId);
   if(field==='hours'){
@@ -5053,10 +5080,20 @@ async function resolveFlag(id){
 // ═══════════════════════════════════════════════════
 function setSettTab(tab,el){
   document.querySelectorAll('#page-settings .tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.sett-sec').forEach(s=>s.classList.remove('active'));
-  el.classList.add('active');document.getElementById('settTab-'+tab)?.classList.add('active');
+  document.querySelectorAll('.sett-sec').forEach(function(s){
+    s.classList.remove('active');
+    s.style.display='none';
+  });
+  el.classList.add('active');
+  var target=document.getElementById('settTab-'+tab);
+  if(target){
+    target.classList.add('active');
+    target.style.display='block';
+  }
+  if(tab==='data')initExportUI();
 }
 function loadSettings(){
+  initExportUI();
   document.getElementById('sCompany').value=cfg.company||'';
   document.getElementById('sCurrency').value=cfg.currency||'£';
   document.getElementById('sThreshold').value=cfg.threshold||80;
@@ -5737,94 +5774,511 @@ function editAttReq(id){
 // DATA EXPORT / IMPORT
 // ═══════════════════════════════════════════════════
 
-async function exportAllData(format='json'){
-  const statusEl=document.getElementById('exportStatus');
-  statusEl.innerHTML='<i class="fa-solid fa-rotate fa-spin"></i> Fetching all data...';
-  try {
-    // Fetch all tables
-    const [empR,attR,expR,batR,msgR,payR,salR,docR,attReqR,settR,prSumR]=await Promise.all([
-      sb.from('employees').select('*').order('name'),
-      sb.from('attendance').select('*').order('date'),
-      sb.from('expenses').select('*').order('date'),
-      sb.from('expense_batches').select('*').order('submitted_at'),
-      sb.from('messages').select('*').order('created_at'),
-      sb.from('payment_status').select('*'),
-      sb.from('salary_history').select('*').order('effective_from'),
-      sb.from('employee_documents').select('*').order('uploaded_at'),
-      sb.from('attendance_requests').select('*').order('created_at'),
-      sb.from('settings').select('*'),
-      sb.from('payroll_summary').select('*')
-    ]);
+// ═══════════════════════════════════════
+// EXPORT / IMPORT
+// ═══════════════════════════════════════
 
-    const errors=[empR,attR,expR,batR,msgR,payR,salR,docR,attReqR,settR,prSumR]
-      .filter(r=>r.error).map(r=>r.error.message);
+function toggleExportCheck(label){
+  const cb=label.querySelector('input');
+  const checked=cb.checked;
+  label.style.borderColor=checked?'var(--acc)':'var(--bdr)';
+  label.style.background=checked?'var(--accl)':'';
+}
+
+function setExportDateRange(range){
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const fmt=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const from=document.getElementById('exportFrom');
+  const to=document.getElementById('exportTo');
+  if(range==='all'){from.value='';to.value='';return;}
+  if(range==='thismonth'){
+    from.value=fmt(new Date(now.getFullYear(),now.getMonth(),1));
+    to.value=fmt(new Date(now.getFullYear(),now.getMonth()+1,0));
+  }else if(range==='lastmonth'){
+    from.value=fmt(new Date(now.getFullYear(),now.getMonth()-1,1));
+    to.value=fmt(new Date(now.getFullYear(),now.getMonth(),0));
+  }else if(range==='thisyear'){
+    from.value=fmt(new Date(now.getFullYear(),0,1));
+    to.value=fmt(new Date(now.getFullYear(),11,31));
+  }else if(range==='lastyear'){
+    from.value=fmt(new Date(now.getFullYear()-1,0,1));
+    to.value=fmt(new Date(now.getFullYear()-1,11,31));
+  }
+}
+
+function initExportUI(){
+  // Wire up label visual feedback on checkbox change
+  document.querySelectorAll('#exportCheckboxes input[type=checkbox]').forEach(function(cb){
+    cb.addEventListener('change',function(){
+      var label=cb.closest('label');
+      if(!label)return;
+      label.style.borderColor=cb.checked?'var(--acc)':'var(--bdr)';
+      label.style.background=cb.checked?'var(--accl)':'';
+    });
+  });
+  // Populate employee dropdown
+  const sel=document.getElementById('exportEmployee');
+  if(!sel||sel.options.length>1)return;
+  employees.forEach(e=>{const o=new Option(e.name,e.id);sel.appendChild(o);});
+  // Set checked style for default checked boxes
+  document.querySelectorAll('#exportCheckboxes label').forEach(label=>{
+    const cb=label.querySelector('input');
+    if(cb&&cb.checked){label.style.borderColor='var(--acc)';label.style.background='var(--accl)';}
+  });
+}
+
+async function doExport(format){
+  const statusEl=document.getElementById('exportStatus');
+  statusEl.innerHTML='<i class="fa-solid fa-rotate fa-spin"></i> Preparing export...';
+
+  // What to include
+  const checks=Array.from(document.querySelectorAll('#exportCheckboxes input:checked')).map(c=>c.value);
+  if(!checks.length){statusEl.innerHTML='<span style="color:var(--red);">Select at least one data type to export.</span>';return;}
+
+  // Date range
+  const fromVal=document.getElementById('exportFrom').value;
+  const toVal=document.getElementById('exportTo').value;
+  const fromD=fromVal?new Date(fromVal+'T00:00:00'):null;
+  const toD=toVal?new Date(toVal+'T23:59:59'):null;
+
+  // Employee filter
+  const empFilter=document.getElementById('exportEmployee').value;
+  const empF=empFilter==='all'?null:empFilter;
+
+  // Filter helper
+  const inRange=(date)=>{
+    if(!date)return true;
+    const d=new Date(date+'T00:00:00');
+    if(fromD&&d<fromD)return false;
+    if(toD&&d>toD)return false;
+    return true;
+  };
+  const empMatch=(id)=>!empF||id===empF;
+
+  try{
+    // Fetch fresh data for selected tables
+    const fetches={};
+    if(checks.includes('employees'))fetches.employees=await sb.from('employees').select('*').order('name');
+    if(checks.includes('attendance'))fetches.attendance=await sb.from('attendance').select('*').order('date');
+    if(checks.includes('expenses'))fetches.expenses=await sb.from('expenses').select('*').order('date');
+    if(checks.includes('payroll')){
+      fetches.payroll_summary=await sb.from('payroll_summary').select('*');
+      fetches.salary_history=await sb.from('salary_history').select('*').order('effective_from');
+      fetches.expense_batches=await sb.from('expense_batches').select('*').order('submitted_at');
+      fetches.payment_status=await sb.from('payment_status').select('*');
+    }
+    if(checks.includes('messages'))fetches.messages=await sb.from('messages').select('*').order('created_at');
+    if(checks.includes('documents'))fetches.employee_documents=await sb.from('employee_documents').select('*').order('uploaded_at');
+    fetches.settings=await sb.from('settings').select('*').eq('id',1).single();
+
+    const errors=Object.values(fetches).filter(r=>r.error).map(r=>r.error.message);
     if(errors.length){statusEl.innerHTML=`<span style="color:var(--red);">Error: ${errors[0]}</span>`;return;}
 
-    if(format==='json'){
+    // Apply filters
+    const empData=fetches.employees?.data||[];
+    const empMap={};empData.forEach(e=>empMap[e.id]=e.name);
+
+    const filteredAtt=(fetches.attendance?.data||[]).filter(r=>inRange(r.date)&&empMatch(r.employee_id));
+    const filteredExp=(fetches.expenses?.data||[]).filter(r=>inRange(r.date)&&empMatch(r.employee_id));
+    const filteredEmps=empF?empData.filter(e=>e.id===empF):empData;
+    const filteredMsgs=(fetches.messages?.data||[]).filter(r=>!empF||(r.sender===empF||r.receiver===empF));
+    const filteredDocs=(fetches.employee_documents?.data||[]).filter(r=>empMatch(r.employee_id));
+    const filteredPaySum=(fetches.payroll_summary?.data||[]).filter(r=>empMatch(r.employee_id));
+    const filteredSalHist=(fetches.salary_history?.data||[]).filter(r=>empMatch(r.employee_id));
+    const filteredBatches=(fetches.expense_batches?.data||[]).filter(r=>empMatch(r.employee_id));
+    const filteredPaySt=(fetches.payment_status?.data||[]).filter(r=>empMatch(r.employee_id));
+
+    const d=new Date().toISOString().slice(0,10);
+    const empLabel=empF?`_${empMap[empF]?.replace(/\s+/g,'_')||empF}`:'';
+    const dateLabel=fromVal&&toVal?`_${fromVal}_to_${toVal}`:fromVal?`_from_${fromVal}`:toVal?`_to_${toVal}`:'';
+
+    if(format==='csv'){
+      // One CSV per selected data type
+      const sheets=[];
+      if(checks.includes('attendance')&&filteredAtt.length){
+        const headers=['Date','Employee','Status','Sign In','Sign Out','Hours','OT','Bonus','Notes'];
+        const rows=filteredAtt.map(r=>[r.date,`"${(empMap[r.employee_id]||'').replace(/"/g,'""')}"`,r.status,r.sign_in||'',r.sign_out||'',r.hours||'',r.overtime||'',r.bonus||'',`"${(r.notes||'').replace(/"/g,'""')}"`]);
+        sheets.push({name:'attendance',csv:[headers,...rows].map(r=>r.join(',')).join('\n')});
+      }
+      if(checks.includes('expenses')&&filteredExp.length){
+        const headers=['Date','Employee','Merchant','Category','Amount','Tags','Receipt URL'];
+        const C2=cur();
+        const rows=filteredExp.map(r=>[r.date,`"${(empMap[r.employee_id]||'').replace(/"/g,'""')}"`,`"${(r.merchant||r.description||'').replace(/"/g,'""')}"`,`"${(r.category||'').replace(/"/g,'""')}"`,r.amount,`"${(r.tags||[]).join(';')}"`,r.receipt_url||'']);
+        sheets.push({name:'expenses',csv:[headers,...rows].map(r=>r.join(',')).join('\n')});
+      }
+      if(checks.includes('employees')&&filteredEmps.length){
+        const headers=['Name','Role','Contract','Phone','Join Date','Status','Contracted Hours','Work Start','Work End'];
+        const rows=filteredEmps.map(e=>[`"${(e.name||'').replace(/"/g,'""')}"`,`"${(e.role||'').replace(/"/g,'""')}"`,e.contract_type||'',e.phone||'',e.join_date||'',e.status||'',e.contracted_hours||'',e.work_start||'',e.work_end||'']);
+        sheets.push({name:'employees',csv:[headers,...rows].map(r=>r.join(',')).join('\n')});
+      }
+      if(!sheets.length){statusEl.innerHTML='<span style="color:var(--amb);">No data to export for selected filters.</span>';return;}
+      // Download one CSV per sheet
+      sheets.forEach(({name,csv})=>{
+        const blob=new Blob([csv],{type:'text/csv'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;a.download=`OHM_${name}${empLabel}${dateLabel}_${d}.csv`;
+        document.body.appendChild(a);a.click();document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+      const total=sheets.reduce((s,sh)=>s+sh.csv.split('\n').length-1,0);
+      statusEl.innerHTML=`<span style="color:var(--grn);"><i class="fa-solid fa-circle-check"></i> Exported ${total.toLocaleString()} rows as ${sheets.length} CSV file${sheets.length>1?'s':''}.</span>`;
+
+    }else{
+      // JSON full backup
       const backup={
-        _meta:{
-          exported_at:new Date().toISOString(),
-          version:'DAM Pro v2',
-          tables:{
-            employees:empR.data.length,
-            attendance:attR.data.length,
-            expenses:expR.data.length,
-            expense_batches:batR.data.length,
-            messages:msgR.data.length,
-            payment_status:payR.data.length,
-            salary_history:salR.data.length,
-            employee_documents:docR.data.length,
-            attendance_requests:attReqR.data.length,
-            payroll_summary:prSumR.data.length
-          }
-        },
-        employees:empR.data,
-        attendance:attR.data,
-        expenses:expR.data,
-        expense_batches:batR.data,
-        messages:msgR.data,
-        payment_status:payR.data,
-        salary_history:salR.data,
-        employee_documents:docR.data,
-        attendance_requests:attReqR.data,
-        settings:settR.data,
-        payroll_summary:prSumR.data
+        _meta:{exported_at:new Date().toISOString(),version:'OHM DAM Pro',filters:{from:fromVal||'all',to:toVal||'all',employee:empF?empMap[empF]:'all',tables:checks}},
+        employees:filteredEmps,
+        attendance:filteredAtt,
+        expenses:filteredExp,
+        payroll_summary:filteredPaySum,
+        salary_history:filteredSalHist,
+        expense_batches:filteredBatches,
+        payment_status:filteredPaySt,
+        messages:filteredMsgs,
+        employee_documents:filteredDocs,
+        settings:fetches.settings?.data||{}
       };
       const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
-      const d=new Date().toISOString().slice(0,10);
-      a.href=url;a.download=`DAMPro_backup_${d}.json`;a.click();
+      a.href=url;a.download=`OHM_backup${empLabel}${dateLabel}_${d}.json`;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      const total=Object.values(backup._meta.tables).reduce((s,n)=>s+n,0);
-      statusEl.innerHTML=`<span style="color:var(--grn);"><i class="fa-solid fa-circle-check"></i> Exported ${total.toLocaleString()} records across ${Object.keys(backup._meta.tables).length} tables</span>`;
-
-    } else if(format==='csv'){
-      // CSV export for expenses
-      const rows=expR.data;
-      const empMap={};empR.data.forEach(e=>empMap[e.id]=e.name);
-      const headers=['Date','Employee','Merchant','Category','Amount','Status','Tags','Notes','Receipt URL'];
-      const lines=[headers.join(','),...rows.map(r=>[
-        r.date,
-        `"${(empMap[r.employee_id]||'').replace(/"/g,'""')}"`,
-        `"${(r.merchant||'').replace(/"/g,'""')}"`,
-        `"${(r.category||'').replace(/"/g,'""')}"`,
-        r.amount,
-        r.status,
-        `"${(r.tags||[]).join(';')}"`,
-        `"${(r.notes||'').replace(/"/g,'""')}"`,
-        r.receipt_url||''
-      ].join(','))];
-      const csvStr=lines.join('\n');const blob=new Blob([csvStr],{type:'text/csv'});
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');
-      const d=new Date().toISOString().slice(0,10);
-      a.href=url;a.download=`DAMPro_expenses_${d}.csv`;a.click();
-      URL.revokeObjectURL(url);
-      statusEl.innerHTML=`<span style="color:var(--grn);"><i class="fa-solid fa-circle-check"></i> Exported ${rows.length} expense rows as CSV</span>`;
+      const total=filteredAtt.length+filteredExp.length+filteredEmps.length;
+      statusEl.innerHTML=`<span style="color:var(--grn);"><i class="fa-solid fa-circle-check"></i> Exported ${total.toLocaleString()} records as JSON.</span>`;
     }
-  } catch(err){
+  }catch(err){
     statusEl.innerHTML=`<span style="color:var(--red);">Export failed: ${err.message}</span>`;
+    console.error('Export error:',err);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════
+// EXCEL EXPORT ENGINE (SheetJS + full formatting)
+// ═══════════════════════════════════════════════════
+async function doExportXLSX(){
+  const statusEl=document.getElementById('exportStatus');
+  statusEl.innerHTML='<i class="fa-solid fa-rotate fa-spin"></i> Building Excel report...';
+
+  // Gather filters
+  const fromVal=document.getElementById('exportFrom').value;
+  const toVal=document.getElementById('exportTo').value;
+  const empFilter=document.getElementById('exportEmployee').value;
+  const empF=empFilter==='all'?null:empFilter;
+  const fromD=fromVal?new Date(fromVal+'T00:00:00'):null;
+  const toD=toVal?new Date(toVal+'T23:59:59'):null;
+  const C=cur();
+
+  // Fetch fresh data
+  try{
+    const [attR,expR,empR]=await Promise.all([
+      sb.from('attendance').select('*').order('date'),
+      sb.from('expenses').select('*').order('date'),
+      sb.from('employees').select('*').order('name'),
+    ]);
+    if(attR.error)throw attR.error;
+
+    const allEmps=(empR.data||[]).filter(e=>e.status==='Active');
+    const scopeEmps=empF?allEmps.filter(e=>e.id===empF):allEmps;
+    const allAtt=attR.data||[];
+    const allExp=expR.data||[];
+
+    // Filter by date range
+    const inRange=d=>{if(!d)return true;const dt=new Date(d+'T00:00:00');if(fromD&&dt<fromD)return false;if(toD&&dt>toD)return false;return true;};
+    const filtAtt=allAtt.filter(r=>inRange(r.date)&&(empF?r.employee_id===empF:true));
+    const filtExp=allExp.filter(r=>inRange(r.date)&&(empF?r.employee_id===empF:true));
+
+    // Get all unique dates in range that have records
+    const allDates=[...new Set(filtAtt.map(r=>r.date))].sort();
+
+    const wb=XLSX.utils.book_new();
+
+    // ── COLORS ──
+    const COLORS={
+      headerBg:'1E3A5F',    // dark navy header
+      headerFg:'FFFFFF',    // white text
+      subheaderBg:'2563EB', // blue sub-header
+      subheaderFg:'FFFFFF',
+      dayBg:'1E40AF',       // day section header - deep blue
+      dayFg:'FFFFFF',
+      presentBg:'D1FAE5',   // light green - present
+      presentFg:'065F46',
+      absentBg:'FEE2E2',    // light red - absent
+      absentFg:'991B1B',
+      leaveBg:'FEF3C7',     // light amber - leave
+      leaveFg:'92400E',
+      otBg:'EDE9FE',        // purple - overtime
+      otFg:'5B21B6',
+      totalBg:'F0FDF4',     // mint green - totals
+      totalFg:'14532D',
+      payBg:'ECFDF5',
+      payFg:'065F46',
+      altRow:'F8FAFC',      // alternate row color
+      border:'CBD5E1',
+      sectionBg:'EFF6FF',
+      empNameBg:'DBEAFE',
+      empNameFg:'1E3A8A',
+      expBg:'FFFBEB',
+      expFg:'78350F',
+    };
+
+    const mkFont=(bold,color,size)=>({bold:!!bold,color:{rgb:color||'000000'},sz:size||10,name:'Arial'});
+    const mkFill=color=>({fgColor:{rgb:color},patternType:'solid'});
+    const mkBorder=()=>({top:{style:'thin',color:{rgb:'CBD5E1'}},bottom:{style:'thin',color:{rgb:'CBD5E1'}},left:{style:'thin',color:{rgb:'CBD5E1'}},right:{style:'thin',color:{rgb:'CBD5E1'}}});
+    const mkAlign=(h,v)=>({horizontal:h||'left',vertical:v||'center',wrapText:true});
+
+    // ── SHEET 1: DAILY ATTENDANCE ──────────────────────────────
+    const attData=[];
+    let attMerges=[];
+    let r=0;
+
+    // Title row
+    const dateRangeStr=(fromVal&&toVal)?`${fromVal} to ${toVal}`:fromVal?`From ${fromVal}`:toVal?`To ${toVal}`:'All Time';
+    const empStr=empF?scopeEmps[0]?.name:'All Employees';
+    attData.push([{v:'OHM Electrical — Daily Attendance Report',s:{font:mkFont(true,'FFFFFF',14),fill:mkFill(COLORS.headerBg),alignment:mkAlign('left','center'),border:mkBorder()}},'','','','','','','','','']);
+    attMerges.push({s:{r,c:0},e:{r,c:9}});r++;
+    attData.push([{v:`Period: ${dateRangeStr}   |   Staff: ${empStr}`,s:{font:mkFont(false,'FFFFFF',10),fill:mkFill(COLORS.headerBg),alignment:mkAlign('left','center')}},'','','','','','','','','']);
+    attMerges.push({s:{r,c:0},e:{r,c:9}});r++;
+    attData.push([]);r++;
+
+    // For each date
+    allDates.forEach(date=>{
+      const dayRecs=filtAtt.filter(a=>a.date===date);
+      const dt=new Date(date+'T00:00:00');
+      const dayName=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dt.getDay()];
+      const dateStr=dt.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+      // Day header
+      attData.push([{v:`📅  ${dateStr}`,s:{font:mkFont(true,COLORS.dayFg,11),fill:mkFill(COLORS.dayBg),alignment:mkAlign('left','center'),border:mkBorder()}},'','','','','','','','','']);
+      attMerges.push({s:{r,c:0},e:{r,c:9}});r++;
+
+      // Column headers
+      const hdr=['Employee','Role','Status','Sign In','Sign Out','Hours','OT Hours','Bonus','Notes','Pay Est.'];
+      attData.push(hdr.map(h=>({v:h,s:{font:mkFont(true,COLORS.subheaderFg,10),fill:mkFill(COLORS.subheaderBg),alignment:mkAlign('center','center'),border:mkBorder()}})));r++;
+
+      // Employee rows for this day
+      let dayPresent=0,dayHrs=0,dayOT=0,dayPay=0;
+      scopeEmps.forEach((emp,ei)=>{
+        const rec=dayRecs.find(a=>a.employee_id===emp.id);
+        const st=rec?.status||'—';
+        const isPresent=['P','HD','LA'].includes(st);
+        const isAbsent=st==='A';
+        const isLeave=['L','S','H','UL'].includes(st);
+        const hrs=parseFloat(rec?.hours)||0;
+        const ot=parseFloat(rec?.overtime)||0;
+        const bonus=parseFloat(rec?.bonus)||0;
+
+        let pay=0;
+        if(rec&&isPresent){const p=calcPay(emp,rec);pay=p.base+p.ot+bonus;}
+        if(isPresent){dayPresent++;dayHrs+=hrs;dayOT+=ot;dayPay+=pay;}
+
+        const rowBg=isPresent?COLORS.presentBg:isAbsent?COLORS.absentBg:isLeave?COLORS.leaveBg:ei%2===0?'FFFFFF':COLORS.altRow;
+        const rowFg=isPresent?COLORS.presentFg:isAbsent?COLORS.absentFg:isLeave?COLORS.leaveFg:'374151';
+
+        const statusLabels={'P':'Present','A':'Absent','L':'Annual Leave','S':'Sick Leave','H':'Bank Holiday','HD':'Half Day','LA':'Late Arrival','UL':'Unpaid Leave','—':'Not Marked'};
+        const stLabel=statusLabels[st]||st;
+
+        attData.push([
+          {v:emp.name,s:{font:mkFont(true,rowFg,10),fill:mkFill(rowBg),alignment:mkAlign('left','center'),border:mkBorder()}},
+          {v:emp.role||'',s:{font:mkFont(false,'64748B',9),fill:mkFill(rowBg),alignment:mkAlign('left','center'),border:mkBorder()}},
+          {v:stLabel,s:{font:mkFont(true,rowFg,10),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+          {v:rec?.sign_in||'—',s:{font:mkFont(false,'374151',10),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+          {v:rec?.sign_out||'—',s:{font:mkFont(false,'374151',10),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+          {v:hrs>0?hrs:'—',s:{font:mkFont(true,hrs>0?'1D4ED8':'64748B',10),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+          {v:ot>0?ot:'—',s:{font:mkFont(true,ot>0?COLORS.otFg:'64748B',10),fill:mkFill(ot>0?COLORS.otBg:rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+          {v:bonus>0?bonus:'—',s:{font:mkFont(false,'374151',10),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+          {v:rec?.notes||'',s:{font:mkFont(false,'64748B',9),fill:mkFill(rowBg),alignment:mkAlign('left','center'),border:mkBorder()}},
+          {v:pay>0?C+pay.toFixed(2):'—',s:{font:mkFont(true,pay>0?COLORS.payFg:'64748B',10),fill:mkFill(pay>0?COLORS.payBg:rowBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+        ]);r++;
+      });
+
+      // Day summary row
+      attData.push([
+        {v:`Day Total: ${dayPresent} present`,s:{font:mkFont(true,COLORS.totalFg,10),fill:mkFill(COLORS.totalBg),alignment:mkAlign('left','center'),border:mkBorder()}},
+        '','',
+        {v:'',s:{fill:mkFill(COLORS.totalBg),border:mkBorder()}},
+        {v:'',s:{fill:mkFill(COLORS.totalBg),border:mkBorder()}},
+        {v:dayHrs>0?dayHrs.toFixed(1)+'h':'—',s:{font:mkFont(true,COLORS.totalFg,10),fill:mkFill(COLORS.totalBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:dayOT>0?dayOT.toFixed(1)+'h':'—',s:{font:mkFont(true,COLORS.otFg,10),fill:mkFill(COLORS.totalBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:'',s:{fill:mkFill(COLORS.totalBg),border:mkBorder()}},
+        {v:'',s:{fill:mkFill(COLORS.totalBg),border:mkBorder()}},
+        {v:dayPay>0?C+dayPay.toFixed(2):'—',s:{font:mkFont(true,COLORS.payFg,10),fill:mkFill(COLORS.totalBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+      ]);
+      attMerges.push({s:{r,c:0},e:{r,c:2}});r++;
+      attData.push([]);r++; // blank row between days
+    });
+
+    // Build attendance sheet
+    const attWS=XLSX.utils.aoa_to_sheet(attData.map(row=>Array.isArray(row)?row:[row]));
+    attWS['!merges']=attMerges;
+    attWS['!cols']=[{wch:28},{wch:14},{wch:16},{wch:10},{wch:10},{wch:8},{wch:9},{wch:8},{wch:22},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,attWS,'Daily Attendance');
+
+    // ── SHEET 2: EMPLOYEE SUMMARY ──────────────────────────────
+    const sumData=[];
+    let sumMerges=[];let sr=0;
+
+    sumData.push([{v:'OHM Electrical — Employee Summary Report',s:{font:mkFont(true,'FFFFFF',14),fill:mkFill(COLORS.headerBg),alignment:mkAlign('left','center'),border:mkBorder()}},'','','','','','','','','','']);
+    sumMerges.push({s:{sr,c:0},e:{s:sr,c:10}});sr++;
+    sumData.push([{v:`Period: ${dateRangeStr}`,s:{font:mkFont(false,'FFFFFF',10),fill:mkFill(COLORS.headerBg),alignment:mkAlign('left')}},'','','','','','','','','','']);
+    sumMerges.push({s:{r:sr,c:0},e:{r:sr,c:10}});sr++;
+    sumData.push([]);sr++;
+
+    const sumHdr=['Employee','Role','Pay Type','Present Days','Absent Days','Total Hours','OT Hours','Base Pay','OT Pay','Expenses','Total Payable'];
+    sumData.push(sumHdr.map(h=>({v:h,s:{font:mkFont(true,COLORS.headerFg,10),fill:mkFill(COLORS.headerBg),alignment:mkAlign('center','center'),border:mkBorder()}})));sr++;
+
+    let gtHrs=0,gtOT=0,gtBase=0,gtOTPay=0,gtExp=0,gtTotal=0;
+    scopeEmps.forEach((emp,ei)=>{
+      const empAtt=filtAtt.filter(r=>r.employee_id===emp.id);
+      const empExp=filtExp.filter(e=>e.employee_id===emp.id);
+      const present=empAtt.filter(r=>['P','HD','LA'].includes(r.status)).length;
+      const absent=empAtt.filter(r=>r.status==='A').length;
+      const hrs=empAtt.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
+      const ot=empAtt.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
+      const bonus=empAtt.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
+      let base=0,otPay=0;
+      empAtt.filter(r=>['P','HD','LA'].includes(r.status)).forEach(rec=>{const p=calcPay(emp,rec);base+=p.base;otPay+=p.ot;});
+      const expTotal=empExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      const total=base+otPay+bonus+expTotal;
+      gtHrs+=hrs;gtOT+=ot;gtBase+=base;gtOTPay+=otPay;gtExp+=expTotal;gtTotal+=total;
+      const rowBg=ei%2===0?'FFFFFF':COLORS.altRow;
+      const ptLabel={'fixed':'Fixed Salary','daily':'Daily Wage','hourly':'Hourly Rate'}[emp.pay_type||'hourly']||'Hourly';
+      sumData.push([
+        {v:emp.name,s:{font:mkFont(true,'1E3A5F',10),fill:mkFill(COLORS.empNameBg),alignment:mkAlign('left','center'),border:mkBorder()}},
+        {v:emp.role||'',s:{font:mkFont(false,'64748B',9),fill:mkFill(rowBg),alignment:mkAlign('left','center'),border:mkBorder()}},
+        {v:ptLabel,s:{font:mkFont(false,'374151',9),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:present,s:{font:mkFont(true,COLORS.presentFg,10),fill:mkFill(COLORS.presentBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:absent,s:{font:mkFont(true,absent>0?COLORS.absentFg:'64748B',10),fill:mkFill(absent>0?COLORS.absentBg:rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:hrs.toFixed(1),s:{font:mkFont(true,'1D4ED8',10),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:ot.toFixed(1),s:{font:mkFont(true,ot>0?COLORS.otFg:'64748B',10),fill:mkFill(ot>0?COLORS.otBg:rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:C+base.toFixed(2),s:{font:mkFont(false,'374151',10),fill:mkFill(rowBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+        {v:C+otPay.toFixed(2),s:{font:mkFont(false,otPay>0?COLORS.otFg:'64748B',10),fill:mkFill(otPay>0?COLORS.otBg:rowBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+        {v:expTotal!==0?C+expTotal.toFixed(2):'—',s:{font:mkFont(false,expTotal>0?COLORS.expFg:expTotal<0?'991B1B':'64748B',10),fill:mkFill(expTotal!==0?COLORS.expBg:rowBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+        {v:C+total.toFixed(2),s:{font:mkFont(true,COLORS.payFg,11),fill:mkFill(COLORS.payBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+      ]);sr++;
+    });
+
+    // Grand total row
+    sumData.push([
+      {v:'GRAND TOTAL',s:{font:mkFont(true,'FFFFFF',11),fill:mkFill(COLORS.headerBg),alignment:mkAlign('left','center'),border:mkBorder()}},
+      {v:'',s:{fill:mkFill(COLORS.headerBg),border:mkBorder()}},
+      {v:'',s:{fill:mkFill(COLORS.headerBg),border:mkBorder()}},
+      {v:'',s:{fill:mkFill(COLORS.headerBg),border:mkBorder()}},
+      {v:'',s:{fill:mkFill(COLORS.headerBg),border:mkBorder()}},
+      {v:gtHrs.toFixed(1)+'h',s:{font:mkFont(true,'FFFFFF',11),fill:mkFill(COLORS.headerBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+      {v:gtOT.toFixed(1)+'h',s:{font:mkFont(true,'FFFFFF',11),fill:mkFill(COLORS.headerBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+      {v:C+gtBase.toFixed(2),s:{font:mkFont(true,'FFFFFF',11),fill:mkFill(COLORS.headerBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+      {v:C+gtOTPay.toFixed(2),s:{font:mkFont(true,'FFFFFF',11),fill:mkFill(COLORS.headerBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+      {v:C+gtExp.toFixed(2),s:{font:mkFont(true,'FFFFFF',11),fill:mkFill(COLORS.headerBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+      {v:C+gtTotal.toFixed(2),s:{font:mkFont(true,'FFFFFF',12),fill:mkFill(COLORS.headerBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+    ]);sr++;
+
+    const sumWS=XLSX.utils.aoa_to_sheet(sumData.map(row=>Array.isArray(row)?row:[row]));
+    sumWS['!merges']=[{s:{r:0,c:0},e:{r:0,c:10}},{s:{r:1,c:0},e:{r:1,c:10}}];
+    sumWS['!cols']=[{wch:28},{wch:14},{wch:14},{wch:12},{wch:12},{wch:12},{wch:10},{wch:12},{wch:12},{wch:12},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,sumWS,'Employee Summary');
+
+    // ── SHEET 3: EXPENSES ─────────────────────────────────────
+    if(filtExp.length>0){
+      const expSheetData=[];
+      let er2=0;
+      expSheetData.push([{v:'OHM Electrical — Expense Ledger',s:{font:mkFont(true,'FFFFFF',14),fill:mkFill(COLORS.headerBg),alignment:mkAlign('left','center'),border:mkBorder()}},'','','','','','']);
+      expSheetData.push([{v:`Period: ${dateRangeStr}   |   Staff: ${empStr}`,s:{font:mkFont(false,'FFFFFF',10),fill:mkFill(COLORS.headerBg)}},'','','','','','']);
+      expSheetData.push([]);er2+=3;
+      const expHdr=['Date','Employee','Merchant / Supplier','Category','Tags','Amount','Receipt'];
+      expSheetData.push(expHdr.map(h=>({v:h,s:{font:mkFont(true,COLORS.subheaderFg,10),fill:mkFill(COLORS.subheaderBg),alignment:mkAlign('center','center'),border:mkBorder()}})));er2++;
+      let expGrandTotal=0;
+      filtExp.sort((a,b)=>a.date.localeCompare(b.date)).forEach((exp,ei)=>{
+        const emp2=allEmps.find(e=>e.id===exp.employee_id);
+        const amt=parseFloat(exp.amount)||0;
+        expGrandTotal+=amt;
+        const isNeg=amt<0;
+        const rowBg=ei%2===0?'FFFFFF':COLORS.altRow;
+        expSheetData.push([
+          {v:exp.date,s:{font:mkFont(false,'374151',10),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+          {v:emp2?.name||'?',s:{font:mkFont(true,'1E3A5F',10),fill:mkFill(COLORS.empNameBg),alignment:mkAlign('left','center'),border:mkBorder()}},
+          {v:exp.merchant||exp.description||'—',s:{font:mkFont(false,'374151',10),fill:mkFill(rowBg),alignment:mkAlign('left','center'),border:mkBorder()}},
+          {v:exp.category||'—',s:{font:mkFont(false,'374151',10),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+          {v:(exp.tags||[]).join(', ')||'—',s:{font:mkFont(false,'64748B',9),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+          {v:C+Math.abs(amt).toFixed(2)+(isNeg?' (deduction)':''),s:{font:mkFont(true,isNeg?COLORS.absentFg:COLORS.expFg,10),fill:mkFill(isNeg?COLORS.absentBg:COLORS.expBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+          {v:exp.receipt_url?'✓ Attached':'—',s:{font:mkFont(false,exp.receipt_url?COLORS.presentFg:'64748B',10),fill:mkFill(exp.receipt_url?COLORS.presentBg:rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        ]);er2++;
+      });
+      // Total
+      expSheetData.push([
+        {v:'TOTAL',s:{font:mkFont(true,'FFFFFF',11),fill:mkFill(COLORS.headerBg),alignment:mkAlign('left','center'),border:mkBorder()}},
+        '','','','',
+        {v:C+expGrandTotal.toFixed(2),s:{font:mkFont(true,'FFFFFF',12),fill:mkFill(COLORS.headerBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+        {v:'',s:{fill:mkFill(COLORS.headerBg),border:mkBorder()}},
+      ]);
+      const expWS=XLSX.utils.aoa_to_sheet(expSheetData.map(row=>Array.isArray(row)?row:[row]));
+      expWS['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}},{s:{r:er2,c:0},e:{r:er2,c:4}}];
+      expWS['!cols']=[{wch:12},{wch:22},{wch:28},{wch:16},{wch:14},{wch:16},{wch:14}];
+      XLSX.utils.book_append_sheet(wb,expWS,'Expenses');
+    }
+
+    // ── SHEET 4: PAYROLL SUMMARY ──────────────────────────────
+    const payData=[];let pr2=0;
+    payData.push([{v:'OHM Electrical — Payroll Summary',s:{font:mkFont(true,'FFFFFF',14),fill:mkFill(COLORS.headerBg),alignment:mkAlign('left','center'),border:mkBorder()}},'','','','','','','','']);
+    payData.push([{v:`Period: ${dateRangeStr}   |   Exported: ${new Date().toLocaleDateString('en-GB')}`,s:{font:mkFont(false,'FFFFFF',10),fill:mkFill(COLORS.headerBg)}},'','','','','','','','']);
+    payData.push([]);pr2+=3;
+    const payHdr=['Employee','Contract','Pay Type','Present Days','Hours','OT Hours','Base Pay','OT Pay','Bonus','Expenses','TOTAL PAYABLE'];
+    payData.push(payHdr.map(h=>({v:h,s:{font:mkFont(true,'FFFFFF',10),fill:mkFill('1E3A5F'),alignment:mkAlign('center','center'),border:mkBorder()}})));pr2++;
+    let ptBase=0,ptOT=0,ptBonus=0,ptExp=0,ptTotal=0;
+    scopeEmps.forEach((emp,ei)=>{
+      const empAtt=filtAtt.filter(r=>r.employee_id===emp.id&&['P','HD','LA'].includes(r.status));
+      const empExp=filtExp.filter(e=>e.employee_id===emp.id);
+      let base=0,otPay=0,bonus=0;
+      empAtt.forEach(rec=>{const p=calcPay(emp,rec);base+=p.base;otPay+=p.ot;bonus+=parseFloat(rec.bonus)||0;});
+      const expTotal=empExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      const total=base+otPay+bonus+expTotal;
+      const hrs=filtAtt.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
+      const ot=filtAtt.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
+      ptBase+=base;ptOT+=otPay;ptBonus+=bonus;ptExp+=expTotal;ptTotal+=total;
+      const rowBg=ei%2===0?'FFFFFF':COLORS.altRow;
+      const ptLabel={'fixed':'Fixed Salary','daily':'Daily Wage','hourly':'Hourly Rate'}[emp.pay_type||'hourly']||'Hourly';
+      payData.push([
+        {v:emp.name,s:{font:mkFont(true,'1E3A5F',10),fill:mkFill(COLORS.empNameBg),alignment:mkAlign('left','center'),border:mkBorder()}},
+        {v:emp.contract_type||'PAYE',s:{font:mkFont(false,'374151',9),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:ptLabel,s:{font:mkFont(false,'374151',9),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:empAtt.length,s:{font:mkFont(true,COLORS.presentFg,10),fill:mkFill(COLORS.presentBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:hrs.toFixed(1),s:{font:mkFont(true,'1D4ED8',10),fill:mkFill(rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:ot.toFixed(1),s:{font:mkFont(true,ot>0?COLORS.otFg:'64748B',10),fill:mkFill(ot>0?COLORS.otBg:rowBg),alignment:mkAlign('center','center'),border:mkBorder()}},
+        {v:C+base.toFixed(2),s:{font:mkFont(false,'374151',10),fill:mkFill(rowBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+        {v:C+otPay.toFixed(2),s:{font:mkFont(false,otPay>0?COLORS.otFg:'64748B',10),fill:mkFill(otPay>0?COLORS.otBg:rowBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+        {v:bonus>0?C+bonus.toFixed(2):'—',s:{font:mkFont(false,'374151',10),fill:mkFill(rowBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+        {v:expTotal!==0?C+expTotal.toFixed(2):'—',s:{font:mkFont(false,expTotal>0?COLORS.expFg:expTotal<0?'991B1B':'64748B',10),fill:mkFill(expTotal!==0?COLORS.expBg:rowBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+        {v:C+total.toFixed(2),s:{font:mkFont(true,COLORS.payFg,12),fill:mkFill(COLORS.payBg),alignment:mkAlign('right','center'),border:mkBorder()}},
+      ]);pr2++;
+    });
+    // Grand total
+    payData.push([
+      {v:'GRAND TOTAL',s:{font:mkFont(true,'FFFFFF',12),fill:mkFill('1E3A5F'),alignment:mkAlign('left','center'),border:mkBorder()}},
+      '','','','',
+      {v:'',s:{fill:mkFill('1E3A5F'),border:mkBorder()}},
+      {v:C+ptBase.toFixed(2),s:{font:mkFont(true,'FFFFFF',11),fill:mkFill('1E3A5F'),alignment:mkAlign('right','center'),border:mkBorder()}},
+      {v:C+ptOT.toFixed(2),s:{font:mkFont(true,'FFFFFF',11),fill:mkFill('1E3A5F'),alignment:mkAlign('right','center'),border:mkBorder()}},
+      {v:C+ptBonus.toFixed(2),s:{font:mkFont(true,'FFFFFF',11),fill:mkFill('1E3A5F'),alignment:mkAlign('right','center'),border:mkBorder()}},
+      {v:C+ptExp.toFixed(2),s:{font:mkFont(true,'FFFFFF',11),fill:mkFill('1E3A5F'),alignment:mkAlign('right','center'),border:mkBorder()}},
+      {v:C+ptTotal.toFixed(2),s:{font:mkFont(true,'FFFFFF',13),fill:mkFill('1E3A5F'),alignment:mkAlign('right','center'),border:mkBorder()}},
+    ]);
+    const payWS=XLSX.utils.aoa_to_sheet(payData.map(row=>Array.isArray(row)?row:[row]));
+    payWS['!merges']=[{s:{r:0,c:0},e:{r:0,c:10}},{s:{r:1,c:0},e:{r:1,c:10}},{s:{r:pr2,c:0},e:{r:pr2,c:4}}];
+    payWS['!cols']=[{wch:26},{wch:12},{wch:14},{wch:12},{wch:10},{wch:10},{wch:13},{wch:12},{wch:12},{wch:13},{wch:15}];
+    XLSX.utils.book_append_sheet(wb,payWS,'Payroll Summary');
+
+    // Download
+    const d=new Date().toISOString().slice(0,10);
+    const empLabel=empF?`_${scopeEmps[0]?.name?.replace(/\s+/g,'_')||'employee'}`:'';
+    const dateLabel=fromVal&&toVal?`_${fromVal}_to_${toVal}`:fromVal?`_from_${fromVal}`:toVal?`_to_${toVal}`:'';
+    XLSX.writeFile(wb,`OHM_Report${empLabel}${dateLabel}_${d}.xlsx`,{bookType:'xlsx',type:'binary'});
+    statusEl.innerHTML=`<span style="color:var(--grn);"><i class="fa-solid fa-circle-check"></i> Excel file downloaded — ${allDates.length} days, ${scopeEmps.length} employees, ${filtExp.length} expenses</span>`;
+  }catch(err){
+    statusEl.innerHTML=`<span style="color:var(--red);">Export failed: ${err.message}</span>`;
+    console.error('XLSX export error:',err);
   }
 }
 
