@@ -1774,6 +1774,7 @@ async function submitExp(){
   if(!merchant||!amt||!date){_submittingExp=false;toast('Please fill date, merchant and amount','e');return;}
   let fileUrl=null;
   if(_rcptFile){
+    if(_rcptFile.size>5*1024*1024){toast('Receipt must be under 5MB','e');_submittingExp=false;return;}
     const ext=_rcptFile.name.split('.').pop()||'jpg';
     const path=`receipts/${emp.id}/${Date.now()}.${ext}`;
     const {error}=await SB.storage.from('employee-docs').upload(path,_rcptFile,{upsert:true});
@@ -1869,6 +1870,7 @@ async function editAndResendExp(id){
       const merchant=document.getElementById('expMerchant').value.trim();
       const amt=parseFloat(document.getElementById('expAmt').value);
       if(!merchant||!amt){toast('Fill in merchant and amount','e');return;}
+  if(isNaN(parseFloat(amt))){toast('Amount must be a number','e');return;}
       const r=await SB.from('expenses').update({merchant,amount:amt,category:document.getElementById('expCat').value||null,notes:document.getElementById('expNotes').value||null,status:'pending',flagged:false,flag_note:null,date:document.getElementById('expDate').value,tags:document.getElementById('expVAT')&&document.getElementById('expVAT').checked?['VAT']:[]}).eq('id',id);
       if(r.error){toast(r.error.message,'e');return;}
       const idx=myExp.findIndex(x=>x.id===id);if(idx>=0){myExp[idx]={...myExp[idx],merchant,amount:amt,status:'pending',flagged:false,flag_note:null,tags:document.getElementById('expVAT')&&document.getElementById('expVAT').checked?['VAT']:[]};}
@@ -2305,7 +2307,11 @@ async function submitAttRequest(){
   const endStr=`${markEn.h}:${markEn.m}`;
   const startMins=parseInt(markSt.h)*60+parseInt(markSt.m);
   const endMins=parseInt(markEn.h)*60+parseInt(markEn.m);
-  if(endMins<=startMins){toast('End time must be after start time','e');_submittingAtt=false;return;}
+  // Warn if date is more than 30 days in the past
+  const _subDt=new Date(date+'T00:00:00');
+  const _daysAgo=Math.floor((new Date()-_subDt)/(1000*60*60*24));
+  if(_daysAgo>30&&!confirm('This date is '+_daysAgo+' days ago. Submit anyway?')){_submittingAtt=false;return;}
+    if(endMins<=startMins){toast('End time must be after start time','e');_submittingAtt=false;return;}
   const hours=parseFloat(((endMins-startMins)/60).toFixed(1));
   const [_ssh,_ssm]=STD_START.split(':').map(Number);
   const [_seh,_sem]=STD_END.split(':').map(Number);
@@ -2419,7 +2425,7 @@ async function tryAutoLogin(){
     if(cfgR.data)cfg=cfgR.data;
     if(!r.error&&r.data&&r.data.status==='Active'&&r.data.pin){
       allEmps=[r.data];
-      await enterApp(r.data);
+      try{await enterApp(r.data);}catch(e){console.error('enterApp error:',e);}
       return;
     }
     // PIN was cleared, employee deactivated, or record missing — force re-login
