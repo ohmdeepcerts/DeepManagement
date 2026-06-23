@@ -338,6 +338,28 @@ tr.rsun td{background:var(--sut)!important;}
 .qd{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all 0.15s;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff;}
 .qd:hover{transform:scale(1.2);}
 .qd.active{border-color:var(--txt);transform:scale(1.15);}
+/* ── Option A: Gradient row colours by status ── */
+.mr-P td{background:linear-gradient(90deg,#bbf7d0 0%,#dcfce7 40%,var(--card) 80%)!important;}
+.mr-A td{background:linear-gradient(90deg,#fecaca 0%,#fee2e2 40%,var(--card) 80%)!important;}
+.mr-HD td{background:linear-gradient(90deg,#fde68a 0%,#fef9c3 40%,var(--card) 80%)!important;}
+.mr-L td{background:linear-gradient(90deg,#ddd6fe 0%,#ede9fe 40%,var(--card) 80%)!important;}
+.mr-S td{background:linear-gradient(90deg,#fed7aa 0%,#ffedd5 40%,var(--card) 80%)!important;}
+.mr-H td{background:linear-gradient(90deg,#fbcfe8 0%,#fce7f3 40%,var(--card) 80%)!important;}
+.mr-LA td{background:linear-gradient(90deg,#fde68a 0%,#fef9c3 40%,var(--card) 80%)!important;}
+.mr-EL td{background:linear-gradient(90deg,#fed7aa 0%,#ffedd5 40%,var(--card) 80%)!important;}
+.mr-UL td{background:linear-gradient(90deg,#e2e8f0 0%,#f1f5f9 40%,var(--card) 80%)!important;}
+/* Glow dot next to status label */
+.st-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.st-dot-P{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,0.2);}
+.st-dot-A{background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,0.2);}
+.st-dot-HD{background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,0.2);}
+.st-dot-L{background:#a855f7;box-shadow:0 0 0 3px rgba(168,85,247,0.2);}
+.st-dot-S{background:#f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.2);}
+.st-dot-H{background:#ec4899;box-shadow:0 0 0 3px rgba(236,72,153,0.2);}
+.st-dot-LA{background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,0.2);}
+.st-dot-EL{background:#f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.2);}
+.st-dot-UL{background:#94a3b8;box-shadow:0 0 0 3px rgba(148,163,184,0.2);}
+.st-dot-nm{background:#cbd5e1;}
 .qd-P{background:#16a34a;}.qd-A{background:#dc2626;}.qd-HD{background:#d97706;}.qd-m{background:#64748b;font-size:12px;}
 .pb{height:5px;background:var(--bdr);border-radius:3px;overflow:hidden;margin-top:4px;}
 .pf{height:100%;border-radius:3px;transition:width 0.5s;}
@@ -2882,7 +2904,9 @@ function buildMarkTable(){
     const sOpts=`<option value="">— Not Marked —</option>`+STATUSES.map(s=>`<option value="${s.c}"${st===s.c?' selected':''}>${s.c} – ${s.l}</option>`).join('')+`<option value="CLEAR">✕ Clear / Remove</option>`;
     const wkLbl=iS?'<span style="font-size:9px;color:#4338ca;font-weight:700;background:#e0e7ff;padding:1px 4px;border-radius:3px;margin-left:3px;">SUN</span>':isA?'<span style="font-size:9px;color:#7c3aed;font-weight:700;background:#ede9fe;padding:1px 4px;border-radius:3px;margin-left:3px;">SAT</span>':'';
     const notMarkedCls=!st?' style="opacity:0.65;"':'';
-    return`<tr class="${rowCls}" id="mr-${emp.id}"${notMarkedCls}>
+    const stRowCls=st?`mr-${st}`:'';
+    const dotCls=st?`st-dot st-dot-${st}`:'st-dot st-dot-nm';
+    return`<tr class="${rowCls} ${stRowCls}" id="mr-${emp.id}"${notMarkedCls}>
       <td><div style="display:flex;align-items:center;gap:5px;"><span class="ava" style="background:${avcol(emp.id)}">${inits(emp.name)}</span><strong style="font-size:13px;">${emp.name}</strong>${wkLbl}</div></td>
       <td><div style="display:flex;flex-direction:column;gap:3px;">
         <div class="qs">
@@ -2891,7 +2915,10 @@ function buildMarkTable(){
           <span class="qd qd-HD${st==='HD'?' active':''}" title="Half Day" onclick="qMark('${emp.id}','HD')"></span>
           <span class="qd qd-m${['L','S','H','LA','EL','UL'].includes(st)?' active':''}" title="More" onclick="tMore('${emp.id}')">···</span>
         </div>
-        <select data-eid="${emp.id}" data-f="status" id="st-${emp.id}" onchange="onMC(this)" style="font-size:11px;padding:3px 4px;${!st?'color:var(--txtm);font-style:italic;':''}">${sOpts}</select>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:2px;">
+          <span class="${dotCls}" id="sd-${emp.id}"></span>
+          <select data-eid="${emp.id}" data-f="status" id="st-${emp.id}" onchange="onMC(this)" style="font-size:11px;padding:3px 4px;${!st?'color:var(--txtm);font-style:italic;':''}">${sOpts}</select>
+        </div>
       </div></td>
       <td><input type="time" value="${rec?.sign_in||''}" data-default="${dIn}" data-eid="${emp.id}" data-f="sign_in" id="si-${emp.id}" onchange="onMC(this)"></td>
       <td><input type="time" value="${rec?.sign_out||''}" data-default="${dOut}" data-eid="${emp.id}" data-f="sign_out" id="so-${emp.id}" onchange="onMC(this)"></td>
@@ -2907,7 +2934,17 @@ function qMark(empId,status){
   _touched.add(empId);
   const sSel=document.getElementById(`st-${empId}`);if(sSel){sSel.value=status;sSel.style.color='';sSel.style.fontStyle='';sSel.size=1;}
   const row=document.getElementById(`mr-${empId}`);
-  if(row){row.style.opacity='1';row.querySelectorAll('.qd').forEach(d=>d.classList.remove('active'));row.querySelector(`.qd-${['P','A','HD'].includes(status)?status:'m'}`)?.classList.add('active');}
+  if(row){
+    row.style.opacity='1';
+    row.querySelectorAll('.qd').forEach(d=>d.classList.remove('active'));
+    row.querySelector(`.qd-${['P','A','HD'].includes(status)?status:'m'}`)?.classList.add('active');
+    // Swap gradient class
+    row.className=row.className.replace(/\bmr-\S+/g,'').trim();
+    if(status)row.classList.add(`mr-${status}`);
+    // Swap glow dot
+    const dot=document.getElementById(`sd-${empId}`);
+    if(dot){dot.className=`st-dot${status?' st-dot-'+status:' st-dot-nm'}`;}
+  }
   const si=document.getElementById(`si-${empId}`);
   const so=document.getElementById(`so-${empId}`);
   const hr=document.getElementById(`hr-${empId}`);
@@ -2959,6 +2996,12 @@ function onMC(el){
       else if(el.value==='A')row.querySelector('.qd-A')?.classList.add('active');
       else if(el.value==='HD')row.querySelector('.qd-HD')?.classList.add('active');
       else if(el.value)row.querySelector('.qd-m')?.classList.add('active');
+      // Swap gradient class
+      row.className=row.className.replace(/\bmr-\S+/g,'').trim();
+      if(el.value)row.classList.add(`mr-${el.value}`);
+      // Swap glow dot
+      const dot=document.getElementById(`sd-${empId}`);
+      if(dot){dot.className=`st-dot${el.value?' st-dot-'+el.value:' st-dot-nm'}`;}
       // Clear times/hours/OT when switching to non-present statuses
       const isPresent=['P','HD','LA','EL'].includes(el.value);
       if(!isPresent){
