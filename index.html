@@ -1847,13 +1847,15 @@ function calculatePayrollForEmployeeMonth(employeeId,month,year){
         return s+rate;
       },0);
     } else if(pt==='fixed'){
-      // Expected = sum of daily-equivalent for each present day (using historical rate per day)
+      // Expected = sum of daily-equivalent for each present day
+      // MUST round per-day to 2dp to match calcPay — prevents phantom deductions
       expectedBase=aR.reduce((s,r)=>{
         const rate=getRateForDate(emp,'fixed',r.date);
         const d=new Date(r.date+'T00:00:00');
         const wd=workDaysInMonth(emp,d.getFullYear(),d.getMonth());
-        return s+(wd>0?rate/wd:0);
+        return s+parseFloat((wd>0?rate/wd:0).toFixed(2));
       },0);
+      expectedBase=parseFloat(expectedBase.toFixed(2));
     }
   } else if(pt==='hourly'&&emp.contracted_hours&&emp.hourly_rate){
     const ch=parseFloat(emp.contracted_hours)||8;
@@ -1863,7 +1865,7 @@ function calculatePayrollForEmployeeMonth(employeeId,month,year){
       return s+ch*rate;
     },0);
   }
-  const deductionTotal=Math.max(0,parseFloat((expectedBase-basePay).toFixed(2)));
+  const deductionTotal=Math.max(0,parseFloat((parseFloat(expectedBase.toFixed(2))-parseFloat(basePay.toFixed(2))).toFixed(2)));
   const grossPay=parseFloat((expectedBase+overtimePay+bonusPay).toFixed(2));
 
   // Expenses — all statuses included (matches renderPayroll and ledger display)
@@ -1884,6 +1886,10 @@ function calculatePayrollForEmployeeMonth(employeeId,month,year){
   const psKey=`${employeeId}_${month}_${year}`;
   const ps=paymentStatuses[psKey]||{};
 
+  // is_partial: true if current month and today is not the last day
+  const now=new Date();
+  const isCurrentMonth=(now.getFullYear()===year&&now.getMonth()===month);
+  const isPartial=isCurrentMonth;
   return{
     employee_id:employeeId,
     month,year,
@@ -1901,7 +1907,9 @@ function calculatePayrollForEmployeeMonth(employeeId,month,year){
     bank_amount:parseFloat(bankAmt.toFixed(2)),
     cash_amount:cashAmt,
     bank_paid:!!ps.bank_paid,
-    cash_paid:!!ps.cash_paid
+    cash_paid:!!ps.cash_paid,
+    is_partial:isPartial,
+    calculated_at:new Date().toISOString()
   };
 }
 
@@ -1931,6 +1939,43 @@ async function savePayrollSummary(employeeId,month,year,opts){
 // Recalculate one employee's payroll for one month — call after attendance/expense/salary changes
 async function recalcEmployeeMonth(employeeId,month,year){
   return await savePayrollSummary(employeeId,month,year);
+}
+
+// ── CENTRAL INVALIDATION — call this whenever attendance/expenses/settings change
+// Queues a background recalculate + save so all pages see fresh data
+const _invalidateQ=new Set();
+let _invalidateTimer=null;
+function invalidatePayroll(employeeId,month,year){
+  const key=`${employeeId}_${month}_${year}`;
+  _invalidateQ.add(key);
+  if(_invalidateTimer)clearTimeout(_invalidateTimer);
+  _invalidateTimer=setTimeout(async()=>{
+    const keys=[..._invalidateQ];_invalidateQ.clear();
+    for(const k of keys){
+      const[eid,mo,yr]=k.split('_');
+      await savePayrollSummary(eid,parseInt(mo),parseInt(yr));
+    }
+    // Re-render active page if relevant
+    if(currentPage==='payroll')renderPayroll();
+    if(currentPage==='dashboard')renderDashboard();
+    if(currentPage==='yearly')renderYearly();
+  },800);
+}
+
+// Invalidate all employees for a month (e.g. settings change)
+function invalidatePayrollMonth(month,year){
+  employees.filter(e=>e.status==='Active').forEach(e=>invalidatePayroll(e.id,month,year));
+}
+
+// Invalidate all months from a date onwards for one employee (salary change)
+function invalidatePayrollFromDate(employeeId,fromDate){
+  const d=new Date(fromDate+'T00:00:00');
+  const now=new Date();
+  let y=d.getFullYear(),m=d.getMonth();
+  while(y<now.getFullYear()||(y===now.getFullYear()&&m<=now.getMonth())){
+    invalidatePayroll(employeeId,m,y);
+    m++;if(m>11){m=0;y++;}
+  }
 }
 
 // Recalculate every month from a given date through the current month for one employee
@@ -2171,6 +2216,7 @@ async function sbUpdate(table,id,data){
 async function sbUpsertAtt(rec){
   setSyncStatus('saving');
   const r=await sb.from('attendance').upsert(rec,{onConflict:'employee_id,date'});
+  if(!r.error){const _d=new Date(rec.date+'T00:00:00');invalidatePayroll(rec.employee_id,_d.getMonth(),_d.getFullYear());}
   if(r.error){setSyncStatus('err');console.error('Att upsert:',r.error);return false;}
   setSyncStatus('saved');return true;
 }
@@ -2359,18 +2405,34 @@ function renderDashboard(){
   const prevTotalExp=prevScopeExp.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   const vatTotal=scopeExpenses.filter(r=>r.tags?.includes('VAT')).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
 
-  // Payroll
+  // Payroll — read from saved payroll_summary rows (single source of truth)
+  // Falls back to live calcPay only if no saved row exists yet (new month / not yet calculated)
   let payrollEst=0,baseTotal=0,otTotal=0,bonusTotal=0,prevPayrollEst=0;
   scopeEmps.forEach(emp=>{
-    const recs=scopeMRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
-    recs.forEach(r=>{const p=calcPay(emp,r);baseTotal+=p.base;otTotal+=p.ot;payrollEst+=p.total;});
-    const bn=scopeMRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-    bonusTotal+=bn;payrollEst+=bn;
-    payrollEst+=scopeExpenses.filter(e=>e.employee_id===emp.id).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
-    const pR=scopePrevMRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
-    pR.forEach(r=>{const p=calcPay(emp,r);prevPayrollEst+=p.total;});
-    prevPayrollEst+=scopePrevMRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-    prevPayrollEst+=prevScopeExp.filter(e=>e.employee_id===emp.id).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+    const savedRow=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===month&&p.year===year);
+    if(savedRow){
+      baseTotal+=parseFloat(savedRow.base_pay)||0;
+      otTotal+=parseFloat(savedRow.overtime_pay)||0;
+      bonusTotal+=parseFloat(savedRow.bonus_pay)||0;
+      payrollEst+=parseFloat(savedRow.net_pay)||0;
+    } else {
+      // No saved row yet — calculate live and trigger background save
+      const recs=scopeMRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
+      recs.forEach(r=>{const p=calcPay(emp,r);baseTotal+=p.base;otTotal+=p.ot;payrollEst+=p.total;});
+      const bn=scopeMRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
+      bonusTotal+=bn;payrollEst+=bn;
+      payrollEst+=scopeExpenses.filter(e=>e.employee_id===emp.id).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      invalidatePayroll(emp.id,month,year);
+    }
+    const prevRow=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===pm&&p.year===py);
+    if(prevRow){
+      prevPayrollEst+=parseFloat(prevRow.net_pay)||0;
+    } else {
+      const pR=scopePrevMRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
+      pR.forEach(r=>{const p=calcPay(emp,r);prevPayrollEst+=p.total;});
+      prevPayrollEst+=scopePrevMRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
+      prevPayrollEst+=prevScopeExp.filter(e=>e.employee_id===emp.id).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+    }
   });
 
   const pendingExp=batches.filter(b=>b.status==='pending').length;
@@ -3083,6 +3145,7 @@ async function saveAttSilent(){
   if(toSave.length===0)return;
   setSyncStatus('saving');
   const results=await Promise.all(toSave.map(r=>sb.from('attendance').upsert(r,{onConflict:'employee_id,date'}).select().single()));
+  results.forEach((res,i)=>{if(!res.error){const r=toSave[i];const _d=new Date(r.date+'T00:00:00');invalidatePayroll(r.employee_id,_d.getMonth(),_d.getFullYear());}});
   const hasErr=results.some(r=>r.error);
   if(hasErr){setSyncStatus('err');console.error('Att save errors:',results.filter(r=>r.error).map(r=>r.error));return;}
   // Update local state
@@ -3122,6 +3185,7 @@ async function saveAllAttendance(){
   if(toSave.length===0&&clearedEmpIds.length===0){toast('Nothing to save','i');return;}
   setSyncStatus('saving');
   const results=toSave.length?await Promise.all(toSave.map(r=>sb.from('attendance').upsert(r,{onConflict:'employee_id,date'}).select().single())):[];
+  results.forEach((res,i)=>{if(toSave[i]&&!res.error){const r=toSave[i];const _d=new Date(r.date+'T00:00:00');invalidatePayroll(r.employee_id,_d.getMonth(),_d.getFullYear());}});
   const hasErr=results.some(r=>r.error);
   if(hasErr){setSyncStatus('err');toast('Some records failed to save','e');console.error(results.filter(r=>r.error));return;}
   results.forEach(r=>{if(!r.data)return;const idx=attendance.findIndex(a=>a.employee_id===r.data.employee_id&&a.date===r.data.date);if(idx>=0)attendance[idx]=r.data;else attendance.push(r.data);});
@@ -3780,8 +3844,10 @@ async function renderEmpReport(){
   const pct=wD>0?Math.round(present/wD*100):0;
   const suns=mRecs.filter(r=>isSun(new Date(r.date+'T00:00:00'))&&isP(r.status));
   const C=cur();
-  const recOT=mRecs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).ot,0);
-  const totalPay=mRecs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).base,0)+recOT+totalBonus;
+  // Use saved payroll_summary for totals — single source of truth
+  const _erSav=payrollSummaries.find(p=>p.employee_id===empId&&p.month===month&&p.year===year);
+  const recOT=_erSav?(parseFloat(_erSav.overtime_pay)||0):mRecs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).ot,0);
+  const totalPay=_erSav?(parseFloat(_erSav.base_pay)||0)+recOT+totalBonus:mRecs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).base,0)+recOT+totalBonus;
   // Gross pay = what they'd earn if all days were full contracted hours (no deductions)
   var grossPay=totalPay;
   var totalHoursDeduction=0;
@@ -3790,8 +3856,8 @@ async function renderEmpReport(){
     var dr=parseFloat(emp.daily_rate)||0;
     var fullDayRecs=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';});
     grossPay=fullDayRecs.length*parseFloat(dr.toFixed(2))+recOT+totalBonus;
-    var actualBase=fullDayRecs.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
-    totalHoursDeduction=Math.max(0,parseFloat((fullDayRecs.length*parseFloat(dr.toFixed(2))-actualBase).toFixed(2)));
+    var actualBase=_erSav?(parseFloat(_erSav.base_pay)||0):fullDayRecs.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
+    totalHoursDeduction=_erSav?(parseFloat(_erSav.deduction_total)||0):Math.max(0,parseFloat((fullDayRecs.length*parseFloat(dr.toFixed(2))-actualBase).toFixed(2)));
   } else if(emp.pay_type==='fixed'&&emp.salary&&emp.contracted_hours){
     // Fixed salary: gross = what they'd earn if they worked all contracted hours for days present
     var ch=parseFloat(emp.contracted_hours)||8;
@@ -3802,8 +3868,8 @@ async function renderEmpReport(){
     var fullDayRecs2=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';});
     var roundedDailyEq=parseFloat(dailyEq.toFixed(2));
     grossPay=fullDayRecs2.length*roundedDailyEq+recOT+totalBonus;
-    var actualBase2=fullDayRecs2.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
-    totalHoursDeduction=Math.max(0,parseFloat((grossPay-actualBase2-recOT-totalBonus).toFixed(2)));
+    var actualBase2=_erSav?(parseFloat(_erSav.base_pay)||0):fullDayRecs2.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
+    totalHoursDeduction=_erSav?(parseFloat(_erSav.deduction_total)||0):Math.max(0,parseFloat((grossPay-actualBase2-recOT-totalBonus).toFixed(2)));
   } else if(emp.pay_type==='hourly'&&emp.hourly_rate&&emp.contracted_hours){
     var ch2=parseFloat(emp.contracted_hours)||8;
     var hr=parseFloat(emp.hourly_rate)||0;
@@ -4112,7 +4178,9 @@ function printTimesheet(){
   var expSection='';
   if(showExp&&mExp.length>0){
     const hasRate=(emp.pay_type==='fixed'&&emp.salary)||(emp.pay_type==='daily'&&emp.daily_rate)||emp.hourly_rate;
-    const totalPay2=attendance.filter(function(r){var d=new Date(r.date+'T00:00:00');return r.employee_id===empId&&d.getMonth()===month&&d.getFullYear()===year&&(r.status==='P'||r.status==='HD'||r.status==='LA');}).reduce(function(s,r){return s+calcPay(emp,r).base;},0);
+    const totalPay2=attendance.filter(function(r){var d=new Date(r.date+'T00:00:00');return r.employee_id===empId&&d.getMonth()===month&&d.getFullYear()===year&&isP(r.status);});
+    const _ptSav=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===mo&&p.year===yr);
+    const totalBase=_ptSav?(parseFloat(_ptSav.base_pay)||0):mRecs.filter(r=>isP(r.status)).reduce(function(s,r){return s+calcPay(emp,r).base;},0);
     expSection='<div style="page-break-before:always;font-family:sans-serif;padding:20px;">'
       +'<div style="text-align:center;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:8px;">'
       +'<strong style="font-size:15px;">'+(cfg.company||'DAM Pro')+'</strong><br>'
@@ -4165,8 +4233,10 @@ function renderYearly(){
     const ot=recs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
     const bonus=recs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
     const suns=recs.filter(r=>isSun(new Date(r.date+'T00:00:00'))&&isP(r.status)).length;
-    const recPay=recs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).total,0);
-    const gross=recPay+bonus; // fixed salary already included in recPay
+    // Use saved payroll_summary if available — single source of truth
+    const _ySaved=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===month&&p.year===selYear);
+    const recPay=_ySaved?(parseFloat(_ySaved.base_pay)||0)+(parseFloat(_ySaved.overtime_pay)||0):recs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).total,0);
+    const gross=_ySaved?(parseFloat(_ySaved.gross_pay)||0):(recPay+bonus);
     const pct=empYWD>0?Math.round(present/empYWD*100):0;const pc=pct>=80?'var(--grn)':pct>=60?'var(--amb)':'var(--red)';
     const mB=MONTHS.map((_,mi)=>recs.filter(r=>new Date(r.date+'T00:00:00').getMonth()===mi&&isWD(new Date(r.date+'T00:00:00'))&&isP(r.status)).length);
     return`<tr><td><span class="ava" style="background:${avcol(emp.id)}">${inits(emp.name)}</span>${emp.name}</td>${mB.map(n=>`<td style="text-align:center;font-size:11px;color:${n>20?'var(--grn)':n>0?'var(--txt2)':'var(--txtm)'}">${n||'—'}</td>`).join('')}<td style="font-weight:700;color:var(--grn);">${present}</td><td style="font-weight:700;color:var(--red);">${absent}</td><td style="font-weight:700;">${totalH.toFixed(0)}h</td><td style="font-weight:700;color:var(--amb);">${ot.toFixed(0)}h</td><td style="color:#4338ca;font-weight:700;">${suns}</td><td style="font-weight:700;color:var(--grn);">${emp.pay_type||emp.hourly_rate?C+gross.toFixed(0):'—'}</td><td style="font-weight:700;color:${pc};">${pct}%</td></tr>`;
@@ -4283,11 +4353,13 @@ function renderPayroll(){
     var contrH=parseFloat(emp.contracted_hours)||8;
     var fullDays=aR.filter(function(r){return r.status==='P'||r.status==='LA';}).length;
     var dedAmt=deductionTotal!=null?deductionTotal:0;
-    var shortfallH=(pt==='daily'&&deductionTotal==null)?Math.max(0,contrH*fullDays-totalHFinal):0;
-    var shortfallAmt=deductionTotal!=null?deductionTotal:(shortfallH>0?parseFloat(((shortfallH*(parseFloat(emp.daily_rate)||0)/contrH)).toFixed(2)):0);
+    // Always use saved deduction_total — never recalculate independently
+    var shortfallH=0;
+    var shortfallAmt=deductionTotal!=null?parseFloat(deductionTotal):0;
     if(pt==='fixed'){
-      var fixedShortAmt=deductionTotal!=null?deductionTotal:Math.max(0,parseFloat(((parseFloat(emp.salary)||0)-basePay).toFixed(2)));
-      return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+(fixedShortAmt>0?'<span style=\'color:var(--red)\'>−'+C+fixedShortAmt.toFixed(2)+' deducted</span>':'monthly salary')+'</span>';
+      // Always use deduction_total from saved payroll_summary — single source of truth
+      var fixedShortAmt=deductionTotal!=null?parseFloat(deductionTotal):0;
+      return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+(fixedShortAmt>0.01?'<span style=\'color:var(--red)\'>−'+C+fixedShortAmt.toFixed(2)+' deducted</span>':'monthly salary')+'</span>';
     }
     if(pt==='daily')return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+aR.length+' days</span>'+(shortfallAmt>0?'<br><span style="font-size:10px;color:var(--red);font-weight:600;">-'+C+shortfallAmt.toFixed(2)+(shortfallH>0?' ('+shortfallH.toFixed(1)+'h short)':'')+'</span>':'');
     return C+basePay.toFixed(2)+'<br><span style="font-size:10px;color:var(--txtm);">'+totalHFinal.toFixed(1)+'h</span>';
@@ -4324,7 +4396,7 @@ function renderPayroll(){
       </td>
     </tr>`;
   });
-  rows+=`<tr class="pl-tot"><td colspan="3" style="text-align:right;padding-right:11px;">TOTALS</td><td style="font-weight:700;color:var(--grn);">${C}${gBase.toFixed(2)}</td><td style="font-weight:700;color:var(--amb);">${C}${gOT.toFixed(2)}</td><td style="font-weight:700;color:var(--grn);">${C}${gBonus.toFixed(2)}</td><td style="font-weight:700;color:var(--tel);">${C}${gExp.toFixed(2)}</td><td style="font-weight:700;color:var(--grn);font-size:14px;">${C}${gTotal.toFixed(2)}</td><td><div style="font-size:12px;line-height:1.7;"><div><i class="fa-solid fa-building-columns" style="color:var(--tel);font-size:10px;margin-right:3px;"></i><strong>${C}${gBank.toFixed(2)}</strong> bank</div><div><i class="fa-solid fa-money-bill-wave" style="color:var(--grn);font-size:10px;margin-right:3px;"></i><strong>${C}${gCash.toFixed(2)}</strong> cash</div></div></td></tr>`;
+  rows+=`<tr class="pl-tot"><td colspan="3" style="text-align:right;padding-right:11px;">TOTALS</td><td style="font-weight:700;color:var(--grn);">${C}${gBase.toFixed(2)}</td><td style="font-weight:700;color:var(--amb);">${C}${gOT.toFixed(2)}</td><td style="font-weight:700;color:var(--grn);">${C}${gBonus.toFixed(2)}</td><td style="font-weight:700;color:${gExp<0?'var(--red)':`var(--tel)`};">${gExp<0?'-'+C+Math.abs(gExp).toFixed(2):C+gExp.toFixed(2)}</td><td style="font-weight:700;color:var(--grn);font-size:14px;">${C}${gTotal.toFixed(2)}</td><td><div style="font-size:12px;line-height:1.7;"><div><i class="fa-solid fa-building-columns" style="color:var(--tel);font-size:10px;margin-right:3px;"></i><strong>${C}${gBank.toFixed(2)}</strong> bank</div><div><i class="fa-solid fa-money-bill-wave" style="color:var(--grn);font-size:10px;margin-right:3px;"></i><strong>${C}${gCash.toFixed(2)}</strong> cash</div></div></td></tr>`;
   const totalH2=mRecs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
   const totalOT2=mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
   document.getElementById('prStats').innerHTML=`<div class="sc b"><div class="sc-lbl">Total Hours</div><div class="sc-val">${totalH2.toFixed(0)}</div><div class="sc-sub">${MONTHS[m]} ${y}</div><i class="fa-solid fa-clock sc-ico"></i></div><div class="sc a"><div class="sc-lbl">OT Hours</div><div class="sc-val">${totalOT2.toFixed(0)}</div><i class="fa-solid fa-hourglass-half sc-ico"></i></div><div class="sc tl"><div class="sc-lbl">To Bank (all)</div><div class="sc-val">${C}${gBank.toFixed(0)}</div><i class="fa-solid fa-building-columns sc-ico"></i></div><div class="sc g"><div class="sc-lbl">Total Payable</div><div class="sc-val">${C}${gTotal.toFixed(0)}</div><div class="sc-sub">${C}${gCash.toFixed(0)} cash</div><i class="fa-solid fa-sterling-sign sc-ico"></i></div>`;
@@ -4392,9 +4464,11 @@ function exportPayrollCSV(){
   emps.forEach(emp=>{
     const recs=mRecs.filter(r=>r.employee_id===emp.id);const aR=recs.filter(r=>isP(r.status));
     const pt=emp.pay_type||'hourly';
-    let base=0;aR.forEach(r=>{base+=calcPay(emp,r).base;});
-    let otP=0;aR.forEach(r=>{otP+=calcPay(emp,r).ot;});
-    const bonus=recs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
+    const _csvSav=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===m&&p.year===y);
+    let base=_csvSav?(parseFloat(_csvSav.base_pay)||0):0;
+    let otP=_csvSav?(parseFloat(_csvSav.overtime_pay)||0):0;
+    if(!_csvSav){aR.forEach(r=>{base+=calcPay(emp,r).base;});aR.forEach(r=>{otP+=calcPay(emp,r).ot;});}
+    const bonus=_csvSav?(parseFloat(_csvSav.bonus_pay)||0):recs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
     const empExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===emp.id&&d.getMonth()===m&&d.getFullYear()===y;});
     const expAmt=empExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
     const total=base+otP+bonus+expAmt;const bank=Math.min(parseFloat(emp.bank_amt)||0,total);
@@ -4784,7 +4858,7 @@ async function saveEmployee(){
       if(idx2>=0)employees[idx2][rateField]=newRate;
       const histRow={employee_id:saved.id,pay_type:pt3,old_rate:0,new_rate:newRate,effective_from:fromDate,notes:'Initial rate'};
       const hr=await sb.from('salary_history').insert(histRow).select().single();
-      if(!hr.error)salaryHistory.unshift(hr.data);
+      if(!hr.error){salaryHistory.unshift(hr.data);invalidatePayrollFromDate(emp.id,histRow.effective_from||new Date().toISOString().slice(0,10));}
     }
     // Photo is included in main save above
     toast(`${name} added!`,'s');
@@ -5218,6 +5292,9 @@ async function saveSettings(){
     rate_sun:parseFloat(document.getElementById('sSun').value)||1.0,
   });
   toast('Settings saved!','s');
+  // Invalidate payroll for current + previous month — rate changes affect calculations
+  const _sNow=new Date();
+  invalidatePayrollMonth(_sNow.getMonth(),_sNow.getFullYear());
 }
 function renderBankList(){
   const accounts=cfg.bank_accounts||[];
@@ -5507,6 +5584,7 @@ async function savePayRise(){
   const hr=await sb.from('salary_history').insert(histRow).select().single();
   if(hr.error){toast(hr.error.message,'e');return;}
   salaryHistory.unshift(hr.data);
+  invalidatePayrollFromDate(histRow.employee_id,histRow.effective_from||new Date().toISOString().slice(0,10));
   // Update employee current rate field
   const rateField=pt==='fixed'?'salary':pt==='daily'?'daily_rate':'hourly_rate';
   const r=await sb.from('employees').update({[rateField]:newRate}).eq('id',empId).select().single();
@@ -5548,6 +5626,7 @@ async function editSalaryHistEntry(histId){
   if(dateStr===null)return;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)){toast('Invalid date format — use YYYY-MM-DD','e');return;}
   const r=await sb.from('salary_history').update({new_rate:newRate,effective_from:dateStr,notes:'Manually corrected'}).eq('id',histId).select().single();
+  if(!r.error){const _sh=salaryHistory.find(h=>h.id===histId);if(_sh)invalidatePayrollFromDate(_sh.employee_id,dateStr||_sh.effective_from);}
   if(r.error){toast(r.error.message,'e');return;}
   const idx=salaryHistory.findIndex(x=>x.id===histId);
   if(idx>=0)salaryHistory[idx]=r.data;
@@ -5833,7 +5912,7 @@ async function reviewAttReq(id,status,officeNote){
   const attStatus=isLate&&isEarlyLeave?'LA':isLate?'LA':isEarlyLeave?'EL':'P';
     const attRec={employee_id:req.employee_id,date:req.date,status:attStatus,sign_in:req.sign_in,sign_out:req.sign_out,hours:req.hours,overtime:(function(){var e=employees.find(function(x){return x.id===req.employee_id;});var t=e&&e.ot_threshold!=null&&parseFloat(e.ot_threshold)>0?parseFloat(e.ot_threshold):(parseFloat(cfg.ot_threshold)||8);return Math.max(0,parseFloat(req.hours||0)-t);})()
 ,notes:req.employee_note};
-    const ua=await sb.from('attendance').upsert(attRec,{onConflict:'employee_id,date'}).select().single();
+    const ua=await sb.from('attendance').upsert(attRec,{onConflict:'employee_id,date'}).select().single();if(!ua.error){const _ad=new Date(attRec.date+'T00:00:00');invalidatePayroll(attRec.employee_id,_ad.getMonth(),_ad.getFullYear());}
     if(!ua.error){const ai=attendance.findIndex(a=>a.employee_id===req.employee_id&&a.date===req.date);if(ai>=0)attendance[ai]=ua.data;else attendance.push(ua.data);}
     toast('Approved and attendance saved!','s');
   } else if(status==='rejected'){toast('Request rejected','i');}
@@ -6269,8 +6348,11 @@ async function doExportXLSX(){
       const hrs=ea.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
       const otH=ea.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
       const bon=ea.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-      let base=0,otPay=0;
-      pRecs.forEach(rec=>{const p=calcPay(emp,rec);base+=p.base;otPay+=p.ot;});
+      // Use saved payroll_summary — single source of truth
+      const _xSav=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===month&&p.year===year);
+      let base=_xSav?(parseFloat(_xSav.base_pay)||0):0;
+      let otPay=_xSav?(parseFloat(_xSav.overtime_pay)||0):0;
+      if(!_xSav)pRecs.forEach(rec=>{const p=calcPay(emp,rec);base+=p.base;otPay+=p.ot;});
       const expT=ee.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
       const total=base+otPay+bon+expT;
       gt.base+=base;gt.ot+=otPay;gt.bon+=bon;gt.exp+=expT;gt.total+=total;
@@ -6397,8 +6479,11 @@ async function doExportXLSX(){
       const hrs=ea.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
       const otH=ea.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
       const bon=ea.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-      let base=0,otPay=0;
-      pRecs.forEach(rec=>{const p=calcPay(emp,rec);base+=p.base;otPay+=p.ot;});
+      // Use saved payroll_summary — single source of truth
+      const _xSav=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===month&&p.year===year);
+      let base=_xSav?(parseFloat(_xSav.base_pay)||0):0;
+      let otPay=_xSav?(parseFloat(_xSav.overtime_pay)||0):0;
+      if(!_xSav)pRecs.forEach(rec=>{const p=calcPay(emp,rec);base+=p.base;otPay+=p.ot;});
       const expT=ee.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
       const total=base+otPay+bon+expT;
       pg.base+=base;pg.ot+=otPay;pg.bon+=bon;pg.exp+=expT;pg.total+=total;
