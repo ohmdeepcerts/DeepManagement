@@ -2908,10 +2908,26 @@ function qMark(empId,status){
   const sSel=document.getElementById(`st-${empId}`);if(sSel){sSel.value=status;sSel.style.color='';sSel.style.fontStyle='';sSel.size=1;}
   const row=document.getElementById(`mr-${empId}`);
   if(row){row.style.opacity='1';row.querySelectorAll('.qd').forEach(d=>d.classList.remove('active'));row.querySelector(`.qd-${['P','A','HD'].includes(status)?status:'m'}`)?.classList.add('active');}
-  const si=document.getElementById(`si-${empId}`),so=document.getElementById(`so-${empId}`);
-  if(isP(status)){if(si&&!si.value)si.value=si.dataset.default;if(so&&!so.value)so.value=so.dataset.default;if(status==='HD'&&si?.value){const[h,m]=si.value.split(':').map(Number),t=(h*60+m)+240;so.value=String(Math.min(Math.floor(t/60),23)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');}}
-  else if(['A','UL'].includes(status)){if(si)si.value='';if(so)so.value='';}
-  recalcHOT(empId);
+  const si=document.getElementById(`si-${empId}`);
+  const so=document.getElementById(`so-${empId}`);
+  const hr=document.getElementById(`hr-${empId}`);
+  const ot=document.getElementById(`ot-${empId}`);
+  if(isP(status)){
+    // Present/HD/LA/EL — auto-fill times if empty
+    if(si&&!si.value)si.value=si.dataset.default||'';
+    if(so&&!so.value)so.value=so.dataset.default||'';
+    if(status==='HD'&&si?.value){
+      const[h,m]=si.value.split(':').map(Number),t=(h*60+m)+240;
+      so.value=String(Math.min(Math.floor(t/60),23)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
+    }
+    recalcHOT(empId);
+  } else {
+    // Absent / Leave / Sick / Holiday / Unpaid — clear everything
+    if(si)si.value='';
+    if(so)so.value='';
+    if(hr)hr.value='';
+    if(ot)ot.value='';
+  }
   deb('att-save',()=>saveAttSilent(),1500);
 }
 function tMore(id){const s=document.getElementById(`st-${id}`);if(s){s.focus();s.size=8;setTimeout(()=>s.size=1,3000);}}
@@ -2943,6 +2959,18 @@ function onMC(el){
       else if(el.value==='A')row.querySelector('.qd-A')?.classList.add('active');
       else if(el.value==='HD')row.querySelector('.qd-HD')?.classList.add('active');
       else if(el.value)row.querySelector('.qd-m')?.classList.add('active');
+      // Clear times/hours/OT when switching to non-present statuses
+      const isPresent=['P','HD','LA','EL'].includes(el.value);
+      if(!isPresent){
+        const si=document.getElementById(`si-${empId}`);
+        const so=document.getElementById(`so-${empId}`);
+        const hr=document.getElementById(`hr-${empId}`);
+        const ot=document.getElementById(`ot-${empId}`);
+        if(si)si.value='';
+        if(so)so.value='';
+        if(hr)hr.value='';
+        if(ot)ot.value='';
+      }
     }
   }
   deb('att-save',()=>saveAttSilent(),1500);
