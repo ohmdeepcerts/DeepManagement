@@ -577,6 +577,16 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 
 /* Force data tab content visibility */
 #settTab-data.active{display:block!important;visibility:visible!important;opacity:1!important;}
+@media print{
+  .sidebar,.topbar,.bot-nav,.sync-badge,
+  #syncBadge,.page-actions,.tab-bar,
+  .no-print,[class*="modal"]{display:none!important;}
+  body{background:#fff!important;color:#000!important;}
+  .page.on{display:block!important;}
+  table{border-collapse:collapse!important;width:100%!important;}
+  th,td{border:1px solid #ccc!important;padding:6px 8px!important;font-size:11px!important;}
+  th{background:#f1f5f9!important;color:#000!important;}
+}
 </style>
 </head>
 <body>
@@ -1065,6 +1075,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 
     <!-- PAYROLL -->
     <div class="page" id="page-payroll">
+      <div id="payrollPaginCtrl"></div>
       <div class="ph"><div><h1>Payroll</h1><p>Base + OT + bonus + expenses auto-pulled · bank/cash split</p></div><div class="ps"><div class="nav-pills">
             <div class="np-seg">
               <button class="np-seg-btn" onclick="shiftPayroll(-1)"><i class="fa-solid fa-chevron-left"></i></button>
@@ -1563,6 +1574,8 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 </div>
 <div class="toast-wrap" id="toasts"></div>
 <script>
+(function(){const t=localStorage.getItem('dam_adm_theme');if(t)document.documentElement.dataset.theme=t;})();
+
 // ═══════════════════════════════════════════════════
 // SUPABASE INIT
 // ═══════════════════════════════════════════════════
@@ -1612,12 +1625,39 @@ if(window.location.protocol==='file:'){
 let employees=[], attendance=[], expenses=[], batches=[], messages=[], cfg={}, attRequests=[];
 let paymentStatuses={};
 let currentPage='dashboard';
+// Force UK timezone for all date display and comparisons
+function ukDate(dateStr){
+  // Returns a Date object interpreted in UK local time
+  if(!dateStr)return new Date();
+  return new Date(new Date(dateStr+'T00:00:00').toLocaleString('en-GB',{timeZone:'Europe/London'}));
+}
+function todayUK(){
+  return new Date().toLocaleDateString('en-CA',{timeZone:'Europe/London'}); // YYYY-MM-DD
+}
+let _payrollPage=0; // current page index for payroll table (20 per page)
+// AbortController for event listener cleanup on page change
+let _pageAC=new AbortController();
+function _resetPageListeners(){_pageAC.abort();_pageAC=new AbortController();}
+function pageSignal(){return _pageAC.signal;}
+function updateCharCount(el,max){
+  let counter=el.nextElementSibling;
+  if(!counter||!counter.classList.contains('char-count')){
+    counter=document.createElement('div');
+    counter.className='char-count';
+    counter.style.cssText='font-size:9px;color:var(--txtm);text-align:right;margin-top:1px;';
+    el.parentNode.insertBefore(counter,el.nextSibling);
+  }
+  const len=el.value.length;
+  counter.textContent=`${len}/${max}`;
+  counter.style.color=len>max*0.9?'var(--red)':'var(--txtm)';
+}
 let employeeDocuments=[];
 let salaryHistory=[]; // salary_history rows from DB // all docs loaded
 let markDate=new Date(), dailyDate=new Date();
 let ledgerYear=new Date().getFullYear(), ledgerStaff=null, ledgerMonth=String(new Date().getMonth()+1).padStart(2,'0');
 let aprTab='pending', empTabFilter='Active';
 let _touched=new Set(), _activeTagPicker=null;
+window.addEventListener('beforeunload',e=>{if(_touched&&_touched.size>0){e.preventDefault();e.returnValue='You have unsaved attendance changes.';return e.returnValue;}});
 let _lastEmpId='';
 
 // ═══════════════════════════════════════════════════
@@ -1641,6 +1681,16 @@ function empWorkDays(emp){var w=emp&&emp.work_days;return(Array.isArray(w)&&w.le
 function getRateForDate(emp,pt,dateStr){
   // Find the rate that was effective on dateStr from salary_history; fallback to current emp rate field
   var current=pt==='fixed'?parseFloat(emp.salary)||0:pt==='daily'?parseFloat(emp.daily_rate)||0:parseFloat(emp.hourly_rate)||0;
+  // If current rate is 0 and there's no history, this employee has no salary configured
+  if(!current&&(typeof salaryHistory==='undefined'||!salaryHistory.filter(h=>h.employee_id===emp.id&&h.pay_type===pt).length)){
+    // Flag for missing salary popup — defer so we don't interrupt render
+    if(!window._missingSalaryAlerted)window._missingSalaryAlerted=new Set();
+    if(!window._missingSalaryAlerted.has(emp.id)){
+      window._missingSalaryAlerted.add(emp.id);
+      setTimeout(()=>showMissingSalaryPopup(emp,dateStr),100);
+    }
+    return 0;
+  }
   if(typeof salaryHistory==='undefined'||!salaryHistory.length)return current;
   var empHist=salaryHistory.filter(function(h){return h.employee_id===emp.id&&h.pay_type===pt&&h.effective_from;});
   if(!empHist.length)return current;
@@ -1658,7 +1708,17 @@ function getRateForDate(emp,pt,dateStr){
   return current;
 }
 function isWDFor(emp,d){return empWorkDays(emp).indexOf(d.getDay())>=0;}
-function workDaysInMonth(emp,y,m){var dIn=dim(y,m),wd=empWorkDays(emp),c=0;for(var d=1;d<=dIn;d++){if(wd.indexOf(new Date(y,m,d).getDay())>=0)c++;}return c;}
+function workDaysInMonth(emp,y,m){
+  var dIn=dim(y,m),wd=empWorkDays(emp),c=0;
+  // If employee has a join_date and this is their first month, start counting from join_date
+  var startDay=1;
+  if(emp&&emp.join_date){
+    var jd=new Date(emp.join_date+'T00:00:00');
+    if(jd.getFullYear()===y&&jd.getMonth()===m) startDay=jd.getDate();
+  }
+  for(var d=startDay;d<=dIn;d++){if(wd.indexOf(new Date(y,m,d).getDay())>=0)c++;}
+  return c;
+}
 function isP(s){return s==='P'||s==='HD'||s==='LA'||s==='EL';}
 function inits(n){return(n||'').split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
@@ -1668,12 +1728,27 @@ function fmt(v){return cur()+parseFloat(v||0).toFixed(2);}
 function avcol(id){const i=employees.findIndex(e=>e.id===id);return AVCOLS[Math.abs(i)%AVCOLS.length];}
 const _deb={};
 function deb(k,fn,ms=900){clearTimeout(_deb[k]);_deb[k]=setTimeout(fn,ms);}
+let _lastSyncTime=null;
+let _syncAgoIv=null;
 function setSyncStatus(s,msg=''){
   const el=document.getElementById('syncBadge'),tx=document.getElementById('syncTxt');
   if(!el)return;
   el.className='sync '+s;
-  tx.textContent=s==='saved'?'Synced':s==='saving'?'Saving...':'Error';
-  el.querySelector('i').className=s==='saved'?'fa-solid fa-circle-check':s==='saving'?'fa-solid fa-rotate fa-spin':'fa-solid fa-wifi-slash';
+  if(s==='saved'){
+    _lastSyncTime=Date.now();
+    tx.textContent='Synced just now';
+    el.querySelector('i').className='fa-solid fa-circle-check';
+    // Update "X min ago" every minute
+    if(_syncAgoIv)clearInterval(_syncAgoIv);
+    _syncAgoIv=setInterval(()=>{
+      if(!_lastSyncTime||!tx)return;
+      const mins=Math.floor((Date.now()-_lastSyncTime)/60000);
+      tx.textContent=mins<1?'Synced just now':mins===1?'Synced 1 min ago':`Synced ${mins} min ago`;
+    },30000);
+  } else {
+    tx.textContent=s==='saving'?'Saving...':'Error';
+    el.querySelector('i').className=s==='saving'?'fa-solid fa-rotate fa-spin':'fa-solid fa-wifi-slash';
+  }
 }
 function haptic(pattern='click'){
   if(!navigator.vibrate)return;
@@ -1936,6 +2011,44 @@ async function savePayrollSummary(employeeId,month,year,opts){
   return r.data;
 }
 
+// ── Missing salary popup — shown when getRateForDate finds no rate ──────────
+function showMissingSalaryPopup(emp,fromDate){
+  // Remove any existing popup
+  const existing=document.getElementById('missingSalaryPopup');
+  if(existing)existing.remove();
+  const C=cur();
+  const modal=document.createElement('div');
+  modal.id='missingSalaryPopup';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML=`
+    <div style="background:var(--card);border:1px solid var(--red);border-radius:16px;padding:24px;max-width:420px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.4);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div style="width:40px;height:40px;border-radius:10px;background:rgba(239,68,68,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fa-solid fa-triangle-exclamation" style="color:var(--red);font-size:18px;"></i>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--txt);">Missing Salary Rate</div>
+          <div style="font-size:12px;color:var(--txtm);">${emp.name} · ${emp.pay_type||'hourly'} pay</div>
+        </div>
+      </div>
+      <p style="font-size:13px;color:var(--txtm);margin-bottom:16px;line-height:1.5;">
+        <strong style="color:var(--txt);">${emp.name}</strong> has no salary rate configured for <strong style="color:var(--txt);">${fromDate}</strong>.
+        Pay calculations will return <strong style="color:var(--red);">£0.00</strong> until a rate is added.
+      </p>
+      <div style="display:flex;gap:8px;">
+        <button onclick="document.getElementById('missingSalaryPopup').remove();openEmpModal('${emp.id}');setTimeout(()=>setEmpTab('pay'),300);"
+          style="flex:1;padding:10px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+          <i class="fa-solid fa-plus" style="margin-right:5px;"></i>Add Salary Rate
+        </button>
+        <button onclick="document.getElementById('missingSalaryPopup').remove();"
+          style="padding:10px 16px;background:var(--card2);color:var(--txtm);border:1px solid var(--bdr);border-radius:8px;font-size:13px;cursor:pointer;">
+          Dismiss
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
 // Recalculate one employee's payroll for one month — call after attendance/expense/salary changes
 async function recalcEmployeeMonth(employeeId,month,year){
   return await savePayrollSummary(employeeId,month,year);
@@ -1953,7 +2066,16 @@ function invalidatePayroll(employeeId,month,year){
     const keys=[..._invalidateQ];_invalidateQ.clear();
     for(const k of keys){
       const[eid,mo,yr]=k.split('_');
-      await savePayrollSummary(eid,parseInt(mo),parseInt(yr));
+      try{
+        const result=await savePayrollSummary(eid,parseInt(mo),parseInt(yr));
+        if(!result){
+          // Save failed — show retry toast
+          _showSaveRetryToast(eid,parseInt(mo),parseInt(yr));
+        }
+      }catch(e){
+        console.error('payroll save error:',e);
+        _showSaveRetryToast(eid,parseInt(mo),parseInt(yr));
+      }
     }
     // Re-render active page if relevant
     if(currentPage==='payroll')renderPayroll();
@@ -1963,6 +2085,32 @@ function invalidatePayroll(employeeId,month,year){
 }
 
 // Invalidate all employees for a month (e.g. settings change)
+function _showSaveRetryToast(empId,month,year){
+  const emp=employees.find(e=>e.id===empId);
+  const name=emp?.name||'Employee';
+  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let secs=30;
+  // Reuse or create toast
+  let t=document.getElementById('payrollSaveRetry');
+  if(!t){
+    t=document.createElement('div');t.id='payrollSaveRetry';
+    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;padding:10px 16px;border-radius:10px;font-size:12px;font-weight:600;z-index:9998;display:flex;align-items:center;gap:10px;border:1px solid rgba(239,68,68,0.3);';
+    document.body.appendChild(t);
+  }
+  t.innerHTML=`<i class="fa-solid fa-triangle-exclamation" style="color:var(--red);"></i><span id="_srt">${name} payroll save failed — retrying in ${secs}s</span><button onclick="clearInterval(window._srtIv);document.getElementById('payrollSaveRetry')?.remove();savePayrollSummary('${empId}',${month},${year});" style="background:var(--acc);color:#fff;border:none;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;">Retry</button>`;
+  if(window._srtIv)clearInterval(window._srtIv);
+  window._srtIv=setInterval(()=>{
+    secs--;
+    const el=document.getElementById('_srt');
+    if(el)el.textContent=`${name} payroll save failed — retrying in ${secs}s`;
+    if(secs<=0){
+      clearInterval(window._srtIv);
+      document.getElementById('payrollSaveRetry')?.remove();
+      savePayrollSummary(empId,month,year);
+    }
+  },1000);
+}
+
 function invalidatePayrollMonth(month,year){
   employees.filter(e=>e.status==='Active').forEach(e=>invalidatePayroll(e.id,month,year));
 }
@@ -2197,7 +2345,26 @@ async function loadAllData(){
   }catch(e){
     setSyncStatus('err');
     console.error('Load error:',e);
-    toast('Error loading data: '+e.message,'e');
+    // Show retry countdown toast
+    let _retrySecs=30;
+    const _retryToast=document.getElementById('retryCountdownToast');
+    if(_retryToast)_retryToast.remove();
+    const _rt=document.createElement('div');
+    _rt.id='retryCountdownToast';
+    _rt.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;display:flex;align-items:center;gap:10px;border:1px solid rgba(239,68,68,0.4);box-shadow:0 4px 20px rgba(0,0,0,0.4);';
+    _rt.innerHTML=`<i class="fa-solid fa-wifi-slash" style="color:#f87171;"></i><span id="retryCountdownTxt">Failed to load data — retrying in 30s</span><button onclick="clearInterval(window._retryIv);document.getElementById('retryCountdownToast')?.remove();loadAllData();" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;">Retry now</button>`;
+    document.body.appendChild(_rt);
+    if(window._retryIv)clearInterval(window._retryIv);
+    window._retryIv=setInterval(()=>{
+      _retrySecs--;
+      const txt=document.getElementById('retryCountdownTxt');
+      if(txt)txt.textContent=`Failed to load data — retrying in ${_retrySecs}s`;
+      if(_retrySecs<=0){
+        clearInterval(window._retryIv);
+        document.getElementById('retryCountdownToast')?.remove();
+        loadAllData();
+      }
+    },1000);
   }
 }
 
@@ -2495,10 +2662,10 @@ function renderDashboard(){
 
   // ── ROW 2: EXPENSE KPI CARDS ──────────────────────────────
   const kpi2=[
-    {label:'Total Expenses',val:C+totalExp.toFixed(0),sub:MONTHS[month]+' '+year,icon:'fa-receipt',color:'var(--amb)',bg:'var(--ambl)',click:"navigate('ledger')",dlt:delta(totalExp,prevTotalExp,C,'',false)},
-    {label:'Est. Payroll',val:C+payrollEst.toFixed(0),sub:'base+OT+exp+bonus',icon:'fa-sterling-sign',color:'var(--pur)',bg:'var(--purl)',click:"navigate('payroll')",dlt:delta(payrollEst,prevPayrollEst,C,'',false)},
+    {label:'Total Expenses',val:C+totalExp.toFixed(2),sub:MONTHS[month]+' '+year,icon:'fa-receipt',color:'var(--amb)',bg:'var(--ambl)',click:"navigate('ledger')",dlt:delta(totalExp,prevTotalExp,C,'',false)},
+    {label:'Est. Payroll',val:C+payrollEst.toFixed(2),sub:'base+OT+exp+bonus',icon:'fa-sterling-sign',color:'var(--pur)',bg:'var(--purl)',click:"navigate('payroll')",dlt:delta(payrollEst,prevPayrollEst,C,'',false)},
     {label:'Pending Approvals',val:pendingTotal,sub:`${pendingTime} time · ${pendingExp} expense`,icon:'fa-circle-check',color:pendingTotal>0?'var(--amb)':'var(--grn)',bg:pendingTotal>0?'var(--ambl)':'var(--grnl)',click:"navigate('approvals')"},
-    {label:'VAT Tagged',val:C+vatTotal.toFixed(0),sub:`Est. reclaimable: ${C}${(vatTotal/6).toFixed(0)}`,icon:'fa-tag',color:'#0f766e',bg:'var(--tell)',click:"navigate('tags')"},
+    {label:'VAT Tagged',val:C+vatTotal.toFixed(2),sub:`Est. reclaimable: ${C}${(vatTotal/6).toFixed(0)}`,icon:'fa-tag',color:'#0f766e',bg:'var(--tell)',click:"navigate('tags')"},
   ];
   document.getElementById('kpiRow2').innerHTML=kpi2.map(k=>`
     <div onclick="${k.click}" style="background:var(--card);border:1px solid var(--bdr);border-radius:var(--rl);padding:16px 18px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='var(--shm)';this.style.borderColor='${k.color}50'" onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='var(--bdr)'">
@@ -2631,7 +2798,7 @@ function renderDashboard(){
     <div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:0.5px solid var(--bdr);">
       <span class="ava" style="background:${avcol(emp.id)};flex-shrink:0;">${inits(emp.name)}</span>
       <div style="flex:1;min-width:0;">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="font-weight:600;">${emp.name}</span><span style="color:var(--amb);font-weight:700;">${ot.toFixed(1)}h${otPay>0?' · '+C+otPay.toFixed(0):''}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="font-weight:600;">${emp.name}</span><span style="color:var(--amb);font-weight:700;">${ot.toFixed(1)}h${otPay>0?' · '+C+otPay.toFixed(2):''}</span></div>
         <div style="background:var(--bdr);border-radius:3px;height:4px;"><div style="height:100%;border-radius:3px;background:${ot>8?'var(--red)':ot>4?'var(--amb)':'var(--grn)'};width:${Math.min(100,Math.round(ot/maxOT*100))}%;"></div></div>
       </div>
     </div>`).join(''):'<div style="text-align:center;color:var(--txtm);padding:16px;font-size:13px;"><i class="fa-solid fa-check-circle" style="font-size:22px;color:var(--grn);display:block;margin-bottom:7px;"></i>No overtime this month</div>';
@@ -2657,9 +2824,9 @@ function renderDashboard(){
   const _tmSubEl=document.getElementById('expTopMerchantSub');
   const _amEl=document.getElementById('expActiveMonths');
   const _ytdSubEl=document.getElementById('expYTDSub');
-  if(_ytdEl)_ytdEl.textContent=C+ytdTotal.toFixed(0);
+  if(_ytdEl)_ytdEl.textContent=C+ytdTotal.toFixed(2);
   if(_ytdSubEl)_ytdSubEl.textContent=(isSingle?scopeEmp?.name+' · ':'')+'Jan–Dec '+year;
-  if(_avgEl)_avgEl.textContent=C+monthlyAvg.toFixed(0);
+  if(_avgEl)_avgEl.textContent=C+monthlyAvg.toFixed(2);
   if(_tmEl)_tmEl.textContent=topMerchantEntry?topMerchantEntry[0]:'None yet';
   if(_tmSubEl)_tmSubEl.textContent=topMerchantEntry?`${C}${topMerchantEntry[1].toFixed(0)} this month`:'no data';
   if(_amEl)_amEl.textContent=activeMonths;
@@ -2736,10 +2903,10 @@ function renderDashboard(){
       monthAmts.forEach(amt=>{
         const hasAmt=amt!==0;
         const col=amt>0?'color:var(--amb);':amt<0?'color:var(--red);':'color:var(--txtm);';
-        h+=`<td style="text-align:right;padding:5px 6px;${col}font-weight:${hasAmt?'600':'400'};">${hasAmt?C+amt.toFixed(0):'—'}</td>`;
+        h+=`<td style="text-align:right;padding:5px 6px;${col}font-weight:${hasAmt?'600':'400'};">${hasAmt?C+amt.toFixed(2):'—'}</td>`;
       });
       const totalCol=total>0?'var(--amb)':total<0?'var(--red)':'var(--txtm)';
-      h+=`<td style="text-align:right;padding:5px 8px;font-weight:800;color:${totalCol};">${total!==0?C+total.toFixed(0):'—'}</td>`;
+      h+=`<td style="text-align:right;padding:5px 8px;font-weight:800;color:${totalCol};">${total!==0?C+total.toFixed(2):'—'}</td>`;
       h+='</tr>';
     });
     // Totals row
@@ -2749,7 +2916,7 @@ function renderDashboard(){
     h+='<td style="padding:5px 8px;font-weight:700;color:var(--txtm);position:sticky;left:0;background:var(--card);">Total</td>';
     colTotals.forEach(t=>{
       const tCol=t>0?'var(--amb)':t<0?'var(--red)':'var(--txtm)';
-      h+=`<td style="text-align:right;padding:5px 6px;font-weight:700;color:${tCol};">${t!==0?C+t.toFixed(0):'—'}</td>`;
+      h+=`<td style="text-align:right;padding:5px 6px;font-weight:700;color:${tCol};">${t!==0?C+t.toFixed(2):'—'}</td>`;
     });
     const gtCol=grandTotal>0?'var(--amb)':grandTotal<0?'var(--red)':'var(--txtm)';
     h+=`<td style="text-align:right;padding:5px 8px;font-weight:800;color:${gtCol};">${C}${grandTotal.toFixed(0)}</td>`;
@@ -2879,7 +3046,7 @@ function renderDashboard(){
       ?{l:'Attendance rate',v:_attPctSingle+'%',s:`${_presentDaysSingle} of ${scopeWDSingle} working days`,ico:'fa-percent'}
       :{l:'Top attender',v:topAttender?.name.split(' ')[0]||'—',s:topAttender?`${topAttender.d} days present`:'no data',ico:'fa-medal'},
     isSingle
-      ?{l:'Expenses this month',v:C+totalExp.toFixed(0),s:scopeExpenses.filter(e=>parseFloat(e.amount||0)>0).length+' records',ico:'fa-receipt'}
+      ?{l:'Expenses this month',v:C+totalExp.toFixed(2),s:scopeExpenses.filter(e=>parseFloat(e.amount||0)>0).length+' records',ico:'fa-receipt'}
       :{l:'Expenses vs payroll',v:payrollEst>0?Math.round(totalExp/payrollEst*100)+'%':'—',s:'expenses as % of total payroll',ico:'fa-percent'},
     isSingle
       ?{l:'Hours this month',v:scopeMonthHrs.toFixed(1)+'h',s:contractedHrs?`of ${contractedHrs.toFixed(0)}h contracted`:'total worked',ico:'fa-clock'}
@@ -3086,6 +3253,17 @@ function recalcHOT(empId){
   const stEl=document.querySelector(`#mr-${empId} [data-f="status"]`);
   if(si&&so&&si.value&&so.value){
     const h=calcHours(si.value,so.value);
+    // Block if sign-out is before sign-in (negative hours)
+    if(h<0){
+      si.style.outline='2px solid var(--red)';so.style.outline='2px solid var(--red)';
+      let errEl=document.getElementById(`timeErr-${empId}`);
+      if(!errEl){errEl=document.createElement('div');errEl.id=`timeErr-${empId}`;errEl.style.cssText='color:var(--red);font-size:10px;font-weight:600;margin-top:2px;';so.parentNode.appendChild(errEl);}
+      errEl.textContent='⛔ Sign-out cannot be before sign-in';
+      if(hEl)hEl.value='';if(otEl)otEl.value='';
+      return;
+    }
+    si.style.outline='';so.style.outline='';
+    const errEl=document.getElementById(`timeErr-${empId}`);if(errEl)errEl.remove();
     if(hEl)hEl.value=h;
     const emp=employees.find(e=>e.id===empId);
     const ot=calcOT(h,emp);
@@ -3158,6 +3336,7 @@ async function saveAttSilent(){
 async function saveAllAttendance(){
   const _now=new Date();_now.setHours(0,0,0,0);
   const _md=new Date(markDate);_md.setHours(0,0,0,0);
+  if(isPayrollLocked(markDate.getMonth(),markDate.getFullYear())){toast('⛔ '+markDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'})+' is locked','e');return;}
   if(_md>_now){toast('Cannot save attendance for a future date','e');return;}
   const isLocked=(cfg.locked_months||[]).includes(`${markDate.getFullYear()}_${markDate.getMonth()}`);
   if(isLocked){toast(`${MONTHS[markDate.getMonth()]} ${markDate.getFullYear()} is locked`,'e');return;}
@@ -3201,14 +3380,52 @@ async function clearDay(){
 }
 async function doClearDay(){
   const key=dateKey(markDate);
+  if(isPayrollLocked(markDate.getMonth(),markDate.getFullYear())){toast('⛔ This month is locked — unlock payroll first','e');return;}
+  const dayRecs=attendance.filter(a=>a.date===key);
+  if(!dayRecs.length){toast('No attendance to clear for this day','i');return;}
+  // Calculate total pay at stake
+  let totalPay=0;
+  dayRecs.forEach(r=>{const emp=employees.find(e=>e.id===r.employee_id);if(emp&&isP(r.status)){const p=calcPay(emp,r);totalPay+=p.base+p.ot;}});
+  const C=cur();
+  const empCount=new Set(dayRecs.map(r=>r.employee_id)).size;
+  const dateLabel=markDate.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  // Show proper confirmation modal
+  const existing=document.getElementById('clearDayModal');if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='clearDayModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML=`
+    <div style="background:var(--card);border:1px solid rgba(239,68,68,0.3);border-radius:16px;padding:24px;max-width:400px;width:100%;">
+      <div style="font-size:16px;font-weight:700;color:var(--txt);margin-bottom:6px;"><i class="fa-solid fa-trash" style="color:var(--red);margin-right:8px;"></i>Clear Day</div>
+      <div style="font-size:13px;color:var(--txtm);margin-bottom:16px;line-height:1.6;">
+        Delete all attendance for <strong style="color:var(--txt);">${dateLabel}</strong>?<br>
+        <div style="margin-top:8px;padding:10px;background:rgba(239,68,68,0.08);border-radius:8px;border:1px solid rgba(239,68,68,0.15);">
+          <div style="color:var(--txt);font-weight:600;">${empCount} employee${empCount!==1?'s':''} affected</div>
+          <div style="color:var(--red);font-weight:700;font-size:15px;">${C}${totalPay.toFixed(2)} in pay will be removed</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="document.getElementById('clearDayModal').remove();_doClearDayConfirmed('${key}');"
+          style="flex:1;padding:10px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+          Yes, Clear Day
+        </button>
+        <button onclick="document.getElementById('clearDayModal').remove();"
+          style="flex:1;padding:10px;background:var(--card2);color:var(--txtm);border:1px solid var(--bdr);border-radius:8px;font-size:13px;cursor:pointer;">
+          Cancel
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function _doClearDayConfirmed(key){
   const affected=attendance.filter(a=>a.date===key).map(a=>a.employee_id);
   const r=await sb.from('attendance').delete().eq('date',key);
-  if(r.error){toast(r.error.message,'e');_resetSaveBtn();return;}
+  if(r.error){toast(r.error.message,'e');return;}
   attendance=attendance.filter(a=>a.date!==key);
   _touched.clear();buildMarkTable();toast('Day cleared','i');
-  // Recalculate payroll for every employee who had attendance on this day
-  const affMonth=markDate.getMonth(),affYear=markDate.getFullYear();
-  [...new Set(affected)].forEach(empId=>recalcEmployeeMonth(empId,affMonth,affYear));
+  const affDate=new Date(key+'T00:00:00');
+  [...new Set(affected)].forEach(empId=>invalidatePayroll(empId,affDate.getMonth(),affDate.getFullYear()));
 }
 function shiftMark(n){_touched.clear();markDate=new Date(markDate);markDate.setDate(markDate.getDate()+n);updateMarkNav();buildMarkTable();}
 function setMarkToday(){_touched.clear();markDate=new Date();updateMarkNav();buildMarkTable();}
@@ -3361,7 +3578,7 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
       <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)" onfocus="this.closest('tr').style.opacity='1'" onblur="this.closest('tr').style.opacity=this.value?'1':'0.45'"></td>
       <td>
         <input type="text" class="shi" placeholder="Type to add new expense..." value="" ${isEx?'disabled':''} autocomplete="off" oninput="updateExp('${row.id}','merchant',this.value);this.closest('tr').style.opacity='1';checkAutoNextRow('${row.id}',${i<0?0:i},${totalRows||1});ledMerchantAC(this,'${row.id}')" onblur="setTimeout(hideLedAC,200)">
-        <div style="display:flex;align-items:center;gap:4px;margin-top:3px;"><label title="Attach receipt" style="width:22px;height:22px;border-radius:5px;border:1px dashed var(--bdr);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--txtm);font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label></div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:3px;"><label title="Attach receipt" style="width:22px;height:22px;border-radius:5px;border:1px dashed var(--bdr);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--txtm);font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label></div>
       </td>
       <td><input type="text" class="shi cat-inp" list="ledCatList" placeholder="Category" value="" style="" ${isEx?'disabled':''} oninput="updateExp('${row.id}','category',this.value);this.style.cssText=getCatStyle(this.value)" onfocus="this.closest('tr').style.opacity='1'"></td>
       <td><div class="tc" id="tc-${row.id}">${tagsHtml}</div></td>
@@ -3377,7 +3594,7 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
     <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)"></td>
     <td>
       <input type="text" class="shi" placeholder="Merchant / Supplier..." value="${(row.merchant||'').replace(/"/g,'&quot;')}" ${isEx?'disabled':''} autocomplete="off" oninput="updateExp('${row.id}','merchant',this.value);checkAutoNextRow('${row.id}',${i},${totalRows||1});ledMerchantAC(this,'${row.id}')" onblur="setTimeout(hideLedAC,200)">
-      <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">${row.receipt_url?`<div onclick="openLightbox('${row.receipt_url}')" style="width:30px;height:30px;border-radius:5px;border:1px solid var(--bdr);overflow:hidden;cursor:pointer;flex-shrink:0;background:var(--card2);display:flex;align-items:center;justify-content:center;position:relative;"><img src="${row.receipt_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;" onerror="this.style.display='none'"><i class="fa-solid fa-file-image" style="font-size:14px;color:var(--acc);"></i></div><a href="${row.receipt_url}" target="_blank" title="Open receipt" style="font-size:10px;color:var(--acc);"><i class="fa-solid fa-eye"></i></a>`:''}<label title="${row.receipt_url?'Replace receipt':'Attach receipt'}" style="width:22px;height:22px;border-radius:5px;border:1px dashed ${row.receipt_url?'var(--acc)':'var(--bdr)'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:${row.receipt_url?'var(--acc)':'var(--txtm)'};font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label></div>
+      <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">${row.receipt_url?`<div onclick="openLightbox('${row.receipt_url}')" style="width:30px;height:30px;border-radius:5px;border:1px solid var(--bdr);overflow:hidden;cursor:pointer;flex-shrink:0;background:var(--card2);display:flex;align-items:center;justify-content:center;position:relative;"><img src="${row.receipt_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;" onerror="this.style.display='none'"><i class="fa-solid fa-file-image" style="font-size:14px;color:var(--acc);"></i></div><a href="${row.receipt_url}" target="_blank" title="Open receipt" style="font-size:10px;color:var(--acc);"><i class="fa-solid fa-eye"></i></a>`:''}<label title="${row.receipt_url?'Replace receipt':'Attach receipt'}" style="width:22px;height:22px;border-radius:5px;border:1px dashed ${row.receipt_url?'var(--acc)':'var(--bdr)'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:${row.receipt_url?'var(--acc)':'var(--txtm)'};font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label></div>
       ${row.notes?`<div style="font-size:10px;color:var(--txtm);margin-top:1px;font-style:italic;">"${row.notes}"</div>`:''}
     </td>
     <td><input type="text" class="shi cat-inp" list="ledCatList" placeholder="Category" value="${(row.category||'').replace(/"/g,'&quot;')}" style="${catStyle}" ${isEx?'disabled':''} oninput="updateExp('${row.id}','category',this.value);this.style.cssText=getCatStyle(this.value)"></td>
@@ -3451,6 +3668,7 @@ async function toggleTag(expId,tagName){
 }
 async function updateExp(id,field,val){
   const exp=expenses.find(e=>e.id===id);if(!exp)return;
+  if(field==='amount'&&parseFloat(val)===0){toast('Amount cannot be zero','e');return;}
   exp[field]=val;
   deb('exp-save-'+id,async()=>{
     await sb.from('expenses').update({[field]:val}).eq('id',id);
@@ -3546,8 +3764,8 @@ function updateLedgerFooterOnly(){
   const ct=document.getElementById('ledRowCt');if(ct)ct.textContent=realData.length+' row'+(realData.length!==1?'s':'');
 }
 async function deleteLedRow(id){
+  const exp=expenses.find(e=>e.id===id);if(exp){const _dd=new Date(exp.date+'T00:00:00');if(isPayrollLocked(_dd.getMonth(),_dd.getFullYear())){toast('⛔ Locked payroll month','e');return;}}
   if(!confirm('Delete this expense row?'))return;
-  const exp=expenses.find(e=>e.id===id);
   const r=await sb.from('expenses').delete().eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   expenses=expenses.filter(e=>e.id!==id);renderLedger();toast('Row deleted','i');
@@ -3557,6 +3775,7 @@ async function deleteLedRow(id){
   }
 }
 async function approveExp(id){
+  const _ae=expenses.find(e=>e.id===id);if(_ae){const _aed=new Date(_ae.date+'T00:00:00');if(isPayrollLocked(_aed.getMonth(),_aed.getFullYear())){toast('⛔ Locked payroll month','e');return;}}
   const r=await sb.from('expenses').update({status:'approved'}).eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   const idx=expenses.findIndex(e=>e.id===id);if(idx>=0)expenses[idx].status='approved';
@@ -3564,6 +3783,7 @@ async function approveExp(id){
   const exp=expenses[idx];if(exp){const d=new Date(exp.date+'T00:00:00');recalcEmployeeMonth(exp.employee_id,d.getMonth(),d.getFullYear());}
 }
 async function rejectExp(id){
+  const _re=expenses.find(e=>e.id===id);if(_re){const _red=new Date(_re.date+'T00:00:00');if(isPayrollLocked(_red.getMonth(),_red.getFullYear())){toast('⛔ Locked payroll month','e');return;}}
   const r=await sb.from('expenses').update({status:'rejected'}).eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   const idx=expenses.findIndex(e=>e.id===id);if(idx>=0)expenses[idx].status='rejected';
@@ -3590,7 +3810,31 @@ async function approveAllExp(){
     return e.employee_id===ledgerStaff&&d.getFullYear()===ledgerYear&&String(d.getMonth()+1).padStart(2,'0')===ledgerMonth&&e.status!=='approved';
   });
   if(!data.length){toast('No pending expenses','i');return;}
-  if(!confirm(`Approve all ${data.length} expenses for this month?`))return;
+  const C=cur();
+  const totalAmt=data.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+  const existing=document.getElementById('approveAllModal');if(existing)existing.remove();
+  const modal=document.createElement('div');modal.id='approveAllModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML=`<div style="background:var(--card);border:1px solid var(--bdr);border-radius:16px;padding:24px;max-width:380px;width:100%;">
+    <div style="font-size:15px;font-weight:700;color:var(--txt);margin-bottom:10px;"><i class="fa-solid fa-circle-check" style="color:var(--grn);margin-right:8px;"></i>Approve All Expenses</div>
+    <p style="font-size:13px;color:var(--txtm);margin-bottom:14px;line-height:1.6;">
+      Approve <strong style="color:var(--txt);">${data.length} expense${data.length!==1?'s':''}</strong> totalling
+      <strong style="color:var(--grn);font-size:15px;">${C}${totalAmt.toFixed(2)}</strong>?
+    </p>
+    <div style="display:flex;gap:8px;">
+      <button onclick="document.getElementById('approveAllModal').remove();_doApproveAllExp();" style="flex:1;padding:10px;background:var(--grn);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">Approve All</button>
+      <button onclick="document.getElementById('approveAllModal').remove();" style="flex:1;padding:10px;background:var(--card2);color:var(--txtm);border:1px solid var(--bdr);border-radius:8px;font-size:13px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function _doApproveAllExp(){
+  const data=expenses.filter(e=>{
+    const d=new Date(e.date+'T00:00:00');
+    return e.employee_id===ledgerStaff&&d.getFullYear()===ledgerYear&&String(d.getMonth()+1).padStart(2,'0')===ledgerMonth&&e.status!=='approved';
+  });
+  if(!data.length){toast('No pending expenses','i');return;}
   await Promise.all(data.map(e=>sb.from('expenses').update({status:'approved'}).eq('id',e.id)));
   data.forEach(e=>{const idx=expenses.findIndex(x=>x.id===e.id);if(idx>=0)expenses[idx].status='approved';});
   renderLedger();toast(`${data.length} expenses approved ✓`,'s');
@@ -3762,7 +4006,24 @@ function renderMonthly(){
   for(let d=1;d<=days;d++){const dt=new Date(year,month,d),dow=dt.getDay();const cc=(dow===0?'sc2':dow===6?'wc':'')+(dow===1?' wsc':'');hRow+=`<th class="${cc}" style="width:22px;">${d}<br><span style="font-size:7px;">${['Su','Mo','Tu','We','Th','Fr','Sa'][dow]}</span></th>`;}
   hRow+='<th>P</th><th>A</th><th>HD</th><th>☀</th><th>%</th></tr></thead>';
   let body='<tbody>';
-  emps.forEach(emp=>{
+  // Pagination — 20 per page
+  const PAGE_SIZE=20;
+  const totalPages=Math.ceil(emps.length/PAGE_SIZE);
+  if(_payrollPage>=totalPages)_payrollPage=0;
+  const pagedEmps=emps.slice(_payrollPage*PAGE_SIZE,(_payrollPage+1)*PAGE_SIZE);
+  // Inject pagination controls above table if needed
+  const paginCtrl=document.getElementById('payrollPaginCtrl');
+  if(paginCtrl){
+    if(totalPages<=1){paginCtrl.innerHTML='';}
+    else{
+      paginCtrl.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;">
+        <button onclick="_payrollPage=Math.max(0,_payrollPage-1);renderPayroll();" ${_payrollPage===0?'disabled':''} style="padding:5px 12px;border-radius:6px;border:1px solid var(--bdr);background:var(--card);color:var(--txt);cursor:pointer;font-size:12px;">← Prev</button>
+        <span style="font-size:12px;color:var(--txtm);">Page ${_payrollPage+1} of ${totalPages} · ${emps.length} employees</span>
+        <button onclick="_payrollPage=Math.min(totalPages-1,_payrollPage+1);renderPayroll();" ${_payrollPage>=totalPages-1?'disabled':''} style="padding:5px 12px;border-radius:6px;border:1px solid var(--bdr);background:var(--card);color:var(--txt);cursor:pointer;font-size:12px;">Next →</button>
+      </div>`;
+    }
+  }
+  pagedEmps.forEach(emp=>{
     const wD=Array.from({length:days},(_,i)=>isWD(new Date(year,month,i+1))).filter(Boolean).length;
     body+=`<tr><td><span class="ava" style="background:${avcol(emp.id)};width:20px;height:20px;font-size:8px;margin-right:4px;">${inits(emp.name)}</span>${emp.name}</td>`;
     const counts={P:0,A:0,HD:0,SUN:0};
@@ -4150,7 +4411,8 @@ async function renderEmpReport(){
 `;
 }
 function printTimesheet(){
-  const empId=document.getElementById('erEmp')?.value;
+  const _ptSel=document.getElementById('erEmp');if(_ptSel&&!_ptSel.value&&_ptSel.options.length>1)_ptSel.value=_ptSel.options[1].value;
+  const empId=_ptSel?.value;
   const month=parseInt(document.getElementById('erMonth')?.value);
   const year=parseInt(document.getElementById('erYear')?.value);
   const emp=employees.find(e=>e.id===empId);if(!emp)return;
@@ -4239,7 +4501,7 @@ function renderYearly(){
     const gross=_ySaved?(parseFloat(_ySaved.gross_pay)||0):(recPay+bonus);
     const pct=empYWD>0?Math.round(present/empYWD*100):0;const pc=pct>=80?'var(--grn)':pct>=60?'var(--amb)':'var(--red)';
     const mB=MONTHS.map((_,mi)=>recs.filter(r=>new Date(r.date+'T00:00:00').getMonth()===mi&&isWD(new Date(r.date+'T00:00:00'))&&isP(r.status)).length);
-    return`<tr><td><span class="ava" style="background:${avcol(emp.id)}">${inits(emp.name)}</span>${emp.name}</td>${mB.map(n=>`<td style="text-align:center;font-size:11px;color:${n>20?'var(--grn)':n>0?'var(--txt2)':'var(--txtm)'}">${n||'—'}</td>`).join('')}<td style="font-weight:700;color:var(--grn);">${present}</td><td style="font-weight:700;color:var(--red);">${absent}</td><td style="font-weight:700;">${totalH.toFixed(0)}h</td><td style="font-weight:700;color:var(--amb);">${ot.toFixed(0)}h</td><td style="color:#4338ca;font-weight:700;">${suns}</td><td style="font-weight:700;color:var(--grn);">${emp.pay_type||emp.hourly_rate?C+gross.toFixed(0):'—'}</td><td style="font-weight:700;color:${pc};">${pct}%</td></tr>`;
+    return`<tr><td><span class="ava" style="background:${avcol(emp.id)}">${inits(emp.name)}</span>${emp.name}</td>${mB.map(n=>`<td style="text-align:center;font-size:11px;color:${n>20?'var(--grn)':n>0?'var(--txt2)':'var(--txtm)'}">${n||'—'}</td>`).join('')}<td style="font-weight:700;color:var(--grn);">${present}</td><td style="font-weight:700;color:var(--red);">${absent}</td><td style="font-weight:700;">${totalH.toFixed(0)}h</td><td style="font-weight:700;color:var(--amb);">${ot.toFixed(0)}h</td><td style="color:#4338ca;font-weight:700;">${suns}</td><td style="font-weight:700;color:var(--grn);">${emp.pay_type||emp.hourly_rate?C+gross.toFixed(2):'—'}</td><td style="font-weight:700;color:${pc};">${pct}%</td></tr>`;
   }).join('');
   document.getElementById('yrTable').innerHTML=`<table><thead><tr><th>Employee</th>${MONTHS.map(m=>`<th style="text-align:center">${m.slice(0,3)}</th>`).join('')}<th>Present</th><th>Absent</th><th>Hours</th><th>OT</th><th>☀</th><th>Est Pay</th><th>Att%</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -4347,6 +4609,11 @@ function renderPayroll(){
       recalcEmployeeMonth(emp.id,m,y).then(()=>{if(currentPage==='payroll')renderPayroll();});
     }
     gBase+=basePay;gOT+=otPay;gBonus+=bonusFinal;gExp+=expAmt;gTotal+=rowTotal;gBank+=bankAmt;gCash+=cashAmt;
+    // Weekend multiplier tag
+    const wkMult=isSat(new Date())?parseFloat(emp.sat_mult||cfg.rate_sat||1):isSun(new Date())?parseFloat(emp.sun_mult||cfg.rate_sun||1):1;
+    // Check if any present records this month have weekend multipliers > 1
+    const hasWkMult=mRecs.some(r=>{const rd=new Date(r.date+'T00:00:00');return isP(r.status)&&((isSat(rd)&&parseFloat(emp.sat_mult||cfg.rate_sat||1)>1)||(isSun(rd)&&parseFloat(emp.sun_mult||cfg.rate_sun||1)>1));});
+    const wkTag=hasWkMult?'<span style="background:rgba(124,58,237,0.12);color:#7c3aed;font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:3px;" title="Weekend multiplier applied">SAT/SUN ×</span>':'';
     const ptBdg=pt==='fixed'?'<span style="background:#dbeafe;color:#1d4ed8;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:3px;">SALARY</span>':pt==='daily'?'<span style="background:#fef3c7;color:#b45309;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:3px;">DAILY</span>':'<span style="background:#dcfce7;color:#15803d;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:3px;">HOURLY</span>';
     const cPill=`<span class="cp ${emp.contract_type==='PAYE'?'cp-p':'cp-s'}">${emp.contract_type||'PAYE'}</span>`;
     const baseDisp=(function(){
@@ -4744,11 +5011,49 @@ function closeEmpModal(){document.getElementById('empModal').classList.remove('o
 async function deleteEmployee(){
   const id=document.getElementById('empId').value;
   const emp=employees.find(e=>e.id===id);if(!emp)return;
+  // Show Archive vs Permanently Delete modal
+  const existing=document.getElementById('deleteEmpModal');if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='deleteEmpModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML=`
+    <div style="background:var(--card);border:1px solid var(--bdr);border-radius:16px;padding:24px;max-width:440px;width:100%;">
+      <div style="font-size:16px;font-weight:700;color:var(--txt);margin-bottom:6px;">Remove Employee: ${emp.name}</div>
+      <p style="font-size:13px;color:var(--txtm);margin-bottom:18px;line-height:1.5;">Choose how to remove this employee. Archived employees are hidden but all data is kept.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
+        <button onclick="document.getElementById('deleteEmpModal').remove();_archiveEmployee('${id}','${emp.name.replace(/'/g,"\'")}');"
+          style="padding:12px 16px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:10px;color:var(--amb);font-size:13px;font-weight:700;cursor:pointer;text-align:left;">
+          <i class="fa-solid fa-box-archive" style="margin-right:8px;"></i>Archive — hide from all views, keep all data
+        </button>
+        <button onclick="document.getElementById('deleteEmpModal').remove();_confirmHardDelete('${id}','${emp.name.replace(/'/g,"\'")}');"
+          style="padding:12px 16px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;text-align:left;">
+          <i class="fa-solid fa-trash" style="margin-right:8px;"></i>Permanently Delete — removes ALL records forever
+        </button>
+      </div>
+      <button onclick="document.getElementById('deleteEmpModal').remove();"
+        style="width:100%;padding:10px;background:var(--card2);color:var(--txtm);border:1px solid var(--bdr);border-radius:8px;font-size:13px;cursor:pointer;">
+        Cancel
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function _archiveEmployee(id,name){
+  const r=await sb.from('employees').update({status:'Archived'}).eq('id',id);
+  if(r.error){toast(r.error.message,'e');return;}
+  const idx=employees.findIndex(e=>e.id===id);
+  if(idx>=0)employees[idx].status='Archived';
+  document.getElementById('empModal').classList.remove('open');
+  renderEmployees();
+  toast(name+' archived — hidden from all views','s');
+}
+
+async function _confirmHardDelete(id,name){
   confirmAction({
-    title:'Delete Employee',
-    message:emp.name+' and ALL their attendance, expenses, documents and payroll records will be permanently removed.',
+    title:'Permanently Delete '+name,
+    message:'This will delete '+name+' AND all their attendance, expenses, payroll, salary history and documents from the database forever. This cannot be undone.',
     requireType:'DELETE',
-    onConfirm:function(){_doDeleteEmployee(id,emp.name);}
+    onConfirm:function(){_doDeleteEmployee(id,name);}
   });
 }
 async function _doDeleteEmployee(id,empName){
@@ -5573,7 +5878,10 @@ async function savePayRise(){
   const effectiveFrom=document.getElementById('prEffectiveFrom').value;
   const reason=document.getElementById('prReason').value;
   const notesExtra=document.getElementById('prNotes').value.trim();
-  if(!newRate||newRate<=0){toast('Enter the new rate amount','e');return;}
+  if(newRate<0){toast('Rate cannot be negative','e');return;}
+  if(newRate===0){
+    if(!confirm('You are setting the salary to £0.00 — this will make all pay calculations return £0 for this employee. Are you sure?'))return;
+  }
   if(!effectiveFrom){toast('Select an effective date','e');return;}
   const pt=emp.pay_type||'fixed';
   const C=cur();
@@ -5891,6 +6199,7 @@ function renderAttRequests(){
 
 async function reviewAttReq(id,status,officeNote){
   const req=attRequests.find(r=>r.id===id);if(!req)return;
+  if(status==='approved'){const _rd=new Date(req.date+'T00:00:00');if(isPayrollLocked(_rd.getMonth(),_rd.getFullYear())){toast('⛔ '+req.date+' is in a locked payroll month — unlock first','e');return;}}
   const r=await sb.from('attendance_requests').update({status,office_note:officeNote||null,reviewed_at:status!=='pending'?new Date().toISOString():null}).eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   const idx=attRequests.findIndex(r=>r.id===id);
@@ -5905,7 +6214,7 @@ async function reviewAttReq(id,status,officeNote){
     const _wsMins=_wsH*60+_wsM;
     const startMins=req.sign_in?parseInt(req.sign_in.split(':')[0])*60+parseInt(req.sign_in.split(':')[1]):_wsMins;
     // Determine status: LA = late arrival, EL = left early, P = on time
-  const _wsEndMins=(()=>{const e=(_reqEmp&&_reqEmp.work_end)||cfg.work_end||'17:00';const[h,m]=e.split(':').map(Number);return h*60+m;})();
+  const _wsEndMins=(()=>{const e=(_aEmp&&_aEmp.work_end)||cfg.work_end||'17:00';const[h,m]=e.split(':').map(Number);return h*60+m;})();
   const endMins2=req.sign_out?(()=>{const[h,m]=req.sign_out.split(':').map(Number);return h*60+m;})():null;
   const isLate=startMins>_wsMins+15;
   const isEarlyLeave=endMins2!==null&&endMins2<_wsEndMins-10;
@@ -5918,11 +6227,6 @@ async function reviewAttReq(id,status,officeNote){
   } else if(status==='rejected'){toast('Request rejected','i');}
   else{toast('Reset to pending','i');}
   updateBadges();renderAttRequests();
-  // Auto-recalc payroll for this employee's month
-  if(status==='approved'&&req){
-    const rd=new Date(req.date+'T00:00:00');
-    recalcEmployeeMonth(req.employee_id,rd.getMonth(),rd.getFullYear());
-  }
 }
 
 function promptRejectAtt(id){
@@ -7040,7 +7344,7 @@ window.onerror=function(msg,url,line,col,err){
 };
 window.addEventListener('unhandledrejection',function(e){
   console.error('Unhandled promise:',e.reason);
-  if(e.reason&&e.reason.message&&e.reason.message.indexOf('aborted')<0)
+  if(e.reason&&e.reason.message&&e.reason.message.indexOf('aborted')<0&&e.reason.message.indexOf('payroll')<0&&e.reason.message.indexOf('save')<0)
     toast('Connection error — check internet','e');
 });
 </script>
