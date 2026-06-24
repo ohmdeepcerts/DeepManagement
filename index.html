@@ -120,6 +120,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 [data-theme=dark] .tog-sw{background:#3b82f6;}
 .tog-sw::after{content:'';position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#fff;transition:var(--tr);}
 [data-theme=dark] .tog-sw::after{left:15px;}
+.shimmer-row{background:linear-gradient(90deg,var(--card) 25%,var(--card2) 50%,var(--card) 75%);background-size:200% 100%;animation:shimmerAnim 1.2s ease infinite;height:48px;border-radius:8px;margin-bottom:4px;}
+@keyframes shimmerAnim{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
 .sync{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;}
 .sync.saved{background:var(--grnl);color:var(--grn);}
 .sync.saving{background:var(--ambl);color:var(--amb);}
@@ -646,7 +648,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <div class="tb-right">
       <span class="pg-title" id="pgTitle">DASHBOARD</span>
       <div class="thm-tog" onclick="toggleTheme()"><i class="fa-solid fa-sun"></i><div class="tog-sw"></div><i class="fa-solid fa-moon"></i></div>
-      <button id="hardRefreshBtn" onclick="hardRefresh()" title="Refresh data from Supabase" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--bdr);background:var(--card);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:var(--tr);"><i class="fa-solid fa-rotate-right"></i></button>
+      <button id="hardRefreshBtn" onclick="hardRefresh()" title="Refresh data" title="Refresh data from Supabase" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--bdr);background:var(--card);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:var(--tr);"><i class="fa-solid fa-rotate-right"></i></button>
       <div class="sync saved" id="syncBadge"><i class="fa-solid fa-circle-check"></i><span id="syncTxt">Ready</span></div>
       <!-- ADMIN DROPDOWN -->
       <div style="position:relative;">
@@ -758,7 +760,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 
           <!-- OT Hotspot -->
           <div class="card">
-            <div class="ch"><div class="ct"><i class="fa-solid fa-fire" style="color:var(--red);margin-right:5px;"></i>OT Hotspot</div><div class="cs" id="otSub">Top 5 this month</div></div>
+            <div class="ch"><div class="ct"><i class="fa-solid fa-fire" style="color:var(--red);margin-right:5px;"></i>OT Hotspot <span style="font-size:10px;color:var(--txtm);" title="Based on live attendance records">~est</span></div><div class="cs" id="otSub">Top 5 this month</div></div>
             <div id="otHotspot" style="max-height:200px;overflow-y:auto;padding:0 14px;"></div>
           </div>
 
@@ -1730,6 +1732,19 @@ const _deb={};
 function deb(k,fn,ms=900){clearTimeout(_deb[k]);_deb[k]=setTimeout(fn,ms);}
 let _lastSyncTime=null;
 let _syncAgoIv=null;
+// called after successful admin login
+function onAdminLoggedIn(){startAdminAutoRefresh();}
+let _lastRefreshTime=Date.now();
+let _refreshAgoIv=null;
+function updateRefreshAgo(){
+  const mins=Math.floor((Date.now()-_lastRefreshTime)/60000);
+  const rfEl=document.getElementById('refreshAgoTxt');
+  if(rfEl)rfEl.textContent=mins<1?'just now':mins===1?'1 min ago':`${mins} min ago`;
+}
+function showShimmer(containerId,rows=5){
+  const el=document.getElementById(containerId);if(!el)return;
+  el.innerHTML=Array(rows).fill('<div class="shimmer-row"></div>').join('');
+}
 function setSyncStatus(s,msg=''){
   const el=document.getElementById('syncBadge'),tx=document.getElementById('syncTxt');
   if(!el)return;
@@ -2054,6 +2069,33 @@ async function recalcEmployeeMonth(employeeId,month,year){
   return await savePayrollSummary(employeeId,month,year);
 }
 
+// ── AUTO-REFRESH: poll every 50s for request/expense counts ──────────
+let _autoRefreshIv=null;
+function startAdminAutoRefresh(){
+  if(_autoRefreshIv)clearInterval(_autoRefreshIv);
+  _autoRefreshIv=setInterval(async()=>{
+    if(!currentUser)return;
+    // Quietly refresh counts only — don't re-render everything
+    const [reqR,expR,msgR]=await Promise.all([
+      sb.from('attendance_requests').select('id,status').eq('status','pending'),
+      sb.from('expenses').select('id,status').eq('status','pending'),
+      sb.from('messages').select('id,read').eq('read',false),
+    ]);
+    let changed=false;
+    if(!reqR.error){
+      const newCount=reqR.data?.length||0;
+      const oldCount=attRequests.filter(r=>r.status==='pending').length;
+      if(newCount!==oldCount){await loadAllData();changed=true;}
+    }
+    if(!changed&&!expR.error){
+      const newCount=expR.data?.length||0;
+      const oldCount=expenses.filter(e=>e.status==='pending').length;
+      if(newCount!==oldCount){await loadAllData();changed=true;}
+    }
+    if(!changed){updateBadges();updateRefreshAgo();}
+  },50000);
+}
+
 // ── CENTRAL INVALIDATION — call this whenever attendance/expenses/settings change
 // Queues a background recalculate + save so all pages see fresh data
 const _invalidateQ=new Set();
@@ -2146,7 +2188,7 @@ async function recalcWholeMonth(month,year){
   for(const emp of emps){
     await savePayrollSummary(emp.id,month,year);
   }
-  setSyncStatus('saved');
+  setSyncStatus('saved');_lastRefreshTime=Date.now();updateRefreshAgo();
 }
 
 // Lock a month: marks all employees' payroll_summary rows for that month as final+locked
@@ -2185,18 +2227,49 @@ async function unlockPayrollMonth(month,year){
 // ═══════════════════════════════════════════════════
 let isLoggedIn=false;
 // PIN auth replaced by Supabase Auth
+// ── safeWrite: wraps Supabase writes with error toast + console log ──
+async function escapeHtml(s){
+  if(!s)return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+async function safeWrite(fn, successMsg, silentFail=false){
+  try{
+    const r=await fn();
+    if(r&&r.error){
+      console.error('safeWrite error:',r.error);
+      if(!silentFail)toast(r.error.message||'Save failed','e');
+      return false;
+    }
+    if(successMsg)toast(successMsg,'s');
+    return r||true;
+  }catch(e){
+    console.error('safeWrite exception:',e);
+    if(!silentFail)toast('Connection error — please try again','e');
+    return false;
+  }
+}
+
+let _adminLoginAttempts=0;
+let _adminLoginDelay=0;
 async function doAdminLogin(){
   const email=document.getElementById('adminEmail').value.trim();
   const password=document.getElementById('adminPassword').value;
   const err=document.getElementById('authErr');
   const btn=document.getElementById('authBtn');
   err.style.display='none';
+  // Progressive delay on failed attempts
+  if(_adminLoginDelay>0){
+    btn.disabled=true;btn.textContent='Please wait...';
+    await new Promise(r=>setTimeout(r,_adminLoginDelay));
+    btn.disabled=false;btn.textContent='Sign In';
+  }
   if(!email||!password){err.textContent='Please enter your email and password.';err.style.display='block';return;}
   btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-rotate fa-spin" style="margin-right:6px;"></i>Signing in...';
   const {data,error}=await sb.auth.signInWithPassword({email,password});
   btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-right-to-bracket" style="margin-right:6px;"></i>Sign In';
   if(error){
-    err.textContent=error.message==='Invalid login credentials'?'Incorrect email or password.':error.message;
+    _adminLoginAttempts++;_adminLoginDelay=Math.min(([0,1000,2000,4000,8000][_adminLoginAttempts]||8000),8000);
+    err.textContent=(error.message==='Invalid login credentials'?'Incorrect email or password.':error.message)+(_adminLoginAttempts>=2?` (${_adminLoginDelay/1000}s delay next attempt)`:'');
     err.style.display='block';
     document.getElementById('adminPassword').value='';
     return;
@@ -2437,7 +2510,7 @@ function navigate(page){
   else if(page==='settings')loadSettings();
   else if(page==='att-requests')renderAttRequests();
 }
-document.querySelectorAll('.nav-item[data-page]').forEach(el=>el.addEventListener('click',()=>navigate(el.dataset.page)));
+document.querySelectorAll('.nav-item[data-page]').forEach(el=>el.addEventListener('click', ()=>navigate(el.dataset.page)));
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('col');}
 function toggleTheme(){const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';localStorage.setItem('dam_theme',h.dataset.theme);}
 (()=>{const t=localStorage.getItem('dam_theme');if(t){document.documentElement.dataset.theme=t;}else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches){document.documentElement.dataset.theme='dark';}else{document.documentElement.dataset.theme='light';}})();
@@ -2595,10 +2668,14 @@ function renderDashboard(){
     if(prevRow){
       prevPayrollEst+=parseFloat(prevRow.net_pay)||0;
     } else {
-      const pR=scopePrevMRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
-      pR.forEach(r=>{const p=calcPay(emp,r);prevPayrollEst+=p.total;});
-      prevPayrollEst+=scopePrevMRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
-      prevPayrollEst+=prevScopeExp.filter(e=>e.employee_id===emp.id).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      const _prevSaved=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===pm&&p.year===py);
+      if(_prevSaved){prevPayrollEst+=parseFloat(_prevSaved.net_pay)||0;}
+      else{
+        const pR=scopePrevMRecs.filter(r=>r.employee_id===emp.id&&isP(r.status));
+        pR.forEach(r=>{const p=calcPay(emp,r);prevPayrollEst+=p.total;});
+        prevPayrollEst+=scopePrevMRecs.filter(r=>r.employee_id===emp.id).reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
+        prevPayrollEst+=prevScopeExp.filter(e=>e.employee_id===emp.id).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      }
     }
   });
 
@@ -2649,7 +2726,7 @@ function renderDashboard(){
     {label:'Present Today',val:presentToday,sub:isSingle?(presentToday?'At work today':'Not marked today'):`of ${scopeEmps.length} active`,icon:'fa-user-check',color:'var(--grn)',bg:'var(--grnl)',click:"navigate('mark')",
       extra:leaveToday>0?`<div style="font-size:10px;color:var(--txtm);margin-top:3px;">${leaveNames.slice(0,2).join(', ')}${leaveNames.length>2?' +'+( leaveNames.length-2)+' more':''}</div>`:''},
     {label:'Absent Today',val:absentToday,sub:absentNames.length?absentNames.slice(0,2).join(', ')+(absentNames.length>2?` +${absentNames.length-2} more`:''):'None absent',icon:'fa-user-xmark',color:'var(--red)',bg:'var(--redl)',click:"navigate('daily')"},
-    {label:isSingle&&contractedHrs?'Hours vs Contracted':'Month Hours',val:scopeMonthHrs.toFixed(0)+'h',sub:isSingle&&contractedHrs?`of ${contractedHrs.toFixed(0)}h contracted`:MONTHS[month]+' '+year,icon:'fa-clock',color:'var(--blu)',bg:'var(--blul)',click:"navigate('monthly')",dlt:delta(scopeMonthHrs,prevMonthHrs,'','h',true)},
+    {label:isSingle&&contractedHrs?'Hours vs Contracted':'Month Hours',val:scopeMonthHrs.toFixed(0)+'h',sub:isSingle&&contractedHrs?`of ${contractedHrs.toFixed(0)}h contracted`:MONTHS[month]+' '+year,icon:'fa-clock',color:'var(--blu)',bg:'var(--blul)',click:"navigate('monthly')",dlt:delta(scopeMonthHrs,prevMonthHrs,'~','h',true)},
     {label:'OT Hours',val:scopeOTH.toFixed(1)+'h',sub:'overtime this month',icon:'fa-hourglass-half',color:'var(--amb)',bg:'var(--ambl)',click:"navigate('payroll')",dlt:delta(scopeOTH,prevOTH,'','h',false)},
   ];
   document.getElementById('kpiRow').innerHTML=kpi1.map(k=>`
@@ -3021,9 +3098,11 @@ function renderDashboard(){
     return isP(r.status)&&e&&isWDFor(e,new Date(r.date+'T00:00:00'));
   }).map(r=>r.date));
   const workedDaysToDate=_workedDayKeys.size;
-  // Cost per day = (wages earned so far + expenses so far) ÷ working days worked so far
+  // ~ Cost per day = (wages earned so far + expenses so far) ÷ working days worked so far
   // Wages = base pay + OT pay + bonuses for all present days this month
   const wagesEarned=scopeEmps.reduce((s,emp)=>{
+    const _savedR=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===month&&p.year===year);
+    if(_savedR)return s+(parseFloat(_savedR.base_pay)||0)+(parseFloat(_savedR.overtime_pay)||0);
     return s+scopeMRecs.filter(r=>r.employee_id===emp.id&&isP(r.status)).reduce((ss,r)=>{
       const p=calcPay(emp,r);return ss+p.base+p.ot;
     },0);
@@ -3385,7 +3464,12 @@ async function doClearDay(){
   if(!dayRecs.length){toast('No attendance to clear for this day','i');return;}
   // Calculate total pay at stake
   let totalPay=0;
-  dayRecs.forEach(r=>{const emp=employees.find(e=>e.id===r.employee_id);if(emp&&isP(r.status)){const p=calcPay(emp,r);totalPay+=p.base+p.ot;}});
+  dayRecs.forEach(r=>{
+    const emp2=employees.find(e=>e.id===r.employee_id);if(!emp2||!isP(r.status))return;
+    const savedRow=payrollSummaries.find(p=>p.employee_id===r.employee_id&&p.month===markDate.getMonth()&&p.year===markDate.getFullYear());
+    if(savedRow){totalPay+=(parseFloat(savedRow.base_pay)||0)/(savedRow.present_days||1);}
+    else{const p=calcPay(emp2,r);totalPay+=p.base+p.ot;}
+  });
   const C=cur();
   const empCount=new Set(dayRecs.map(r=>r.employee_id)).size;
   const dateLabel=markDate.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -3524,7 +3608,7 @@ function renderLedger(){
   });
   const realData=data.filter(function(r){return !isBlank(r);});
   const total=realData.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
-  document.getElementById('ledTitle').innerHTML=`${emp.name}${isEx?` <span style="color:var(--red);font-size:0.7em;background:var(--redl);padding:1px 6px;border-radius:4px;">EX</span>`:''} | ${MONTHS[parseInt(ledgerMonth)-1]} ${ledgerYear}`;
+  document.getElementById('ledTitle').innerHTML=`${escapeHtml(emp.name)}${isEx?` <span style="color:var(--red);font-size:0.7em;background:var(--redl);padding:1px 6px;border-radius:4px;">EX</span>`:''} | ${MONTHS[parseInt(ledgerMonth)-1]} ${ledgerYear}`;
   document.getElementById('ledTotal').textContent=C+total.toFixed(2);
   document.getElementById('ledRowCt').textContent=`${realData.length} row${realData.length!==1?'s':''}`;
   // Tag summary (from real rows only)
@@ -3656,12 +3740,12 @@ function openTagPicker(e,expId){
   picker.style.cssText=`display:block;top:${topPos}px;left:${Math.max(4,leftPos)}px;`;
   _activeTagPicker=picker;
 }
-document.addEventListener('click',()=>{if(_activeTagPicker){_activeTagPicker.style.display='none';_activeTagPicker=null;}});
+document.addEventListener('click', ()=>{if(_activeTagPicker){_activeTagPicker.style.display='none';_activeTagPicker=null;}});
 async function toggleTag(expId,tagName){
   const exp=expenses.find(e=>e.id===expId);if(!exp)return;
   const tags=[...(exp.tags||[])];
   if(tags.includes(tagName)){exp.tags=tags.filter(t=>t!==tagName);}else{exp.tags=[...tags,tagName];}
-  await sb.from('expenses').update({tags:exp.tags}).eq('id',expId);
+  safeWrite(()=>sb.from('expenses').update({tags:exp.tags}).eq('id',expId),'Tag saved',false);
   const cell=document.getElementById(`tc-${expId}`);
   if(cell)cell.innerHTML=buildTagsCell(exp.tags,expId);
   renderLedRight(expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===ledgerStaff&&d.getFullYear()===ledgerYear&&String(d.getMonth()+1).padStart(2,'0')===ledgerMonth;}).sort((a,b)=>a.date.localeCompare(b.date)),cur());
@@ -3669,6 +3753,11 @@ async function toggleTag(expId,tagName){
 async function updateExp(id,field,val){
   const exp=expenses.find(e=>e.id===id);if(!exp)return;
   if(field==='amount'&&parseFloat(val)===0){toast('Amount cannot be zero','e');return;}
+  // Hard block amount/date changes on locked months
+  if(field==='amount'||field==='date'){
+    const _expLockD=new Date((field==='date'?val:exp.date)+'T00:00:00');
+    if(isPayrollLocked(_expLockD.getMonth(),_expLockD.getFullYear())){toast('⛔ This expense is in a locked payroll month — unlock first to edit amount/date','e');return;}
+  }
   exp[field]=val;
   deb('exp-save-'+id,async()=>{
     await sb.from('expenses').update({[field]:val}).eq('id',id);
@@ -3701,6 +3790,8 @@ function checkAutoNextRow(rowId,rowIdx,totalRows){
 }
 async function addLedRow(){
   if(!ledgerStaff){toast('Select a staff member first','e');return;}
+  const _ledD=new Date(`${ledgerYear}-${ledgerMonth}-01`);
+  if(isPayrollLocked(_ledD.getMonth(),_ledD.getFullYear())){toast('⛔ '+_ledD.toLocaleDateString('en-GB',{month:'long',year:'numeric'})+' is locked — unlock payroll first','e');return;}
   const today=dateKey(new Date());
   const dateToUse=today.startsWith(`${ledgerYear}-${ledgerMonth}`)?today:`${ledgerYear}-${ledgerMonth}-${String(dim(parseInt(ledgerYear),parseInt(ledgerMonth)-1)).padStart(2,'0')}`;
   setSyncStatus('saving');
@@ -3878,7 +3969,7 @@ async function submitBatch(){
   if(!confirm(`Submit ${emp?.name} — ${MONTHS[parseInt(ledgerMonth)-1]} ${ledgerYear} (${fmt(total)}) for approval?`))return;
   // Remove existing pending batch for same period
   const existing=batches.find(b=>b.employee_id===ledgerStaff&&b.month===ledgerMonth&&b.year===ledgerYear&&b.status==='pending');
-  if(existing){await sb.from('expense_batches').delete().eq('id',existing.id);batches=batches.filter(b=>b.id!==existing.id);}
+  if(existing){safeWrite(()=>sb.from('expense_batches').delete().eq('id',existing.id),null,true);batches=batches.filter(b=>b.id!==existing.id);}
   const r=await sb.from('expense_batches').insert({employee_id:ledgerStaff,month:ledgerMonth,year:ledgerYear,total,status:'pending'}).select().single();
   if(r.error){toast(r.error.message,'e');return;}
   batches.push(r.data);updateBadges();toast(`Submitted for approval`,'s');
@@ -4521,7 +4612,7 @@ function renderSearch(q){
   if(query.length<2){document.getElementById('srchResults').innerHTML='<div class="es"><i class="fa-solid fa-magnifying-glass"></i><h3>Start typing</h3><p>Min 2 characters</p></div>';return;}
   const results=[];
   employees.forEach(emp=>{if(emp.name.toLowerCase().includes(query)||emp.role?.toLowerCase().includes(query))results.push({type:'Employee',name:emp.name,detail:emp.role||emp.contract_type||'',action:()=>editEmpModal(emp.id)});});
-  attendance.forEach(r=>{const emp=employees.find(e=>e.id===r.employee_id);if(!emp)return;const s=`${emp.name} ${r.date} ${r.status} ${r.notes||''}`.toLowerCase();if(s.includes(query))results.push({type:'Attendance',name:emp.name,detail:`${fmtDate(r.date)} — ${STATUSES.find(st=>st.c===r.status)?.l||r.status}`,action:()=>jumpToMark(r.date)});});
+  attendance.forEach(r=>{const emp=employees.find(e=>e.id===r.employee_id);if(!emp)return;const s=`${escapeHtml(emp.name)} ${r.date} ${r.status} ${escapeHtml(r.notes||'')}`.toLowerCase();if(s.includes(query))results.push({type:'Attendance',name:emp.name,detail:`${fmtDate(r.date)} — ${STATUSES.find(st=>st.c===r.status)?.l||r.status}`,action:()=>jumpToMark(r.date)});});
   expenses.forEach(r=>{const emp=employees.find(e=>e.id===r.employee_id);const s=`${emp?.name||''} ${r.merchant||''} ${r.category||''} ${r.date||''}`.toLowerCase();if(s.includes(query))results.push({type:'Expense',name:r.merchant||'—',detail:`${emp?.name||'?'} · ${r.category||''} · ${fmt(r.amount)} · ${r.date||''}`,action:()=>{}});});
   if(!results.length){document.getElementById('srchResults').innerHTML='<div class="es"><i class="fa-solid fa-magnifying-glass"></i><h3>No results</h3></div>';return;}
   const tc={Employee:'var(--blu)',Attendance:'var(--grn)',Expense:'var(--amb)'};
@@ -4673,7 +4764,8 @@ async function updateBankAmt(el,rowTotal){
   const empId=el.dataset.eid;const val=parseFloat(el.value)||0;
   const emp=employees.find(e=>e.id===empId);if(!emp)return;
   emp.bank_amt=val||null;
-  await sb.from('employees').update({bank_amt:val||null}).eq('id',empId);
+  const _baR=await sb.from('employees').update({bank_amt:val||null}).eq('id',empId);
+  if(_baR.error){toast('Could not save bank amount: '+_baR.error.message,'e');}
   const cashAmt=Math.max(0,rowTotal-Math.min(val,rowTotal));
   const cashEl=document.querySelector(`.pr-cash-${empId}`);
   if(cashEl)cashEl.textContent=cur()+cashAmt.toFixed(2)+' cash';
@@ -4787,7 +4879,7 @@ function renderEmployees(){
     const dotCol=emp.status==='Active'?'var(--grn)':emp.status==='ex'?'var(--pur)':'var(--amb)';
     // Avatar — photo or initials
     const photoHtml=emp.photo_url
-      ?`<img src="${emp.photo_url}" alt="${emp.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;">${inits(emp.name)}</span>`
+      ?`<img src="${emp.photo_url}" alt="${escapeHtml(emp.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;">${inits(emp.name)}</span>`
       :`<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;">${inits(emp.name)}</span>`;
     const avaBg=isEx?'linear-gradient(135deg,#7c3aed,#4c1d95)':avcol(emp.id);
     return`<div class="ec${isEx?' ex':''}" onclick="editEmpModal('${emp.id}')">
@@ -4834,7 +4926,9 @@ function renderEmployees(){
 }
 function setEmpTab(f,el){empTabFilter=f;document.querySelectorAll('#page-employees .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderEmployees();}
 // markEmpEx removed — use the Ex-Employee tab in the employee modal (confirmMarkEx)
-async function markEmpActive(id){const idx=employees.findIndex(e=>e.id===id);if(idx<0)return;await sb.from('employees').update({status:'Active',left_date:null}).eq('id',id);employees[idx].status='Active';employees[idx].left_date=null;renderEmployees();toast('Employee reinstated','s');}
+async function markEmpActive(id){const idx=employees.findIndex(e=>e.id===id);if(idx<0)return;const _raR=await sb.from('employees').update({status:'Active',left_date:null}).eq('id',id);
+  if(_raR.error){toast('Could not reactivate: '+_raR.error.message,'e');return;}
+  employees[idx].status='Active';employees[idx].left_date=null;renderEmployees();toast('Employee reinstated','s');}
 
 function initDangerTab(){
   const id=document.getElementById('empId').value;
