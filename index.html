@@ -1581,6 +1581,29 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 // ═══════════════════════════════════════════════════
 // SUPABASE INIT
 // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// CONFIG — all business rules and constants in one place
+// Change here to affect the entire app
+// ═══════════════════════════════════════════════════════
+const CONFIG_APP = {
+  // Attendance thresholds
+  LATE_GRACE_MINS:    15,    // minutes after contracted start = Late Arrival
+  EARLY_LEAVE_MINS:  10,    // minutes before contracted end = Left Early
+  DEFAULT_HOURS:      8,    // fallback contracted hours per day
+  // Payroll
+  PAGE_SIZE:          20,   // employees per payroll page
+  // Debounce timings
+  SAVE_DEBOUNCE_MS:  800,   // invalidatePayroll queue debounce
+  ATT_DEBOUNCE_MS: 1500,   // attendance auto-save debounce
+  REFRESH_MS:      50000,   // background auto-refresh interval
+  SYNC_REMINDER_MS:30000,   // retry countdown interval
+  // Uploads
+  MAX_FILE_BYTES: 5242880,  // 5MB max upload size
+  // UI
+  PIN_LENGTH:         4,    // employee PIN digits
+  PAST_DATE_WARN_DAYS: 30,  // warn if attendance older than X days
+};
+
 const SUPA_URL='https://pajpoerteyjrprcaisom.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhanBvZXJ0ZXlqcnByY2Fpc29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI4NDEsImV4cCI6MjA5NjQ4ODg0MX0.zUzCg-bq_9ZxYWSmk-Y9a_QqAe0t-45tjHP5Eiyxjcc';
 const sb=supabase.createClient(SUPA_URL,SUPA_KEY,{
@@ -1801,7 +1824,7 @@ function calcOT(h,emp){
   // OT threshold: employee's own → global → 8h default
   const t=emp.ot_threshold!=null&&emp.ot_threshold!==''&&parseFloat(emp.ot_threshold)>0
     ?parseFloat(emp.ot_threshold)
-    :(parseFloat(cfg.ot_threshold)||8);
+    :(parseFloat(cfg.ot_threshold)||CONFIG_APP.DEFAULT_HOURS);
   return v>t?parseFloat((v-t).toFixed(1)):0;
 }
 function calcPay(emp,rec){
@@ -1834,8 +1857,8 @@ function calcPay(emp,rec){
     if(otM>0){
       let bh=0;
       if(pt==='hourly')bh=histRate;
-      else if(pt==='daily'){const ch=parseFloat(emp.contracted_hours)||8;bh=ch>0?histRate/ch:0;}
-      else if(pt==='fixed'){const ch=parseFloat(emp.contracted_hours)||8;const wDays=workDaysInMonth(emp,dt.getFullYear(),dt.getMonth());bh=(ch>0&&wDays>0)?(histRate/wDays)/ch:0;}
+      else if(pt==='daily'){const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;bh=ch>0?histRate/ch:0;}
+      else if(pt==='fixed'){const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;const wDays=workDaysInMonth(emp,dt.getFullYear(),dt.getMonth());bh=(ch>0&&wDays>0)?(histRate/wDays)/ch:0;}
       otRate=bh*otM;
     }
   }
@@ -1850,7 +1873,7 @@ function calcPay(emp,rec){
     basePay=parseFloat((regularH*r*wkM).toFixed(2));
   } else if(pt==='daily'){
     const r=histRate;
-    const ch=parseFloat(emp.contracted_hours)||8; // contracted hours per day
+    const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS; // contracted hours per day
     const workedH=parseFloat(rec.hours)||0;
     const hourlyEquiv=ch>0?r/ch:0; // £/hr equivalent
     if(rec.status==='HD'){
@@ -1865,7 +1888,7 @@ function calcPay(emp,rec){
     }
   } else if(pt==='fixed'){
     const monthlySalary=histRate;
-    const ch=parseFloat(emp.contracted_hours)||8;
+    const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     // Calculate how many working days are in this month
     const dt2=new Date(rec.date+'T00:00:00');
     const yr=dt2.getFullYear(), mo=dt2.getMonth();
@@ -1929,7 +1952,7 @@ function calculatePayrollForEmployeeMonth(employeeId,month,year){
   // Expected (full-hours) base for deduction calculation — use same per-day rate as calcPay to stay consistent
   let expectedBase=basePay;
   if(emp.contracted_hours&&(pt==='daily'||pt==='fixed')){
-    const ch=parseFloat(emp.contracted_hours)||8;
+    const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     if(pt==='daily'){
       // Expected = sum of daily rates for each present day (using historical rate per day)
       expectedBase=aR.reduce((s,r)=>{
@@ -1948,7 +1971,7 @@ function calculatePayrollForEmployeeMonth(employeeId,month,year){
       expectedBase=parseFloat(expectedBase.toFixed(2));
     }
   } else if(pt==='hourly'&&emp.contracted_hours&&emp.hourly_rate){
-    const ch=parseFloat(emp.contracted_hours)||8;
+    const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     // Expected = contracted hours per day * days present * historical rate per day
     expectedBase=aR.reduce((s,r)=>{
       const rate=getRateForDate(emp,'hourly',r.date);
@@ -2093,7 +2116,7 @@ function startAdminAutoRefresh(){
       if(newCount!==oldCount){await loadAllData();changed=true;}
     }
     if(!changed){updateBadges();updateRefreshAgo();}
-  },50000);
+  },CONFIG_APP.REFRESH_MS);
 }
 
 // ── CENTRAL INVALIDATION — call this whenever attendance/expenses/settings change
@@ -2123,7 +2146,7 @@ function invalidatePayroll(employeeId,month,year){
     if(currentPage==='payroll')renderPayroll();
     if(currentPage==='dashboard')renderDashboard();
     if(currentPage==='yearly')renderYearly();
-  },800);
+  },CONFIG_APP.SAVE_DEBOUNCE_MS);
 }
 
 // Invalidate all employees for a month (e.g. settings change)
@@ -2360,6 +2383,65 @@ async function loadAllDataSilent(){
     };
   });
 }
+
+// ═══════════════════════════════════════════════════════
+// AppState — controlled access to the 5 most-shared globals
+// Use AppState.get/set to read/write these from any function
+// Direct mutation of the underlying vars still works for
+// backward compatibility — this is a progressive enhancement
+// ═══════════════════════════════════════════════════════
+const AppState = {
+  // employees
+  get employees(){ return employees; },
+  setEmployees(data){ employees = data; },
+  updateEmployee(id, patch){
+    const idx = employees.findIndex(e => e.id === id);
+    if(idx >= 0) Object.assign(employees[idx], patch);
+  },
+  // attendance
+  get attendance(){ return attendance; },
+  setAttendance(data){ attendance = data; },
+  upsertAttendance(rec){
+    const idx = attendance.findIndex(a => a.employee_id === rec.employee_id && a.date === rec.date);
+    if(idx >= 0) attendance[idx] = {...attendance[idx], ...rec};
+    else attendance.unshift(rec);
+  },
+  // expenses
+  get expenses(){ return expenses; },
+  setExpenses(data){ expenses = data; },
+  // currentPage
+  get currentPage(){ return currentPage; },
+  setCurrentPage(page){ currentPage = page; },
+  // markDate — always clone to prevent mutation bugs
+  get markDate(){ return new Date(markDate); },
+  setMarkDate(date){ markDate = new Date(date); },
+};
+
+// ── DATA SCOPING HELPER ─────────────────────────────────────────────
+// Computed once — covers current month + previous month
+function getDataFromDate(){
+  const now=new Date();
+  const prev=new Date(now.getFullYear(),now.getMonth()-1,1);
+  return prev.toISOString().slice(0,10); // YYYY-MM-DD
+}
+let _dataFromDate=getDataFromDate(); // e.g. "2026-05-01"
+
+// Load data for a specific historical month on demand
+async function loadMonthData(month,year){
+  const from=`${year}-${String(month+1).padStart(2,'0')}-01`;
+  const to=`${year}-${String(month+1).padStart(2,'0')}-31`;
+  const [attR,expR]=await Promise.all([
+    sb.from('attendance').select('*').gte('date',from).lte('date',to),
+    sb.from('expenses').select('*').gte('date',from).lte('date',to),
+  ]);
+  if(!attR.error)(attR.data||[]).forEach(r=>{
+    if(!attendance.find(a=>a.id===r.id))attendance.push(r);
+  });
+  if(!expR.error)(expR.data||[]).forEach(e=>{
+    if(!expenses.find(x=>x.id===e.id))expenses.push(e);
+  });
+}
+
 async function loadAllData(){
   setSyncStatus('saving');
   try{
@@ -2367,8 +2449,10 @@ async function loadAllData(){
     const [empR,cfgR,attR,expR,batR,msgR]=await Promise.all([
       sb.from('employees').select('*').order('name'),
       sb.from('settings').select('*').eq('id',1).single(),
-      sb.from('attendance').select('*').order('date',{ascending:false}),
-      sb.from('expenses').select('*').order('date',{ascending:false}),
+      // Load only current + previous month — massive performance improvement
+      // Use loadMonthData(month, year) for historical months on demand
+      sb.from('attendance').select('*').gte('date',_dataFromDate).order('date',{ascending:false}),
+      sb.from('expenses').select('*').gte('date',_dataFromDate).order('date',{ascending:false}),
       sb.from('expense_batches').select('*').order('submitted_at',{ascending:false}),
       sb.from('messages').select('*').order('created_at')
     ]);
@@ -2385,8 +2469,8 @@ async function loadAllData(){
       sb.from('employee_documents').select('*').order('uploaded_at',{ascending:false}),
       sb.from('salary_history').select('*').order('effective_from',{ascending:false}),
       sb.from('payment_status').select('*'),
-      sb.from('attendance_requests').select('*').order('created_at',{ascending:false}),
-      sb.from('payroll_summary').select('*')
+      sb.from('attendance_requests').select('*').gte('date',_dataFromDate).order('created_at',{ascending:false}),
+      sb.from('payroll_summary').select('*').gte('year',(()=>{const n=new Date();return n.getMonth()===0?n.getFullYear()-1:n.getFullYear();})())
     ]);
     employeeDocuments=docR.error?[]:docR.data||[];
     salaryHistory=salR.error?[]:salR.data||[];
@@ -3273,7 +3357,7 @@ function qMark(empId,status){
     if(hr)hr.value='';
     if(ot)ot.value='';
   }
-  deb('att-save',()=>saveAttSilent(),1500);
+  deb('att-save',()=>saveAttSilent(),CONFIG_APP.ATT_DEBOUNCE_MS);
 }
 function tMore(id){const s=document.getElementById(`st-${id}`);if(s){s.focus();s.size=8;setTimeout(()=>s.size=1,3000);}}
 function onMC(el){
@@ -3324,7 +3408,7 @@ function onMC(el){
       }
     }
   }
-  deb('att-save',()=>saveAttSilent(),1500);
+  deb('att-save',()=>saveAttSilent(),CONFIG_APP.ATT_DEBOUNCE_MS);
 }
 function recalcHOT(empId){
   const si=document.getElementById(`si-${empId}`),so=document.getElementById(`so-${empId}`);
@@ -3359,8 +3443,8 @@ function recalcHOT(empId){
       const [soh,som]=so.value.split(':').map(Number);
       const siMins=sih*60+sim;
       const soMins=soh*60+som;
-      const isLate=siMins>wsMins+15;
-      const isEarly=soMins<weMins-10;
+      const isLate=siMins>wsMins+CONFIG_APP.LATE_GRACE_MINS;
+      const isEarly=soMins<weMins-CONFIG_APP.EARLY_LEAVE_MINS;
       let newStatus='P';
       if(isLate&&isEarly)newStatus='LA';
       else if(isLate)newStatus='LA';
@@ -3760,7 +3844,7 @@ async function updateExp(id,field,val){
   }
   exp[field]=val;
   deb('exp-save-'+id,async()=>{
-    await sb.from('expenses').update({[field]:val}).eq('id',id);
+    await safeWrite(()=>sb.from('expenses').update({[field]:val}).eq('id',id),null,true);
     // Recalc payroll on any meaningful field change
     if(field==='amount'||field==='date'||field==='category'){
       const d=new Date((field==='date'?val:exp.date)+'T00:00:00');
@@ -4098,7 +4182,7 @@ function renderMonthly(){
   hRow+='<th>P</th><th>A</th><th>HD</th><th>☀</th><th>%</th></tr></thead>';
   let body='<tbody>';
   // Pagination — 20 per page
-  const PAGE_SIZE=20;
+  const PAGE_SIZE=CONFIG_APP.PAGE_SIZE;
   const totalPages=Math.ceil(emps.length/PAGE_SIZE);
   if(_payrollPage>=totalPages)_payrollPage=0;
   const pagedEmps=emps.slice(_payrollPage*PAGE_SIZE,(_payrollPage+1)*PAGE_SIZE);
@@ -4204,7 +4288,7 @@ async function renderEmpReport(){
   var grossPay=totalPay;
   var totalHoursDeduction=0;
   if(emp.pay_type==='daily'&&emp.contracted_hours&&emp.daily_rate){
-    var ch=parseFloat(emp.contracted_hours)||8;
+    var ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     var dr=parseFloat(emp.daily_rate)||0;
     var fullDayRecs=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';});
     grossPay=fullDayRecs.length*parseFloat(dr.toFixed(2))+recOT+totalBonus;
@@ -4212,7 +4296,7 @@ async function renderEmpReport(){
     totalHoursDeduction=_erSav?(parseFloat(_erSav.deduction_total)||0):Math.max(0,parseFloat((fullDayRecs.length*parseFloat(dr.toFixed(2))-actualBase).toFixed(2)));
   } else if(emp.pay_type==='fixed'&&emp.salary&&emp.contracted_hours){
     // Fixed salary: gross = what they'd earn if they worked all contracted hours for days present
-    var ch=parseFloat(emp.contracted_hours)||8;
+    var ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     var monthlySal=parseFloat(emp.salary)||0;
     // Work out daily equivalent for this month
     var wDays=workDaysInMonth(emp,year,month);
@@ -4223,7 +4307,7 @@ async function renderEmpReport(){
     var actualBase2=_erSav?(parseFloat(_erSav.base_pay)||0):fullDayRecs2.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
     totalHoursDeduction=_erSav?(parseFloat(_erSav.deduction_total)||0):Math.max(0,parseFloat((grossPay-actualBase2-recOT-totalBonus).toFixed(2)));
   } else if(emp.pay_type==='hourly'&&emp.hourly_rate&&emp.contracted_hours){
-    var ch2=parseFloat(emp.contracted_hours)||8;
+    var ch2=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     var hr=parseFloat(emp.hourly_rate)||0;
     var presentDaysCount=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';}).length;
     grossPay=presentDaysCount*ch2*hr+recOT+totalBonus;
@@ -4345,7 +4429,7 @@ async function renderEmpReport(){
     // Base Pay is already shown in row 1 — skip here
 
     if(showOT){
-      var ch=parseFloat(emp.contracted_hours)||8;
+      var ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
       var otHrRate=emp.pay_type==='daily'?(parseFloat(emp.daily_rate)||0)/ch:parseFloat(emp.hourly_rate)||0;
       payCards+='<div class="sc sc-sm" style="border-color:rgba(99,102,241,0.35);display:flex;align-items:stretch;">'
         +'<div class="sc-accent" style="background:var(--acc);"></div>'
@@ -4377,7 +4461,7 @@ async function renderEmpReport(){
         +'</div>';
     }
     if(showDeduct){
-      var ch2=parseFloat(emp.contracted_hours)||8;
+      var ch2=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
       var dedRate=emp.pay_type==='daily'?(parseFloat(emp.daily_rate)||0)/ch2:parseFloat(emp.hourly_rate)||0;
       var netAfterDed=grossPay-deductAmt+(showOT?recOT:0)+(showBonus?totalBonus:0);
       payCards+='<div class="sc sc-sm" style="border-color:rgba(220,38,38,0.35);display:flex;align-items:stretch;">'
@@ -4634,6 +4718,17 @@ function shiftPayroll(n){
 }
 function renderPayroll(){
   populateMY('prMonth','prYear');
+  // On-demand load: fetch this month's data if not already in memory
+  (async()=>{
+    const _m=parseInt(document.getElementById('prMonth')?.value??new Date().getMonth());
+    const _y=parseInt(document.getElementById('prYear')?.value??new Date().getFullYear());
+    const _from=`${_y}-${String(_m+1).padStart(2,'0')}-01`;
+    if(_from<_dataFromDate){
+      // Historical month — load on demand if not already fetched
+      const alreadyLoaded=attendance.some(a=>a.date.startsWith(_from.slice(0,7)));
+      if(!alreadyLoaded)await loadMonthData(_m,_y);
+    }
+  })();
   // Load payment statuses for this month
   setTimeout(()=>{
     const m2=parseInt(document.getElementById('prMonth')?.value??new Date().getMonth());
@@ -4708,7 +4803,7 @@ function renderPayroll(){
     const ptBdg=pt==='fixed'?'<span style="background:#dbeafe;color:#1d4ed8;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:3px;">SALARY</span>':pt==='daily'?'<span style="background:#fef3c7;color:#b45309;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:3px;">DAILY</span>':'<span style="background:#dcfce7;color:#15803d;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:3px;">HOURLY</span>';
     const cPill=`<span class="cp ${emp.contract_type==='PAYE'?'cp-p':'cp-s'}">${emp.contract_type||'PAYE'}</span>`;
     const baseDisp=(function(){
-    var contrH=parseFloat(emp.contracted_hours)||8;
+    var contrH=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     var fullDays=aR.filter(function(r){return r.status==='P'||r.status==='LA';}).length;
     var dedAmt=deductionTotal!=null?deductionTotal:0;
     // Always use saved deduction_total — never recalculate independently
@@ -4859,7 +4954,7 @@ function renderEmployees(){
     const pt=emp.pay_type||'hourly';
     const payLabel=pt==='fixed'?`${C}${parseFloat(emp.salary||0).toFixed(0)}/mo`:pt==='daily'?`${C}${parseFloat(emp.daily_rate||0).toFixed(0)}/day`:`${C}${parseFloat(emp.hourly_rate||0).toFixed(2)}/h`;
     const hasRate=(pt==='fixed'&&emp.salary)||(pt==='daily'&&emp.daily_rate)||emp.hourly_rate;
-    const ch0=parseFloat(emp.contracted_hours)||8;
+    const ch0=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     const wdc=empWorkDays(emp).length||6;
     let hrEquiv=0;
     if(pt==='fixed'&&emp.salary){
@@ -5252,7 +5347,7 @@ async function saveEmployee(){
     const fromDate=document.getElementById('eNewRateFrom').value||saved.join_date||dateKey(new Date());
     if(newRate>0){
       const rateField=pt3==='fixed'?'salary':pt3==='daily'?'daily_rate':'hourly_rate';
-      await sb.from('employees').update({[rateField]:newRate}).eq('id',saved.id);
+      await safeWrite(()=>sb.from('employees').update({[rateField]:newRate}).eq('id',saved.id),'Rate updated');
       const idx2=employees.findIndex(e=>e.id===saved.id);
       if(idx2>=0)employees[idx2][rateField]=newRate;
       const histRow={employee_id:saved.id,pay_type:pt3,old_rate:0,new_rate:newRate,effective_from:fromDate,notes:'Initial rate'};
@@ -5539,7 +5634,7 @@ function updateRateDisplay(){
   if(!disp)return;
   var sel=null;
   ['fixed','daily','hourly'].forEach(function(t){if(document.getElementById('pt-'+t).classList.contains('sel'))sel=t;});
-  var ch=parseFloat(document.getElementById('eContHrsD').value||document.getElementById('eContHrs').value)||8;
+  var ch=parseFloat(document.getElementById('eContHrsD').value||document.getElementById('eContHrs').value)||CONFIG_APP.DEFAULT_HOURS;
   var workDaysCount=document.querySelectorAll('.eWorkDay:checked').length||6;
   var C=cur();
   var isNew=!document.getElementById('empId').value;
@@ -5618,7 +5713,7 @@ async function loadMessages(empId){
   const msgs=messages.filter(m=>m.employee_id===empId).sort((a,b)=>a.created_at.localeCompare(b.created_at));
   // Mark as read
   const unread=msgs.filter(m=>!m.read&&m.sender!=='office');
-  if(unread.length>0){await sb.from('messages').update({read:true}).eq('employee_id',empId).neq('sender','office');unread.forEach(m=>{const idx=messages.findIndex(x=>x.id===m.id);if(idx>=0)messages[idx].read=true;});}
+  if(unread.length>0){await safeWrite(()=>sb.from('messages').update({read:true}).eq('employee_id',empId).neq('sender','office'),null,true);unread.forEach(m=>{const idx=messages.findIndex(x=>x.id===m.id);if(idx>=0)messages[idx].read=true;});}
   updateBadges();
   const list=document.getElementById('msgList');
   list.innerHTML=msgs.length?msgs.map(m=>{const isOffice=m.sender==='office';return`<div style="display:flex;flex-direction:column;align-items:${isOffice?'flex-end':'flex-start'};"><div class="msg-bubble ${isOffice?'msg-office':'msg-emp'}">${m.body}</div><div style="font-size:10px;color:var(--txtm);margin:1px 4px;">${new Date(m.created_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} · ${isOffice?'Office':emp?.name||'Employee'}</div></div>`}).join(''):'<div class="es" style="padding:20px;"><i class="fa-solid fa-message"></i><h3>No messages yet</h3></div>';
@@ -5643,7 +5738,7 @@ function renderFlags(){
   document.getElementById('flagBody').innerHTML=flagged.map(e=>{const emp=employees.find(x=>x.id===e.employee_id);return`<div class="flag-card"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:7px;margin-bottom:7px;"><div><strong>${emp?.name||'?'}</strong> — ${e.merchant||'—'}<br><span style="font-size:12px;color:var(--txt2);">${fmtDate(e.date)} · ${e.category||'—'} · ${C}${parseFloat(e.amount||0).toFixed(2)}</span></div><span class="bdg" style="background:var(--redl);color:var(--red);">Flagged</span></div>${e.flag_note?`<p style="font-size:12px;color:var(--txt2);margin-bottom:7px;">"${e.flag_note}"</p>`:''}<button class="btn btn-s btn-sm" onclick="resolveFlag('${e.id}')"><i class="fa-solid fa-check"></i>Mark Resolved</button></div>`;}).join('');
 }
 async function resolveFlag(id){
-  await sb.from('expenses').update({flagged:false,flag_note:null}).eq('id',id);
+  await safeWrite(()=>sb.from('expenses').update({flagged:false,flag_note:null}).eq('id',id),'Flag resolved');
   const idx=expenses.findIndex(e=>e.id===id);if(idx>=0){expenses[idx].flagged=false;expenses[idx].flag_note=null;}
   renderFlags();updateBadges();toast('Flag resolved','s');
 }
@@ -5672,7 +5767,7 @@ function loadSettings(){
   document.getElementById('sThreshold').value=cfg.threshold||80;
   document.getElementById('sWStart').value=cfg.work_start||'08:00';
   document.getElementById('sWEnd').value=cfg.work_end||'17:00';
-  document.getElementById('sOT').value=cfg.ot_threshold||8;
+  document.getElementById('sOT').value=cfg.ot_threshold||CONFIG_APP.DEFAULT_HOURS;
   document.getElementById('sOTMult').value=cfg.rate_ot||1.5;
   document.getElementById('sSat').value=cfg.rate_sat||1.0;
   document.getElementById('sSun').value=cfg.rate_sun||1.0;
@@ -6095,13 +6190,13 @@ async function setCustomPay(empId,m,y,type,val,bankAmt,cashAmt){
   const key=`${empId}_${m}_${y}`;
   if(!paymentStatuses[key])paymentStatuses[key]={bank_paid:false,cash_paid:false,bank_custom:null,cash_custom:null};
   paymentStatuses[key][type+'_custom']=val?parseFloat(val):null;
-  await sb.from('payment_status').upsert({
+  await safeWrite(()=>sb.from('payment_status').upsert({
     employee_id:empId,month:m,year:y,
     bank_paid:paymentStatuses[key].bank_paid,
     cash_paid:paymentStatuses[key].cash_paid,
     bank_custom:paymentStatuses[key].bank_custom,
     cash_custom:paymentStatuses[key].cash_custom
-  },{onConflict:'employee_id,month,year'});
+  },{onConflict:'employee_id,month,year'}),null,true);
   // Refresh cell
   const cell=document.getElementById(`pst-${empId}-${m}-${y}`);
   if(cell)cell.innerHTML=renderPayStatus(empId,m,y,bankAmt+cashAmt+(paymentStatuses[key].bank_custom||0)+(paymentStatuses[key].cash_custom||0),bankAmt,cashAmt,cur());
@@ -6113,14 +6208,14 @@ async function markPaid(empId,m,y,type,checked,bankAmt,cashAmt){
   paymentStatuses[key][type+'_paid']=checked;
   if(checked)paymentStatuses[key].paid_at=new Date().toISOString();
   // Persist to Supabase
-  await sb.from('payment_status').upsert({
+  await safeWrite(()=>sb.from('payment_status').upsert({
     employee_id:empId,month:m,year:y,
     bank_paid:paymentStatuses[key].bank_paid,
     cash_paid:paymentStatuses[key].cash_paid,
     paid_at:paymentStatuses[key].paid_at,
     bank_custom:paymentStatuses[key].bank_custom||null,
     cash_custom:paymentStatuses[key].cash_custom||null
-  },{onConflict:'employee_id,month,year'});
+  },{onConflict:'employee_id,month,year'}),null,true);
   // Refresh cell using passed bankAmt/cashAmt
   const cell=document.getElementById(`pst-${empId}-${m}-${y}`);
   if(cell){
@@ -6246,7 +6341,7 @@ async function clearAllAttReqs(){
   if(!approved.length){toast('No old requests to clear','i');return;}
   if(!confirm(`Clear ${approved.length} approved/rejected requests? Pending requests are kept.`))return;
   const ids=approved.map(r=>r.id);
-  await sb.from('attendance_requests').delete().in('id',ids);
+  await safeWrite(()=>sb.from('attendance_requests').delete().in('id',ids),'Old requests cleared');
   attRequests=attRequests.filter(r=>!ids.includes(r.id));
   updateBadges();renderAttRequests();toast(`${approved.length} old requests cleared`,'s');
 }
@@ -6310,10 +6405,10 @@ async function reviewAttReq(id,status,officeNote){
     // Determine status: LA = late arrival, EL = left early, P = on time
   const _wsEndMins=(()=>{const e=(_aEmp&&_aEmp.work_end)||cfg.work_end||'17:00';const[h,m]=e.split(':').map(Number);return h*60+m;})();
   const endMins2=req.sign_out?(()=>{const[h,m]=req.sign_out.split(':').map(Number);return h*60+m;})():null;
-  const isLate=startMins>_wsMins+15;
+  const isLate=startMins>_wsMins+CONFIG_APP.LATE_GRACE_MINS;
   const isEarlyLeave=endMins2!==null&&endMins2<_wsEndMins-10;
   const attStatus=isLate&&isEarlyLeave?'LA':isLate?'LA':isEarlyLeave?'EL':'P';
-    const attRec={employee_id:req.employee_id,date:req.date,status:attStatus,sign_in:req.sign_in,sign_out:req.sign_out,hours:req.hours,overtime:(function(){var e=employees.find(function(x){return x.id===req.employee_id;});var t=e&&e.ot_threshold!=null&&parseFloat(e.ot_threshold)>0?parseFloat(e.ot_threshold):(parseFloat(cfg.ot_threshold)||8);return Math.max(0,parseFloat(req.hours||0)-t);})()
+    const attRec={employee_id:req.employee_id,date:req.date,status:attStatus,sign_in:req.sign_in,sign_out:req.sign_out,hours:req.hours,overtime:(function(){var e=employees.find(function(x){return x.id===req.employee_id;});var t=e&&e.ot_threshold!=null&&parseFloat(e.ot_threshold)>0?parseFloat(e.ot_threshold):(parseFloat(cfg.ot_threshold)||CONFIG_APP.DEFAULT_HOURS);return Math.max(0,parseFloat(req.hours||0)-t);})()
 ,notes:req.employee_note};
     const ua=await sb.from('attendance').upsert(attRec,{onConflict:'employee_id,date'}).select().single();if(!ua.error){const _ad=new Date(attRec.date+'T00:00:00');invalidatePayroll(attRec.employee_id,_ad.getMonth(),_ad.getFullYear());}
     if(!ua.error){const ai=attendance.findIndex(a=>a.employee_id===req.employee_id&&a.date===req.date);if(ai>=0)attendance[ai]=ua.data;else attendance.push(ua.data);}
@@ -6997,7 +7092,7 @@ async function importAllData(){
 
   // Import settings separately (upsert by id=1)
   if(_importData.settings?.length){
-    await sb.from('settings').upsert(_importData.settings[0],{onConflict:'id'});
+    await safeWrite(()=>sb.from('settings').upsert(_importData.settings[0],{onConflict:'id'}),'Settings imported');
   }
 
   if(errors.length){
@@ -7412,7 +7507,7 @@ async function uploadLedReceipt(expId, input){
     const reader=new FileReader();
     reader.onload=async function(e){
       const url=e.target.result;
-      await sb.from('expenses').update({receipt_url:url}).eq('id',expId);
+      await safeWrite(()=>sb.from('expenses').update({receipt_url:url}).eq('id',expId),'Receipt saved');
       const idx=expenses.findIndex(function(ex){return ex.id===expId;});
       if(idx>=0)expenses[idx].receipt_url=url;
       renderLedger();
@@ -7423,7 +7518,7 @@ async function uploadLedReceipt(expId, input){
   }
   const {data:urlData}=sb.storage.from('employee-docs').getPublicUrl(path);
   const url=urlData.publicUrl;
-  await sb.from('expenses').update({receipt_url:url}).eq('id',expId);
+  await safeWrite(()=>sb.from('expenses').update({receipt_url:url}).eq('id',expId),'Receipt saved');
   const idx=expenses.findIndex(function(ex){return ex.id===expId;});
   if(idx>=0)expenses[idx].receipt_url=url;
   renderLedger();
