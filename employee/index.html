@@ -377,9 +377,72 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
 .toast.s i{color:var(--grn);}.toast.e i{color:var(--red);}.toast.i i{color:var(--acc);}
 @keyframes slideD{from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);}}
 .pull-tag{text-align:center;padding:5px;color:var(--txtm);font-size:11px;}
+
+/* ── New feature CSS (audit additions) ── */
+/* ═══════════════════════════════════════════════════════
+   SHARED STYLES — these classes exist in both admin and
+   employee apps. If you change one, update the other too.
+   Classes: .bP .bA .bHD .bL .bS .bLA .bEL .bUL
+            .auth-icon .auth-title .auth-sub .auth-brand
+   ═══════════════════════════════════════════════════════ */
+.bP{background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.2);display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+.bA{background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.2);display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+.bL{background:rgba(250,204,21,0.1);color:#fcd34d;border:1px solid rgba(250,204,21,0.2);display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+.bS{background:rgba(249,115,22,0.1);color:#fb923c;border:1px solid rgba(249,115,22,0.2);display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+.bH{background:rgba(139,92,246,0.12);color:#a78bfa;border:1px solid rgba(139,92,246,0.2);display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+.bHD{background:rgba(6,182,212,0.1);color:#22d3ee;border:1px solid rgba(6,182,212,0.2);display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+.bLA{background:rgba(251,146,60,0.1);color:#fb923c;border:1px solid rgba(251,146,60,0.2);display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+.bEL{background:rgba(249,115,22,0.1);color:#f97316;border:1px solid rgba(249,115,22,0.2);display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+.bUL{background:rgba(100,116,139,0.1);color:#94a3b8;border:1px solid rgba(100,116,139,0.2);display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+/* Mark modal for attendance submission */
+.mark-modal-bg{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;}
+.mark-modal{width:100%;max-width:480px;background:var(--card,#fff);border:1px solid rgba(255,255,255,0.3);border-radius:24px 24px 0 0;padding:20px 18px 32px;box-shadow:0 -8px 40px rgba(0,0,0,0.15);position:relative;}
+.modal-handle{width:36px;height:3px;border-radius:2px;background:rgba(0,0,0,0.15);margin:0 auto 16px;}
+.modal-title{font-size:16px;font-weight:800;margin-bottom:4px;}
+.modal-sub{font-size:12px;opacity:.6;}
+.time-picker-row{display:flex;align-items:center;gap:8px;margin:14px 0;}
+.time-block{flex:1;background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.08);border-radius:12px;padding:10px;text-align:center;cursor:pointer;}
+.time-block.active{border-color:var(--acc,#2563eb);background:rgba(37,99,235,0.06);}
+.time-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.5;}
+.time-val{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;}
+.time-sep{font-size:18px;font-weight:300;opacity:.4;}
+.hr-picker{display:flex;gap:5px;overflow-x:auto;padding:4px 0;-webkit-overflow-scrolling:touch;}
+.hr-picker::-webkit-scrollbar{height:0;}
+.h-btn,.min-btn{flex-shrink:0;width:42px;height:36px;background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.07);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.h-btn.sel,.min-btn.sel{background:rgba(37,99,235,0.12);border-color:rgba(37,99,235,0.4);color:#2563eb;}
+.mark-note{width:100%;background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.08);border-radius:10px;padding:10px 12px;font-size:13px;font-family:inherit;resize:none;margin-top:10px;}
+.mark-preview{border-radius:10px;padding:10px 12px;margin:10px 0;display:none;}
+.mark-pulse{animation:markPulse 2s infinite;}
+/* Circuit dividers */
+.ckt-div{display:flex;align-items:center;margin:10px 0;opacity:.35;}
+.ckt-div-line{flex:1;height:1px;background:currentColor;opacity:.3;}
+.ckt-div-node{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.ckt-div-cross{width:9px;height:9px;position:relative;flex-shrink:0;}
+.ckt-div-cross::before,.ckt-div-cross::after{content:'';position:absolute;background:currentColor;opacity:.4;}
+.ckt-div-cross::before{width:9px;height:1px;top:50%;left:0;transform:translateY(-50%);}
+.ckt-div-cross::after{width:1px;height:9px;left:50%;top:0;transform:translateX(-50%);}
+/* Popup notification */
+.popup-notif{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.95);backdrop-filter:blur(20px);border:1px solid rgba(0,0,0,0.1);border-radius:12px;padding:10px 16px;z-index:999;font-size:12px;font-weight:600;color:#0f172a;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,0.15);animation:slideD .3s ease;}
+/* Receipt zone */
+.rcpt-zone{border:1.5px dashed rgba(37,99,235,0.3);border-radius:12px;padding:20px;text-align:center;cursor:pointer;background:rgba(37,99,235,0.02);transition:all .2s;}
+.rcpt-zone:hover{border-color:rgba(37,99,235,0.5);background:rgba(37,99,235,0.04);}
+/* Profile avatar */
+.prof-av{width:72px;height:72px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;margin:0 auto 12px;}
+/* Salary history */
+.sal-hist-item{padding:10px 14px;border-bottom:1px solid rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:space-between;}
+/* Char counter */
+.ecc{font-size:10px;opacity:.5;text-align:right;margin-top:2px;}
+/* Sunday banners - keep old style */
+.sun-worked-banner{border-radius:12px;margin:5px 0;background:rgba(120,53,15,0.15);border-left:3px solid #f59e0b;padding:12px 14px;display:flex;align-items:center;gap:12px;}
+.sun-rest-banner{border-radius:12px;margin:4px 0;background:rgba(100,116,139,0.1);border-left:3px solid #94a3b8;padding:12px 14px;display:flex;align-items:center;gap:12px;}
+/* Canvas (hidden by default in old theme - no electric background) */
+#elec-canvas{display:none;}
+@keyframes markPulse{0%{box-shadow:0 0 0 0 rgba(37,99,235,0.4);}70%{box-shadow:0 0 0 8px rgba(37,99,235,0);}100%{box-shadow:0 0 0 0 rgba(37,99,235,0);}}
+@media print{.bot-nav,.topbar,#elec-canvas{display:none!important;}body{background:#fff!important;}}
 </style>
 </head>
 <body>
+<canvas id="elec-canvas" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;"></canvas>
 
 <!-- AUTH -->
 <div id="auth">
@@ -751,7 +814,20 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
 <div class="toast-wrap" id="toasts"></div>
 
 <script>
-const SB=supabase.createClient('https://pajpoerteyjrprcaisom.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhanBvZXJ0ZXlqcnByY2Fpc29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI4NDEsImV4cCI6MjA5NjQ4ODg0MX0.zUzCg-bq_9ZxYWSmk-Y9a_QqAe0t-45tjHP5Eiyxjcc',{auth:{persistSession:true,autoRefreshToken:true}});
+// ═══════════════════════════════════════════════════════
+// CONFIG — all business rules and constants in one place
+// ═══════════════════════════════════════════════════════
+const CONFIG_APP = {
+  LATE_GRACE_MINS:     15,   // minutes after start = Late Arrival
+  EARLY_LEAVE_MINS:   10,   // minutes before end = Left Early
+  DEFAULT_HOURS:       8,   // fallback contracted hours
+  SYNC_INTERVAL_MS: 11000,  // background sync frequency
+  MAX_FILE_BYTES:  5242880, // 5MB upload limit
+  PAST_DATE_WARN_DAYS: 30,  // warn if submitting old attendance
+  PIN_LENGTH:          4,   // PIN digits
+};
+
+const sb=supabase.createClient('https://pajpoerteyjrprcaisom.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhanBvZXJ0ZXlqcnByY2Fpc29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI4NDEsImV4cCI6MjA5NjQ4ODg0MX0.zUzCg-bq_9ZxYWSmk-Y9a_QqAe0t-45tjHP5Eiyxjcc',{auth:{persistSession:true,autoRefreshToken:true}});
 // Portal credentials — shared auth account for employee app
 const PORTAL_EMAIL='employee@app.com';
 const PORTAL_PASS='888888';
@@ -778,7 +854,7 @@ function isSun(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt
 
 
 
-function isP(s){return s==='P'||s==='HD'||s==='LA';}
+function isP(s){return s==='P'||s==='HD'||s==='LA'||s==='EL';}
 function dim(y,m){return new Date(y,m+1,0).getDate();}
 function C(){return cfg.currency||'£';}
 function fmt(v){return C()+parseFloat(v||0).toFixed(2);}
@@ -847,6 +923,23 @@ function applyPortalVisibility(e){
   // Also hide/show the salary card on home screen
   const salCard=document.getElementById('hmSalCard');
   if(salCard)salCard.style.display=showPay?'':'none';
+  // Check if salary is configured — show skeleton if not
+  const hasSalary=emp.salary>0||emp.hourly_rate>0||emp.daily_rate>0;
+  if(!hasSalary&&salCard&&showPay){
+    salCard.innerHTML=`<div style="padding:16px;">
+      <div style="font-size:10px;color:var(--acc);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Pay Status</div>
+      <div style="display:flex;align-items:center;gap:10px;padding:14px;background:rgba(250,204,21,0.06);border:1px solid rgba(250,204,21,0.2);border-radius:12px;">
+        <div style="width:36px;height:36px;border-radius:10px;background:rgba(250,204,21,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;animation:markPulse 2s infinite;">
+          <i class="fa-solid fa-clock" style="color:var(--amb);"></i>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--txt);">Pay data being calculated...</div>
+          <div style="font-size:11px;color:var(--txtm);margin-top:2px;">Salary not configured — contact your admin</div>
+        </div>
+      </div>
+    </div>`;
+    return;
+  }
 }
 function setTopbarPhoto(e){
   const av=document.getElementById('tbAv');
@@ -996,7 +1089,7 @@ async function empSavePhoto(){
   ctx.drawImage(img,_empCrop.x*scale,_empCrop.y*scale,_empCrop.imgW*_empCrop.zoom*scale,_empCrop.imgH*_empCrop.zoom*scale);
   const dataUrl=canvas.toDataURL('image/jpeg',0.82);
   // Save to Supabase employees.photo_url
-  const r=await SB.from('employees').update({photo_url:dataUrl}).eq('id',emp.id).select().single();
+  const r=await sb.from('employees').update({photo_url:dataUrl}).eq('id',emp.id).select().single();
   if(r.error){
     document.getElementById('photoErr').textContent='Could not save. Check connection.';
     btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-check" style="margin-right:6px;"></i>Save Photo';
@@ -1020,28 +1113,26 @@ async function submitChangePin(){
   if(n1.length<4||n1.length>6||!/^\d+$/.test(n1)){errEl.textContent='New PIN must be 4-6 digits';return;}
   if(n1!==n2){errEl.textContent='New PINs do not match';return;}
   if(n1===cur){errEl.textContent='New PIN must be different from current PIN';return;}
-  const r=await SB.from('employees').update({pin:n1}).eq('id',emp.id).select().single();
+  const r=await sb.from('employees').update({pin:n1}).eq('id',emp.id).select().single();
   if(r.error){errEl.textContent='Could not save. Check connection.';return;}
   emp=r.data;
   closeChangePin();
   toast('PIN updated','s');
 }
 document.addEventListener('click',e=>{
-  const pill=document.getElementById('idPill');
+  const pill=document.getElementById('idPill',{signal:empSignal()});
   const menu=document.getElementById('pillMenu');
   if(menu&&pill&&!pill.contains(e.target))menu.style.display='none';
 });
-function toggleTheme(){const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';localStorage.setItem('dam_emp_theme',h.dataset.theme);localStorage.setItem('dam_emp_theme_manual',Date.now().toString());}
-(()=>{
-  const saved=localStorage.getItem('dam_emp_theme');
-  const manual=localStorage.getItem('dam_emp_theme_manual');
-  if(saved&&manual&&Date.now()-parseInt(manual)<86400000){
-    document.documentElement.dataset.theme=saved;
-  } else {
-    const h=new Date().getHours();
-    document.documentElement.dataset.theme=(h>=20||h<6)?'dark':'light';
-  }
-})();
+function toggleTheme(){
+  const h=document.documentElement;
+  const isDark=h.dataset.theme!=='light';
+  h.dataset.theme=isDark?'light':'dark';
+  localStorage.setItem('dam_emp_theme',h.dataset.theme);
+  const btn=document.querySelector('.tb-theme');
+  if(btn)btn.innerHTML=isDark?'<i class="fa-solid fa-sun"></i>':'<i class="fa-solid fa-moon"></i>';
+  startElecCanvas();
+}
 function applyAutoTheme(){
   const manual=localStorage.getItem('dam_emp_theme_manual');
   if(manual&&Date.now()-parseInt(manual)<86400000)return;
@@ -1058,7 +1149,7 @@ function applyAutoTheme(){
 function selEmp(id){
   selEmpId=id;pinEntry='';
   const e=allEmps.find(x=>x.id===id);
-  document.getElementById('pinWho').textContent=`Hello ${e?.name?.split(' ')[0]||''} 👋`;
+  document.getElementById('pinWho').textContent=`Hello ${e?.name?.split(' ')[0]||''}`;
   document.getElementById('step1').style.display='none';
   document.getElementById('step2').style.display='block';
   renderPinDots();
@@ -1072,11 +1163,16 @@ function renderPinDots(){
   const dots=document.getElementById('pinDots');
   dots.innerHTML=Array.from({length:maxL},(_,i)=>`<div class="pin-dot${i<pinEntry.length?' on':''}"></div>`).join('');
 }
+let _pinAttempts=0;let _pinDelay=0;
 async function checkPin(){
   const e=allEmps.find(x=>x.id===selEmpId);
   if(!e?.pin){document.getElementById('pinErr').textContent='No PIN set. Contact admin.';pinEntry='';renderPinDots();return;}
-  if(pinEntry===e.pin){await enterApp(e);}
-  else{document.getElementById('pinErr').textContent='Incorrect PIN';pinEntry='';renderPinDots();setTimeout(()=>{document.getElementById('pinErr').textContent='';},2000);}
+  if(pinEntry===e.pin){_pinAttempts=0;_pinDelay=0;await enterApp(e);}
+  else{_pinAttempts++;_pinDelay=[0,1000,2000,4000,8000][Math.min(_pinAttempts,4)];
+    const errEl=document.getElementById('pinErr');
+    errEl.textContent='Incorrect PIN'+(_pinAttempts>=2?` — ${_pinDelay/1000}s delay`:'');
+    pinEntry='';renderPinDots();
+    if(_pinDelay>0){document.querySelectorAll('.pk,.back').forEach(b=>b.style.pointerEvents='none');setTimeout(()=>{document.querySelectorAll('.pk,.back').forEach(b=>b.style.pointerEvents='');if(errEl)errEl.textContent='';},_pinDelay);}setTimeout(()=>{document.getElementById('pinErr').textContent='';},2000);}
 }
 async function enterApp(e){
   emp=e;
@@ -1100,7 +1196,7 @@ async function enterApp(e){
   setSyncUI('live');
   applyAutoTheme();
   setInterval(applyAutoTheme, 3600000);
-  setInterval(silentSync, 11000);
+  window._syncIv=setInterval(silentSync, CONFIG_APP.SYNC_INTERVAL_MS);
   // Silently reload if a newer version of the app has been deployed
   setInterval(checkForUpdateAndReload, 5*60000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkForUpdateAndReload();});
@@ -1109,12 +1205,31 @@ async function enterApp(e){
 function confirmLogout(){
   if(confirm('Sign out? You will need your PIN to sign back in.'))doLogout();
 }
+function showShimmerEmp(id,rows=3){
+  const el=document.getElementById(id);if(!el)return;
+  el.innerHTML=Array(rows).fill('<div style="height:44px;border-radius:10px;background:linear-gradient(90deg,rgba(0,0,0,0.06) 25%,rgba(0,0,0,0.03) 50%,rgba(0,0,0,0.06) 75%);background-size:200% 100%;animation:slideD 1.2s ease infinite;margin-bottom:8px;"></div>').join('');
+}
+function updateEmpCharCount(el,max){
+  let counter=el.nextElementSibling;
+  if(!counter||!counter.classList.contains('ecc')){
+    counter=document.createElement('div');
+    counter.className='ecc';
+    counter.style.cssText='font-size:10px;color:var(--txtm);text-align:right;margin-top:2px;';
+    el.parentNode.insertBefore(counter,el.nextSibling);
+  }
+  const len=el.value.length;
+  counter.textContent=`${len}/${max}`;
+  counter.style.color=len>max*0.9?'var(--red)':'var(--txtm)';
+}
+function todayUK(){return new Date().toLocaleDateString('en-CA',{timeZone:'Europe/London'});}
 function doLogout(){
   // Clear localStorage session
   localStorage.removeItem('dam_emp_id');
   localStorage.removeItem('dam_emp_ts');
+  // Stop 11s sync interval
+  if(window._syncIv){clearInterval(window._syncIv);window._syncIv=null;}
   // Disconnect realtime
-  if(realtimeChannel){SB.removeChannel(realtimeChannel);realtimeChannel=null;}
+  if(realtimeChannel){sb.removeChannel(realtimeChannel);realtimeChannel=null;}
   // Clear ALL in-memory data — no stale data for next employee
   emp=null;
   myAtt=[];myExp=[];myMsgs=[];myBatches=[];mySalHist=[];myPaySt=[];myAttReqs=[];myPayroll=[];
@@ -1181,7 +1296,7 @@ async function silentSync(){
   setSyncUI('syncing');
   try{
   // Check if office has revoked access (PIN cleared or employee deactivated) — force logout if so
-  const meCheck=await SB.from('employees').select('pin,status,photo_url,show_pay_tab,show_running_pay').eq('id',emp.id).single();
+  const meCheck=await sb.from('employees').select('pin,status,photo_url,show_pay_tab,show_running_pay').eq('id',emp.id).single();
   if(!meCheck.error&&meCheck.data&&(!meCheck.data.pin||meCheck.data.status!=='Active')){
     toast('Your access was reset by the office. Please log in again.','e');
     doLogout();
@@ -1201,13 +1316,13 @@ async function silentSync(){
     if(emp.show_pay_tab!==prevShowPay||emp.show_running_pay!==prevShowRunning)applyPortalVisibility(emp);
   }
   const [attR,expR,msgR,batR,payStR,attReqR2,prSumR2]=await Promise.all([
-    SB.from('attendance').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
-    SB.from('expenses').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
-    SB.from('messages').select('*').eq('employee_id',emp.id).order('created_at'),
-    SB.from('expense_batches').select('*').eq('employee_id',emp.id).order('submitted_at',{ascending:false}),
-    SB.from('payment_status').select('*').eq('employee_id',emp.id),
-    SB.from('attendance_requests').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
-    SB.from('payroll_summary').select('*').eq('employee_id',emp.id)
+    sb.from('attendance').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
+    sb.from('expenses').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
+    sb.from('messages').select('*').eq('employee_id',emp.id).order('created_at'),
+    sb.from('expense_batches').select('*').eq('employee_id',emp.id).order('submitted_at',{ascending:false}),
+    sb.from('payment_status').select('*').eq('employee_id',emp.id),
+    sb.from('attendance_requests').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
+    sb.from('payroll_summary').select('*').eq('employee_id',emp.id)
   ]);
   const hadNewMsg=myMsgs.length<(msgR.data||[]).length;
   myAtt=attR.data||[];myExp=expR.data||[];myMsgs=msgR.data||[];
@@ -1239,14 +1354,14 @@ async function silentSync(){
 // ── DATA LOADING ──
 async function loadAll(){
   const [attR,expR,msgR,batR,salR,payStR,attReqR,prSumR]=await Promise.all([
-    SB.from('attendance').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
-    SB.from('expenses').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
-    SB.from('messages').select('*').eq('employee_id',emp.id).order('created_at'),
-    SB.from('expense_batches').select('*').eq('employee_id',emp.id).order('submitted_at',{ascending:false}),
-    SB.from('salary_history').select('*').eq('employee_id',emp.id).order('effective_from',{ascending:false}),
-    SB.from('payment_status').select('*').eq('employee_id',emp.id),
-    SB.from('attendance_requests').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
-    SB.from('payroll_summary').select('*').eq('employee_id',emp.id)
+    sb.from('attendance').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
+    sb.from('expenses').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
+    sb.from('messages').select('*').eq('employee_id',emp.id).order('created_at'),
+    sb.from('expense_batches').select('*').eq('employee_id',emp.id).order('submitted_at',{ascending:false}),
+    sb.from('salary_history').select('*').eq('employee_id',emp.id).order('effective_from',{ascending:false}),
+    sb.from('payment_status').select('*').eq('employee_id',emp.id),
+    sb.from('attendance_requests').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
+    sb.from('payroll_summary').select('*').eq('employee_id',emp.id)
   ]);
   myAtt=attR.data||[];
   myExp=expR.data||[];
@@ -1261,20 +1376,20 @@ async function loadAll(){
 
 // ── REALTIME ──
 function startRealtime(){
-  realtimeChannel=SB.channel('emp-'+emp.id)
+  realtimeChannel=sb.channel('emp-'+emp.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`employee_id=eq.${emp.id}`},payload=>{
       if(!myMsgs.find(m=>m.id===payload.new.id))myMsgs.push(payload.new);
       updateBadges();
       if(document.getElementById('pg-msg').classList.contains('on'))renderMsgs();
-      else showPopupNotif('💬 New message from Office');
+      else showPopupNotif('<i class="fa-solid fa-bell" style="margin-right:5px;"></i>New message from Office');
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'expense_batches',filter:`employee_id=eq.${emp.id}`},async payload=>{
       const idx=myBatches.findIndex(b=>b.id===payload.new.id);
       if(idx>=0)myBatches[idx]=payload.new;else myBatches.push(payload.new);
       updateBadges();
       const st=payload.new.status;
-      if(st==='approved'){confettiBurst(window.innerWidth/2,window.innerHeight/3,40);}
-      showPopupNotif(st==='approved'?'✅ Expenses Approved!':st==='rejected'?'❌ Expenses Rejected':'📋 Expense batch updated');
+      
+      showPopupNotif(st==='approved'?'<i class="fa-solid fa-check-circle" style="color:#16a34a;margin-right:5px;"></i>Expenses Approved!':st==='rejected'?'<i class="fa-solid fa-times-circle" style="color:#dc2626;margin-right:5px;"></i>Expenses Rejected':'<i class="fa-solid fa-receipt" style="margin-right:5px;"></i>Expense batch updated');
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'attendance',filter:`employee_id=eq.${emp.id}`},payload=>{
       const idx=myAtt.findIndex(a=>a.date===payload.new.date);
@@ -1294,14 +1409,14 @@ function startRealtime(){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'payment_status',filter:`employee_id=eq.${emp.id}`},payload=>{
       myPaySt.push(payload.new);
       updateBadges();
-      showPopupNotif(`💰 Payment ${payload.new.bank_paid?'sent to bank':payload.new.cash_paid?'given as cash':'updated'}!`,'payment');
+      showPopupNotif(`<i class="fa-solid fa-sterling-sign" style="margin-right:5px;"></i>Payment ${payload.new.bank_paid?'sent to bank':payload.new.cash_paid?'given as cash':'updated'}!`,'payment');
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'payment_status',filter:`employee_id=eq.${emp.id}`},payload=>{
       const idx=myPaySt.findIndex(p=>p.id===payload.new.id);
       if(idx>=0)myPaySt[idx]=payload.new;else myPaySt.push(payload.new);
       updateBadges();
       const n=payload.new;
-      if(n.bank_paid||n.cash_paid){confettiBurst(window.innerWidth/2,120,35);showPopupNotif(`💰 ${n.bank_paid?'Bank transfer':''} ${n.cash_paid?'Cash payment':''} confirmed ✓`);}
+      if(n.bank_paid||n.cash_paid){showPopupNotif(`<i class="fa-solid fa-sterling-sign" style="margin-right:5px;"></i>${n.bank_paid?'Bank transfer':''} ${n.cash_paid?'Cash payment':''} confirmed`);}
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'attendance_requests',filter:`employee_id=eq.${emp.id}`},payload=>{
       const idx=myAttReqs.findIndex(r=>r.id===payload.new.id);
@@ -1312,9 +1427,9 @@ function startRealtime(){
         const attIdx=myAtt.findIndex(a=>a.date===payload.new.date&&a.employee_id===emp.id);
         if(attIdx>=0){myAtt[attIdx].sign_in=payload.new.sign_in;myAtt[attIdx].sign_out=payload.new.sign_out;myAtt[attIdx].hours=payload.new.hours;}
       }
-      const msg=st==='approved'?`✅ Attendance request approved for ${payload.new.date}`
-               :st==='rejected'?`❌ Attendance request rejected — ${payload.new.office_note||'see office'}`
-               :'📋 Attendance request updated';
+      const msg=st==='approved'?`<i class="fa-solid fa-check-circle" style="color:#16a34a;margin-right:5px;"></i>Attendance request approved for ${payload.new.date}`
+               :st==='rejected'?`<i class="fa-solid fa-times-circle" style="color:#dc2626;margin-right:5px;"></i>Attendance request rejected — ${payload.new.office_note||'see office'}`
+               :'<i class="fa-solid fa-calendar-check" style="margin-right:5px;"></i>Attendance request updated';
       showPopupNotif(msg,'att-req');
       updateBadges();
       if(document.getElementById('pg-att').classList.contains('on'))renderAtt();
@@ -1349,6 +1464,7 @@ function showPg(id){
 // ── HOME ──
 function renderHome(){
   if(!emp)return;
+  showShimmerEmp('homeContent',3);
   const showPay=emp.show_pay_tab!==false;
   const showRunning=emp.show_running_pay!==false;
   const salCard=document.getElementById('hmSalCard');
@@ -1457,7 +1573,7 @@ function renderHome(){
     const dt=new Date(y,m,d),key=dk(dt),rec=mRecs.find(r=>r.date===key);
     const sun=isSun(dt);
     const cls=sun?'sun':rec?rec.status:'empty';
-    const lbl=rec?rec.status:(sun?'☀':'·');
+    const lbl=rec?rec.status:(sun?'·':'·');
     const isT=key===today;
     const el=document.createElement('div');el.className='att-day';
     el.innerHTML=`<div class="att-day-n">${d}</div><div class="att-box ${cls}${isT?' today':''}">${lbl}</div>`;
@@ -1523,7 +1639,7 @@ function renderAtt(){
     const dt=new Date(y,m,d),key=dk(dt),rec=mRecs.find(r=>r.date===key);
     const sun=isSun(dt);const cls=sun?'sun':rec?rec.status:'empty';
     const el=document.createElement('div');el.className='att-day';
-    el.innerHTML=`<div class="att-day-n">${d}</div><div class="att-box ${cls}${key===today?' today':''}">${rec?rec.status:(sun?'☀':'·')}</div>`;
+    el.innerHTML=`<div class="att-day-n">${d}</div><div class="att-box ${cls}${key===today?' today':''}">${rec?rec.status:(sun?'·':'·')}</div>`;
     strip.appendChild(el);
   }
 
@@ -1544,85 +1660,24 @@ function renderAtt(){
 
     if(sun){
       const worked=rec&&isP(rec.status);
-      // Vary by actual date+month so each Sunday looks different across months
-      const weekNum=(Math.floor((d-1)/7) + attM) % 5;
-
       if(worked){
-        // WORKED SUNDAY — animated gold banner with sun
         html+=`<div class="sun-worked-banner">
-          <!-- Stars twinkling in background -->
-          <div style="position:absolute;inset:0;overflow:hidden;">
-            ${[...Array(6)].map((_,i)=>`<div style="position:absolute;width:4px;height:4px;border-radius:50%;background:#fbbf24;opacity:0.6;top:${10+i*12}%;left:${10+i*14}%;animation:twinkle ${1.5+i*0.4}s ease-in-out ${i*0.3}s infinite;"></div>`).join('')}
+          <i class="fa-solid fa-bolt" style="color:#f59e0b;font-size:18px;flex-shrink:0;"></i>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:#fbbf24;">Sunday — Worked</div>
+            <div style="font-size:11px;color:#fbbf24;opacity:0.8;">${rec.sign_in?rec.sign_in+'–'+(rec.sign_out||'?'):'Full day'} · ${rec.hours?rec.hours+'h':''}</div>
           </div>
-          <div style="position:relative;padding:11px 13px;display:flex;align-items:center;gap:9px;">
-            ${dateCol}${dayCol}
-            <div style="flex:1;">
-              <div style="font-size:13px;font-weight:800;color:#78350f;letter-spacing:-0.2px;">Sunday — Worked 💪</div>
-              <div style="font-size:11px;color:#92400e;">${rec.sign_in?rec.sign_in+'–'+(rec.sign_out||'?'):'Full day'}</div>
-            </div>
-            <div style="text-align:center;flex-shrink:0;">
-              <div style="width:44px;height:44px;border-radius:50%;background:rgba(251,191,36,0.25);display:flex;align-items:center;justify-content:center;animation:sunGlow 2s ease-in-out infinite;">
-                <span style="font-size:22px;animation:float1 3s ease-in-out infinite;">☀️</span>
-              </div>
-              ${rec.hours?`<div style="font-size:12px;font-weight:800;color:#78350f;margin-top:3px;">${rec.hours}h</div>`:''}
-            </div>
-          </div>
+          <span style="background:rgba(245,158,11,0.2);color:#fbbf24;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">+1 Day</span>
         </div>`;
       } else {
-        // REST SUNDAY — animated themed banners rotating each week
-        const themes=[
-          // Week 0 — Beach & Palm trees
-          {bg:'linear-gradient(135deg,#0ea5e9,#0284c7,#7dd3fc,#bae6fd)',scene:`
-            <div style="position:absolute;bottom:0;left:0;right:0;height:18px;background:rgba(251,191,36,0.25);border-radius:0 0 14px 14px;"></div>
-            <div style="position:absolute;bottom:14px;right:14px;font-size:28px;animation:float2 4s ease-in-out infinite;">🌴</div>
-            <div style="position:absolute;bottom:14px;right:48px;font-size:18px;animation:float1 5s ease-in-out 0.5s infinite;">🌴</div>
-            <div style="position:absolute;top:8px;left:50%;font-size:26px;animation:float3 3.5s ease-in-out infinite;transform:translateX(-50%);">☀️</div>
-            <div style="position:absolute;top:6px;right:22px;font-size:11px;animation:cloudMove 5s ease-in-out infinite;">☁️</div>`,
-            label:'Beach Day 🏖️',sub:'Relax, you earned it',col:'#0c4a6e'},
-          // Week 1 — Mountain hike
-          {bg:'linear-gradient(135deg,#6ee7b7,#34d399,#a7f3d0,#ecfdf5)',scene:`
-            <div style="position:absolute;bottom:0;left:0;right:0;height:22px;background:rgba(52,211,153,0.2);border-radius:0 0 14px 14px;"></div>
-            <div style="position:absolute;bottom:14px;left:10px;font-size:24px;animation:float1 6s ease-in-out infinite;">🏔️</div>
-            <div style="position:absolute;bottom:12px;left:42px;font-size:18px;animation:float2 5s ease-in-out 1s infinite;">🌲</div>
-            <div style="position:absolute;top:7px;right:12px;font-size:20px;animation:drift 8s ease-in-out infinite;">🦅</div>
-            <div style="position:absolute;top:5px;left:12px;font-size:13px;animation:cloudMove 7s ease-in-out infinite;">☁️</div>`,
-            label:'Adventure Day 🏔️',sub:'Go explore something new',col:'#064e3b'},
-          // Week 2 — Family time
-          {bg:'linear-gradient(135deg,#fce7f3,#fbcfe8,#f9a8d4,#fdf2f8)',scene:`
-            <div style="position:absolute;top:6px;right:10px;font-size:26px;animation:bounce 2s ease-in-out infinite;">👨‍👩‍👧</div>
-            <div style="position:absolute;bottom:8px;left:10px;font-size:20px;animation:float1 4s ease-in-out infinite;">🏠</div>
-            <div style="position:absolute;bottom:10px;left:40px;font-size:14px;animation:float2 3s ease-in-out 0.5s infinite;">🌸</div>
-            <div style="position:absolute;bottom:8px;left:62px;font-size:14px;animation:float3 4s ease-in-out 1s infinite;">🌺</div>`,
-            label:'Family Time 🏠',sub:'The best things in life',col:'#831843'},
-          // Week 3 — Rest & recharge
-          {bg:'linear-gradient(135deg,#ede9fe,#ddd6fe,#c4b5fd,#f5f3ff)',scene:`
-            <div style="position:absolute;top:5px;right:10px;font-size:26px;animation:float3 5s ease-in-out infinite;">🌙</div>
-            <div style="position:absolute;top:8px;right:40px;font-size:12px;animation:twinkle 2s ease-in-out 0.5s infinite;">⭐</div>
-            <div style="position:absolute;top:4px;left:14px;font-size:14px;animation:twinkle 1.8s ease-in-out 0.2s infinite;">✨</div>
-            <div style="position:absolute;bottom:8px;left:12px;font-size:22px;animation:float1 6s ease-in-out infinite;">😴</div>
-            <div style="position:absolute;bottom:8px;left:44px;font-size:18px;animation:float2 4s ease-in-out 1s infinite;">☕</div>`,
-            label:'Recharge Day 😴',sub:'Rest well, work hard tomorrow',col:'#4c1d95'},
-          // Week 4 — Sport & fitness  
-          {bg:'linear-gradient(135deg,#d1fae5,#a7f3d0,#6ee7b7,#ecfdf5)',scene:`
-            <div style="position:absolute;top:5px;right:10px;font-size:24px;animation:bounce 1.5s ease-in-out infinite;">⚽</div>
-            <div style="position:absolute;bottom:8px;right:12px;font-size:20px;animation:float1 4s ease-in-out infinite;">🏃</div>
-            <div style="position:absolute;top:8px;left:12px;font-size:16px;animation:float2 5s ease-in-out 1s infinite;">🏅</div>
-            <div style="position:absolute;bottom:8px;left:12px;font-size:16px;animation:twinkle 2s ease-in-out infinite;">💪</div>`,
-            label:'Active Sunday 🏃',sub:'Stay healthy, stay happy',col:'#065f46'}
-        ];
-        const th=themes[weekNum%themes.length];
-        html+=`<div class="sun-rest-banner" style="background:${th.bg};">
-          <div style="position:absolute;inset:0;overflow:hidden;">${th.scene}</div>
-          <div style="position:relative;padding:12px 13px;display:flex;align-items:center;gap:9px;">
-            ${dateCol}${dayCol}
-            <div style="flex:1;">
-              <div style="font-size:13px;font-weight:800;color:${th.col};letter-spacing:-0.2px;">${th.label}</div>
-              <div style="font-size:11px;color:${th.col};opacity:0.7;">${th.sub}</div>
-            </div>
+        html+=`<div class="sun-rest-banner">
+          <i class="fa-solid fa-mug-hot" style="color:#64748b;font-size:18px;flex-shrink:0;"></i>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;color:#94a3b8;">Sunday — Rest Day</div>
+            <div style="font-size:11px;color:#64748b;">No attendance required</div>
           </div>
         </div>`;
       }
-      continue;
     }
 
     // Regular days
@@ -1748,7 +1803,7 @@ let _rcptFile=null;
 function rcptChosen(input){
   _rcptFile=input.files[0];if(!_rcptFile)return;
   const fnEl=document.getElementById('rcptFileName');
-  if(fnEl){fnEl.textContent='📎 '+_rcptFile.name;fnEl.style.display='block';}
+  if(fnEl){fnEl.textContent='<i class="fa-solid fa-paperclip"></i> '+_rcptFile.name;fnEl.style.display='block';}
   const isPdf=/\.pdf$/i.test(_rcptFile.name);
   if(!isPdf){const r=new FileReader();r.onload=e=>{const img=document.getElementById('rcptPreview');img.src=e.target.result;img.style.display='block';};r.readAsDataURL(_rcptFile);}
   else{const img=document.getElementById('rcptPreview');img.style.display='none';} // PDF: show name only
@@ -1771,16 +1826,18 @@ async function submitExp(){
   const merchant=document.getElementById('expMerchant').value.trim();
   const amt=parseFloat(document.getElementById('expAmt').value);
   const date=document.getElementById('expDate').value;
+  if(!merchant||!date||isNaN(parseFloat(document.getElementById('expAmt').value))){_submittingExp=false;toast('Please fill date, merchant and amount','e');return;}
+  if(amt===0){_submittingExp=false;toast('Amount cannot be zero','e');return;}
   if(!merchant||!amt||!date){_submittingExp=false;toast('Please fill date, merchant and amount','e');return;}
   let fileUrl=null;
   if(_rcptFile){
-    if(_rcptFile.size>5*1024*1024){toast('Receipt must be under 5MB','e');_submittingExp=false;return;}
+    if(_rcptFile.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');_submittingExp=false;return;}
     const ext=_rcptFile.name.split('.').pop()||'jpg';
     const path=`receipts/${emp.id}/${Date.now()}.${ext}`;
-    const {error}=await SB.storage.from('employee-docs').upload(path,_rcptFile,{upsert:true});
-    if(!error){const {data:ud}=SB.storage.from('employee-docs').getPublicUrl(path);fileUrl=ud?.publicUrl||null;}
+    const {error}=await sb.storage.from('employee-docs').upload(path,_rcptFile,{upsert:true});
+    if(!error){const {data:ud}=sb.storage.from('employee-docs').getPublicUrl(path);fileUrl=ud?.publicUrl||null;}
   }
-  const r=await SB.from('expenses').insert({employee_id:emp.id,date,merchant,category:document.getElementById('expCat').value||null,amount:amt,notes:document.getElementById('expNotes').value||null,receipt_url:fileUrl,status:'pending',tags:document.getElementById('expVAT')?.checked?['VAT']:[],flagged:false}).select().single();
+  const r=await sb.from('expenses').insert({employee_id:emp.id,date,merchant,category:document.getElementById('expCat').value||null,amount:amt,notes:document.getElementById('expNotes').value||null,receipt_url:fileUrl,status:'pending',tags:document.getElementById('expVAT')?.checked?['VAT']:[],flagged:false}).select().single();
   if(r.error){_submittingExp=false;toast(r.error.message,'e');return;}
   myExp.unshift(r.data);
   document.getElementById('expMerchant').value='';document.getElementById('expAmt').value='';document.getElementById('expNotes').value='';document.getElementById('expCat').value='';const rp=document.getElementById('rcptPreview');if(rp){rp.style.display='none';rp.src='';}
@@ -1816,7 +1873,7 @@ function renderExpenses(){
         <div class="exp-name">${e.merchant||'—'}</div>
         <div class="exp-meta">${e.category||'—'} · ${fmtDS(e.date)}</div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap;">
-          <span class="exp-status ${e.status||'draft'}">${isApproved?'✓ Approved':isRejected?'✗ Rejected':e.status==='pending'?'⏳ Pending review':'Draft'}</span>
+          <span class="exp-status ${e.status||'draft'}">${isApproved?'Approved':isRejected?'Rejected':e.status==='pending'?'Pending review':'Draft'}</span>
           ${e.receipt_url?`<a href="${e.receipt_url}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:var(--txtm);display:inline-flex;align-items:center;gap:2px;text-decoration:none;"><i class="fa-solid fa-paperclip" style="font-size:9px;"></i>receipt</a>`:''}
         </div>
         ${isFlagged?`<div style="font-size:11px;color:var(--red);margin-top:4px;font-weight:600;"><i class="fa-solid fa-flag" style="margin-right:3px;"></i>Flagged by office${e.flag_note?': "'+e.flag_note+'"':''}</div>`:''}
@@ -1824,7 +1881,7 @@ function renderExpenses(){
       </div>
       <div style="text-align:right;flex-shrink:0;">
         <div class="exp-amt" style="color:${isApproved?'var(--grn)':isRejected?'var(--red)':'var(--grn)'};">${fmt(e.amount)}</div>
-        ${!isFlagged&&!isApproved?`<button onclick="toggleFlag('${e.id}')" style="font-size:10px;color:var(--txtm);background:none;border:1px solid var(--bdr);border-radius:5px;padding:2px 6px;cursor:pointer;margin-top:4px;">⚑ Flag</button>`:''}
+        ${!isFlagged&&!isApproved?`<button onclick="toggleFlag('${e.id}')" style="font-size:10px;color:var(--txtm);background:none;border:1px solid var(--bdr);border-radius:5px;padding:2px 6px;cursor:pointer;margin-top:4px;"><i class="fa-solid fa-flag" style="font-size:11px;"></i> Flag</button>`:''}
       </div>
     </div>`;
   }).join('')+`<div style="border-top:1px solid var(--bdr);padding-top:9px;margin-top:9px;display:flex;justify-content:space-between;"><span style="font-size:13px;font-weight:700;">Total</span><span style="font-family:JetBrains Mono;font-size:14px;font-weight:800;color:var(--grn);">${fmt(total)}</span></div>`:
@@ -1871,7 +1928,7 @@ async function editAndResendExp(id){
       const amt=parseFloat(document.getElementById('expAmt').value);
       if(!merchant||!amt){toast('Fill in merchant and amount','e');return;}
   if(isNaN(parseFloat(amt))){toast('Amount must be a number','e');return;}
-      const r=await SB.from('expenses').update({merchant,amount:amt,category:document.getElementById('expCat').value||null,notes:document.getElementById('expNotes').value||null,status:'pending',flagged:false,flag_note:null,date:document.getElementById('expDate').value,tags:document.getElementById('expVAT')&&document.getElementById('expVAT').checked?['VAT']:[]}).eq('id',id);
+      const r=await sb.from('expenses').update({merchant,amount:amt,category:document.getElementById('expCat').value||null,notes:document.getElementById('expNotes').value||null,status:'pending',flagged:false,flag_note:null,date:document.getElementById('expDate').value,tags:document.getElementById('expVAT')&&document.getElementById('expVAT').checked?['VAT']:[]}).eq('id',id);
       if(r.error){toast(r.error.message,'e');return;}
       const idx=myExp.findIndex(x=>x.id===id);if(idx>=0){myExp[idx]={...myExp[idx],merchant,amount:amt,status:'pending',flagged:false,flag_note:null,tags:document.getElementById('expVAT')&&document.getElementById('expVAT').checked?['VAT']:[]};}
       // Reset button
@@ -1890,7 +1947,7 @@ async function toggleFlag(id){
   const e=myExp.find(x=>x.id===id);if(!e)return;
   const reason=e.flagged?null:prompt('Reason for flagging:');
   if(!e.flagged&&reason===null)return; // cancelled
-  const r=await SB.from('expenses').update({flagged:!e.flagged,flag_note:reason}).eq('id',id);
+  const r=await sb.from('expenses').update({flagged:!e.flagged,flag_note:reason}).eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   e.flagged=!e.flagged;e.flag_note=reason;
   renderExpenses();toast(e.flagged?'Flagged for review':'Flag removed','i');
@@ -2082,8 +2139,9 @@ async function renderMsgs(){
   const area=document.getElementById('msgArea');
   const unread=myMsgs.filter(m=>!m.read&&m.sender==='office');
   if(unread.length>0){
-    await SB.from('messages').update({read:true}).eq('employee_id',emp.id).eq('sender','office');
-    unread.forEach(m=>m.read=true);
+    const _mrR=await sb.from('messages').update({read:true}).eq('employee_id',emp.id).eq('sender','office');
+    if(_mrR.error){toast('Could not update messages','e');}
+    else{unread.forEach(m=>m.read=true);}
   }
   updateBadges();
   if(!myMsgs.length){area.innerHTML='<div style="text-align:center;color:var(--txtm);font-size:13px;padding:20px;">No messages yet. Send a message to the office.</div>';return;}
@@ -2103,7 +2161,7 @@ async function sendMsg(){
   const body=input.value.trim();if(!body)return;
   _sendingMsg=true;
   input.disabled=true;
-  const r=await SB.from('messages').insert({employee_id:emp.id,sender:'employee',body,read:false}).select().single();
+  const r=await sb.from('messages').insert({employee_id:emp.id,sender:'employee',body,read:false}).select().single();
   input.disabled=false;_sendingMsg=false;
   if(r.error){toast(r.error.message,'e');return;}
   // Only add if not already in list (realtime may have already added it)
@@ -2153,7 +2211,7 @@ function buildHomeTodayMark(){
   } else {
     const isSun=new Date().getDay()===0;
     el.innerHTML=`<button onclick="openMarkModal('${today}')" class="mark-today-btn">
-      <i class="fa-solid fa-fingerprint" style="font-size:22px;"></i>Tap to Mark Today${isSun?' 🌞':''}
+      <i class="fa-solid fa-fingerprint" style="font-size:22px;"></i>Tap to Mark Today${''}
     </button>`;
   }
 }
@@ -2283,10 +2341,10 @@ function updateMarkPreview(){
   } else if(hours>STD_HOURS){
     prev.style.background='var(--grnl)';hoursDisp.style.color='var(--grn)';
     const extra=hours-STD_HOURS;
-    statusDisp.innerHTML=`<span style="color:var(--grn);">On time ✓ · +${extra.toFixed(1)}h extra</span>`;
+    statusDisp.innerHTML=`<span style="color:var(--grn);"><i class="fa-solid fa-check" style="color:var(--grn);margin-right:3px;"></i>On time · +${extra.toFixed(1)}h extra</span>`;
   } else {
     prev.style.background='var(--grnl)';hoursDisp.style.color='var(--grn)';
-    statusDisp.innerHTML=`<span style="color:var(--grn);">On time ✓</span>`;
+    statusDisp.innerHTML=`<span style="color:var(--grn);"><i class="fa-solid fa-check" style="color:var(--grn);margin-right:3px;"></i>On time</span>`;
   }
 }
 
@@ -2298,6 +2356,10 @@ function closeMarkModal(){
 }
 
 let _submittingAtt=false;
+window.addEventListener('beforeunload',e=>{if(_submittingAtt){e.preventDefault();e.returnValue='Submission in progress.';return e.returnValue;}});
+let _empPageAC=new AbortController();
+function _resetEmpListeners(){_empPageAC.abort();_empPageAC=new AbortController();}
+function empSignal(){return _empPageAC.signal;}
 async function submitAttRequest(){
   if(_submittingAtt)return;
   _submittingAtt=true;
@@ -2310,9 +2372,10 @@ async function submitAttRequest(){
   // Warn if date is more than 30 days in the past
   const _subDt=new Date(date+'T00:00:00');
   const _daysAgo=Math.floor((new Date()-_subDt)/(1000*60*60*24));
-  if(_daysAgo>30&&!confirm('This date is '+_daysAgo+' days ago. Submit anyway?')){_submittingAtt=false;return;}
-    if(endMins<=startMins){toast('End time must be after start time','e');_submittingAtt=false;return;}
+  if(_daysAgo>CONFIG_APP.PAST_DATE_WARN_DAYS&&!confirm('This date is '+_daysAgo+' days ago. Submit anyway?')){_submittingAtt=false;return;}
+    if(endMins<=startMins){toast('Sign-in and sign-out cannot be the same time','e');_submittingAtt=false;return;}
   const hours=parseFloat(((endMins-startMins)/60).toFixed(1));
+  if(hours<=0){toast('Sign-in and sign-out cannot be the same time','e');_submittingAtt=false;return;}
   const [_ssh,_ssm]=STD_START.split(':').map(Number);
   const [_seh,_sem]=STD_END.split(':').map(Number);
   const stdStart=_ssh*60+_ssm,stdEnd=_seh*60+_sem;
@@ -2329,15 +2392,15 @@ async function submitAttRequest(){
   let r;
   try{
   if(existing){
-    r=await SB.from('attendance_requests').update({sign_in:startStr,sign_out:endStr,hours,employee_note:note,status:'pending',office_note:null,reviewed_at:null}).eq('id',existing.id).select().single();
+    r=await sb.from('attendance_requests').update({sign_in:startStr,sign_out:endStr,hours,employee_note:note,status:'pending',office_note:null,reviewed_at:null}).eq('id',existing.id).select().single();
     if(!r.error){const idx=myAttReqs.findIndex(x=>x.id===existing.id);if(idx>=0)myAttReqs[idx]=r.data;}
   } else {
-    r=await SB.from('attendance_requests').insert({employee_id:emp.id,date,sign_in:startStr,sign_out:endStr,hours,employee_note:note,status:'pending'}).select().single();
+    r=await sb.from('attendance_requests').insert({employee_id:emp.id,date,sign_in:startStr,sign_out:endStr,hours,employee_note:note,status:'pending'}).select().single();
     if(!r.error)myAttReqs.unshift(r.data);
   }
   if(r.error){toast('Could not send request: '+r.error.message,'e');_submittingAtt=false;return;}
   closeMarkModal();_submittingAtt=false;
-  toast('Attendance request sent ✓','s');
+  toast('Attendance request sent','s');
   renderAtt();
   // Also show on home
   buildTodayMarkSection();
@@ -2346,57 +2409,18 @@ async function submitAttRequest(){
 
 
 // ═══════════════════════════════════════════════════
-// SUNDAY ENGINE v2 — 52 unique weekly themes
-// ═══════════════════════════════════════════════════
-;
-
-// ═══════════════════════════════════════════════════
-// HIDDEN GEMS — Micro-interactions
-// ═══════════════════════════════════════════════════
-
-// 1. TACTILE BUTTON RIPPLES
-// 2. CONFETTI BURST
-const CONFETTI_COLORS=['#2563eb','#16a34a','#f59e0b','#ec4899','#8b5cf6','#06b6d4','#f97316'];
-let _confettiCount=0;
-function confettiBurst(x,y,amount=30){
-  if(_confettiCount>80)return;
-  amount=Math.min(amount,80-_confettiCount);
-  for(let i=0;i<amount;i++){
-    const p=document.createElement('div');
-    const col=CONFETTI_COLORS[Math.floor(Math.random()*CONFETTI_COLORS.length)];
-    const size=3+Math.random()*7;
-    const angle=(Math.PI*2*i)/amount;
-    const vel=80+Math.random()*140;
-    const tx=Math.cos(angle)*vel;
-    const ty=Math.sin(angle)*vel-90;
-    const rot=Math.random()*720;
-    p.style.cssText=`position:fixed;left:${x}px;top:${y}px;width:${size}px;height:${size}px;background:${col};border-radius:${Math.random()>0.5?'50%':'2px'};pointer-events:none;z-index:9999;animation:confettiBurst 1.2s cubic-bezier(0.25,0.46,0.45,0.94) forwards;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;`;
-    document.body.appendChild(p);setTimeout(()=>p.remove(),1300);
-  }
-}
 
 // 3. TIME-OF-DAY AWARENESS
 // 4. SECRET GESTURE COMMANDS
-function triggerRainbow(){
-  let hue=0;const iv=setInterval(()=>{
-    hue+=4;document.body.style.filter=`hue-rotate(${hue}deg)`;
-    if(hue>=360){clearInterval(iv);document.body.style.filter='';}
-  },30);
-  toast('🌈 Rainbow mode!','s');
-}
-function triggerWiggle(){
-  document.querySelectorAll('.card,.sal-card').forEach((c,i)=>{
-    setTimeout(()=>{c.style.animation='wiggleCard 0.4s ease';setTimeout(()=>c.style.animation='',400);},i*60);
-  });
-  toast('🎉 Wiggle party!','s');
-}
+
+
 
 // 5. LIVING GLASS SHIMMER on salary card
 // 6. PARALLAX DEPTH ORBS
 // INITIALISE ALL GEMS
 // Keyboard PIN support
 document.addEventListener('keydown',e=>{
-  const s2=document.getElementById('step2');
+  const s2=document.getElementById('step2',{signal:empSignal()});
   if(!s2||s2.style.display==='none')return;
   if(e.key>='0'&&e.key<='9')pk(e.key);
   else if(e.key==='Backspace')pdel();
@@ -2406,9 +2430,9 @@ document.addEventListener('keydown',e=>{
 
 // ── INIT ──
 async function tryAutoLogin(){
-  const {data:{session}}=await SB.auth.getSession();
+  const {data:{session}}=await sb.auth.getSession();
   if(!session){
-    const {error:authErr}=await SB.auth.signInWithPassword({email:PORTAL_EMAIL,password:PORTAL_PASS});
+    const {error:authErr}=await sb.auth.signInWithPassword({email:PORTAL_EMAIL,password:PORTAL_PASS});
     if(authErr){
       console.error('Portal login failed:',authErr.message);
       document.getElementById('phoneErr').textContent='Could not connect. Check internet.';
@@ -2420,8 +2444,8 @@ async function tryAutoLogin(){
   const savedTs=parseInt(localStorage.getItem('dam_emp_ts')||'0');
   const sevenDays=7*24*60*60*1000;
   if(savedId&&Date.now()-savedTs<sevenDays){
-    const r=await SB.from('employees').select('*').eq('id',savedId).single();
-    const cfgR=await SB.from('settings').select('*').eq('id',1).single();
+    const r=await sb.from('employees').select('*').eq('id',savedId).single();
+    const cfgR=await sb.from('settings').select('*').eq('id',1).single();
     if(cfgR.data)cfg=cfgR.data;
     if(!r.error&&r.data&&r.data.status==='Active'&&r.data.pin){
       allEmps=[r.data];
@@ -2433,7 +2457,7 @@ async function tryAutoLogin(){
     localStorage.removeItem('dam_emp_ts');
   }
   // Load settings only — employee list NOT shown until phone is entered
-  const cfgR=await SB.from('settings').select('*').eq('id',1).single();
+  const cfgR=await sb.from('settings').select('*').eq('id',1).single();
   if(cfgR.data)cfg=cfgR.data;
   document.getElementById('step1').style.display='block';
 }
@@ -2448,7 +2472,7 @@ async function submitPhone(){
   const errEl=document.getElementById('phoneErr');
   errEl.textContent='';
   if(norm.length<10){errEl.textContent='Enter a valid mobile number';return;}
-  const r=await SB.from('employees').select('*').eq('status','Active');
+  const r=await sb.from('employees').select('*').eq('status','Active');
   if(r.error){errEl.textContent='Could not connect. Check internet.';return;}
   const matches=(r.data||[]).filter(function(e){return normPhone(e.phone)===norm;});
   if(!matches.length){errEl.textContent='Phone number not recognized. Contact your office.';return;}
@@ -2481,7 +2505,7 @@ async function submitNewPin(){
   if(p1.length<4||p1.length>6||!/^\d+$/.test(p1)){errEl.textContent='PIN must be 4-6 digits';return;}
   if(p1!==p2){errEl.textContent='PINs do not match';return;}
   const e=allEmps.find(function(x){return x.id===selEmpId;});
-  const r=await SB.from('employees').update({pin:p1}).eq('id',selEmpId).select().single();
+  const r=await sb.from('employees').update({pin:p1}).eq('id',selEmpId).select().single();
   if(r.error){errEl.textContent='Could not save PIN. Try again.';return;}
   allEmps=[r.data];
   await enterApp(r.data);
@@ -2519,6 +2543,155 @@ window.addEventListener('unhandledrejection',e=>{
   if(e.reason?.message&&!e.reason.message.includes('aborted'))
     toast('Connection error — check internet','e');
 });
+
+
+// ═══════════════════════════════════════════════════
+// ELECTRIC BACKGROUND CANVAS — B2 Lightning Storm
+// ═══════════════════════════════════════════════════
+let _elecRAF=null;
+
+function startElecCanvas(){
+  if(_elecRAF){cancelAnimationFrame(_elecRAF);_elecRAF=null;}
+  const c=document.getElementById('elec-canvas');
+  if(!c)return;
+  const isDay=document.documentElement.dataset.theme==='light';
+  const ctx=c.getContext('2d');
+
+  function resize(){c.width=window.innerWidth;c.height=window.innerHeight;}
+  resize();
+  window.addEventListener('resize',resize);
+
+  // Floating spark particles
+  const sparks=Array.from({length:isDay?20:38},()=>({
+    x:Math.random()*c.width,
+    y:Math.random()*c.height,
+    vx:(Math.random()-.5)*(isDay?.3:.5),
+    vy:(Math.random()-.5)*.3-.08,
+    r:Math.random()*1.4+.2,
+    alpha:Math.random()*(isDay?.18:.4)+.04,
+    col:isDay
+      ?(Math.random()>.5?'37,99,235':'6,182,212')
+      :(Math.random()>.6?'252,211,77':Math.random()>.5?'59,130,246':'6,182,212'),
+    pulse:Math.random()*Math.PI*2,
+    pulseSpeed:Math.random()*.03+.01,
+  }));
+
+  // Falling spark trails
+  const trails=Array.from({length:isDay?5:10},()=>({
+    x:Math.random()*c.width,
+    y:Math.random()*c.height,
+    vy:Math.random()*(isDay?.5:.9)+.2,
+    len:Math.random()*14+4,
+    alpha:Math.random()*(isDay?.12:.28)+.05,
+    col:isDay?'37,99,235':(Math.random()>.5?'59,130,246':'252,211,77'),
+  }));
+
+  // Glow orbs
+  const orbs=isDay?[
+    {x:()=>c.width*.82,y:()=>c.height*.1,r:100,col:'219,234,254',a:.7},
+    {x:()=>c.width*.05,y:()=>c.height*.65,r:70,col:'224,242,254',a:.45},
+  ]:[
+    {x:()=>c.width*.82,y:()=>c.height*.12,r:120,col:'37,99,235',a:.13},
+    {x:()=>c.width*.08,y:()=>c.height*.7,r:80,col:'250,204,21',a:.07},
+    {x:()=>c.width*.5,y:()=>c.height*.45,r:140,col:'6,182,212',a:.05},
+  ];
+
+  // Lightning bolt
+  let boltSegs=[],boltAlpha=0,boltTimer=60+Math.random()*60;
+  function mkBolt(x1,y1,x2,y2,d){
+    if(d<=0)return[[x1,y1,x2,y2]];
+    const mx=(x1+x2)/2+(Math.random()-.5)*28;
+    const my=(y1+y2)/2+(Math.random()-.5)*22;
+    return[...mkBolt(x1,y1,mx,my,d-1),...mkBolt(mx,my,x2,y2,d-1)];
+  }
+  function regenBolt(){
+    const x=Math.random()*c.width;
+    boltSegs=mkBolt(x,0,x+(Math.random()-.5)*80,c.height*(isDay?.35:.55),4);
+    boltAlpha=isDay?.3:.7;
+  }
+
+  function frame(){
+    ctx.clearRect(0,0,c.width,c.height);
+
+    // Orbs
+    orbs.forEach(o=>{
+      const ox=o.x(),oy=o.y();
+      const g=ctx.createRadialGradient(ox,oy,0,ox,oy,o.r);
+      g.addColorStop(0,`rgba(${o.col},${o.a})`);
+      g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;
+      ctx.beginPath();ctx.arc(ox,oy,o.r,0,Math.PI*2);ctx.fill();
+    });
+
+    // Grid dots
+    ctx.fillStyle=isDay?'rgba(37,99,235,0.06)':'rgba(59,130,246,0.05)';
+    const gs=28;
+    for(let x=gs/2;x<c.width;x+=gs){
+      for(let y=gs/2;y<c.height;y+=gs){
+        ctx.beginPath();ctx.arc(x,y,.8,0,Math.PI*2);ctx.fill();
+      }
+    }
+
+    // Spark particles
+    sparks.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0)p.x=c.width;if(p.x>c.width)p.x=0;
+      if(p.y<-10)p.y=c.height;if(p.y>c.height)p.y=0;
+      p.pulse+=p.pulseSpeed;
+      const a=p.alpha*(0.7+0.3*Math.sin(p.pulse));
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${p.col},${a})`;ctx.fill();
+    });
+
+    // Falling trails
+    trails.forEach(t=>{
+      t.y+=t.vy;
+      if(t.y>c.height+20){t.y=-t.len;t.x=Math.random()*c.width;}
+      const g=ctx.createLinearGradient(t.x,t.y-t.len,t.x,t.y);
+      g.addColorStop(0,`rgba(${t.col},0)`);
+      g.addColorStop(1,`rgba(${t.col},${t.alpha})`);
+      ctx.strokeStyle=g;ctx.lineWidth=isDay?.7:1;
+      ctx.beginPath();ctx.moveTo(t.x,t.y-t.len);ctx.lineTo(t.x,t.y);ctx.stroke();
+    });
+
+    // Lightning bolt
+    if(!isDay){
+      boltTimer++;
+      if(boltTimer>120){boltTimer=0;regenBolt();}
+      if(boltAlpha>0){
+        // Glow
+        ctx.strokeStyle=`rgba(59,130,246,${boltAlpha*.35})`;
+        ctx.lineWidth=4;
+        boltSegs.forEach(([x1,y1,x2,y2])=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();});
+        // Main bolt
+        ctx.strokeStyle=`rgba(148,210,255,${boltAlpha})`;
+        ctx.lineWidth=1.2;
+        ctx.shadowBlur=12;ctx.shadowColor=`rgba(56,189,248,${boltAlpha})`;
+        boltSegs.forEach(([x1,y1,x2,y2])=>{ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();});
+        ctx.shadowBlur=0;
+        boltAlpha-=.028;
+      }
+    }
+
+    _elecRAF=requestAnimationFrame(frame);
+  }
+
+  regenBolt();
+  frame();
+}
+
+// Start canvas on load and restore theme
+(function(){
+  const saved=localStorage.getItem('dam_emp_theme');
+  if(saved)document.documentElement.dataset.theme=saved;
+  // Wait for DOM
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',startElecCanvas);
+  } else {
+    startElecCanvas();
+  }
+})();
+
 </script>
 </body>
 </html>
