@@ -341,15 +341,15 @@ tr.rsun td{background:var(--sut)!important;}
 .qd:hover{transform:scale(1.2);}
 .qd.active{border-color:var(--txt);transform:scale(1.15);}
 /* ── Option A: Gradient row colours by status ── */
-.mr-P td{background:linear-gradient(90deg,#bbf7d0 0%,#dcfce7 40%,var(--card) 80%)!important;}
-.mr-A td{background:linear-gradient(90deg,#fecaca 0%,#fee2e2 40%,var(--card) 80%)!important;}
-.mr-HD td{background:linear-gradient(90deg,#fde68a 0%,#fef9c3 40%,var(--card) 80%)!important;}
-.mr-L td{background:linear-gradient(90deg,#ddd6fe 0%,#ede9fe 40%,var(--card) 80%)!important;}
-.mr-S td{background:linear-gradient(90deg,#fed7aa 0%,#ffedd5 40%,var(--card) 80%)!important;}
+.mr-P td,.rsat.mr-P td,.rsun.mr-P td{background:linear-gradient(90deg,#bbf7d0 0%,#dcfce7 40%,var(--card) 80%)!important;}
+.mr-A td,.rsat.mr-A td,.rsun.mr-A td{background:linear-gradient(90deg,#fecaca 0%,#fee2e2 40%,var(--card) 80%)!important;}
+.mr-HD td,.rsat.mr-HD td,.rsun.mr-HD td{background:linear-gradient(90deg,#fde68a 0%,#fef9c3 40%,var(--card) 80%)!important;}
+.mr-L td,.rsat.mr-L td,.rsun.mr-L td{background:linear-gradient(90deg,#ddd6fe 0%,#ede9fe 40%,var(--card) 80%)!important;}
+.mr-S td,.rsat.mr-S td,.rsun.mr-S td{background:linear-gradient(90deg,#fed7aa 0%,#ffedd5 40%,var(--card) 80%)!important;}
 .mr-H td{background:linear-gradient(90deg,#fbcfe8 0%,#fce7f3 40%,var(--card) 80%)!important;}
-.mr-LA td{background:linear-gradient(90deg,#fde68a 0%,#fef9c3 40%,var(--card) 80%)!important;}
-.mr-EL td{background:linear-gradient(90deg,#fed7aa 0%,#ffedd5 40%,var(--card) 80%)!important;}
-.mr-UL td{background:linear-gradient(90deg,#e2e8f0 0%,#f1f5f9 40%,var(--card) 80%)!important;}
+.mr-LA td,.rsat.mr-LA td,.rsun.mr-LA td{background:linear-gradient(90deg,#fde68a 0%,#fef9c3 40%,var(--card) 80%)!important;}
+.mr-EL td,.rsat.mr-EL td,.rsun.mr-EL td{background:linear-gradient(90deg,#fed7aa 0%,#ffedd5 40%,var(--card) 80%)!important;}
+.mr-UL td,.rsat.mr-UL td,.rsun.mr-UL td{background:linear-gradient(90deg,#e2e8f0 0%,#f1f5f9 40%,var(--card) 80%)!important;}
 /* Glow dot next to status label */
 .st-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;}
 .st-dot-P{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,0.2);}
@@ -1682,6 +1682,17 @@ let markDate=new Date(), dailyDate=new Date();
 let ledgerYear=new Date().getFullYear(), ledgerStaff=null, ledgerMonth=String(new Date().getMonth()+1).padStart(2,'0');
 let aprTab='pending', empTabFilter='Active';
 let _touched=new Set(), _activeTagPicker=null;
+document.addEventListener('paste',function(e){
+  if(currentPage!=='ledger')return;
+  const items=[...(e.clipboardData||e.originalEvent?.clipboardData)?.items||[]];
+  const imgItem=items.find(it=>it.type.startsWith('image/'));
+  if(!imgItem)return;
+  const focused=document.activeElement?.closest('tr[data-exp-id]');
+  const expId=focused?.dataset?.expId;
+  if(!expId){toast('Click a row first then Ctrl+V to paste receipt','i');return;}
+  const blob=imgItem.getAsFile();
+  if(blob)_uploadFileAsReceipt(expId,blob);
+});
 window.addEventListener('beforeunload',e=>{if(_touched&&_touched.size>0){e.preventDefault();e.returnValue='You have unsaved attendance changes.';return e.returnValue;}});
 let _lastEmpId='';
 
@@ -1703,11 +1714,20 @@ function isSun(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt
 function isSat(d){const dt=d instanceof Date?d:new Date(d+'T00:00:00');return dt.getDay()===6;}
 function isWD(d){return!isSun(d);}
 function empWorkDays(emp){var w=emp&&emp.work_days;return(Array.isArray(w)&&w.length)?w:[1,2,3,4,5,6];}
+/**
+ * Returns the pay rate effective on dateStr from salary_history.
+ * Falls back to current emp rate field if no history exists.
+ * Returns 0 and shows missing-salary popup if no rate found.
+ * @param {Object} emp - Employee object
+ * @param {string} pt - Pay type: 'fixed' | 'daily' | 'hourly'
+ * @param {string} dateStr - Date string YYYY-MM-DD
+ * @returns {number} Rate in £
+ */
 function getRateForDate(emp,pt,dateStr){
   // Find the rate that was effective on dateStr from salary_history; fallback to current emp rate field
-  var current=pt==='fixed'?parseFloat(emp.salary)||0:pt==='daily'?parseFloat(emp.daily_rate)||0:parseFloat(emp.hourly_rate)||0;
+  var currentRate=pt==='fixed'?parseFloat(emp.salary)||0:pt==='daily'?parseFloat(emp.daily_rate)||0:parseFloat(emp.hourly_rate)||0;
   // If current rate is 0 and there's no history, this employee has no salary configured
-  if(!current&&(typeof salaryHistory==='undefined'||!salaryHistory.filter(h=>h.employee_id===emp.id&&h.pay_type===pt).length)){
+  if(!currentRate&&(typeof salaryHistory==='undefined'||!salaryHistory.filter(h=>h.employee_id===emp.id&&h.pay_type===pt).length)){
     // Flag for missing salary popup — defer so we don't interrupt render
     if(!window._missingSalaryAlerted)window._missingSalaryAlerted=new Set();
     if(!window._missingSalaryAlerted.has(emp.id)){
@@ -1716,21 +1736,21 @@ function getRateForDate(emp,pt,dateStr){
     }
     return 0;
   }
-  if(typeof salaryHistory==='undefined'||!salaryHistory.length)return current;
-  var empHist=salaryHistory.filter(function(h){return h.employee_id===emp.id&&h.pay_type===pt&&h.effective_from;});
-  if(!empHist.length)return current;
-  empHist.sort(function(a,b){return (a.effective_from||'').localeCompare(b.effective_from||'');}); // ascending
+  if(typeof salaryHistory==='undefined'||!salaryHistory.length)return currentRate;
+  var empHistory=salaryHistory.filter(function(h){return h.employee_id===emp.id&&h.pay_type===pt&&h.effective_from;});
+  if(!empHistory.length)return currentRate;
+  empHistory.sort(function(a,b){return (a.effective_from||'').localeCompare(b.effective_from||'');}); // ascending
   // Find the latest change that took effect on or before dateStr
   var applicable=null;
-  for(var i=0;i<empHist.length;i++){
-    if(empHist[i].effective_from<=dateStr)applicable=empHist[i];
+  for(var i=0;i<empHistory.length;i++){
+    if(empHistory[i].effective_from<=dateStr)applicable=empHistory[i];
     else break;
   }
   if(applicable)return parseFloat(applicable.new_rate)||0;
   // dateStr is before ANY recorded change — use the old_rate from the earliest entry
-  var earliest=empHist[0];
+  var earliest=empHistory[0];
   if(earliest.old_rate!=null&&earliest.old_rate>0)return parseFloat(earliest.old_rate)||0;
-  return current;
+  return currentRate;
 }
 function isWDFor(emp,d){return empWorkDays(emp).indexOf(d.getDay())>=0;}
 function workDaysInMonth(emp,y,m){
@@ -1827,11 +1847,17 @@ function calcOT(h,emp){
     :(parseFloat(cfg.ot_threshold)||CONFIG_APP.DEFAULT_HOURS);
   return v>t?parseFloat((v-t).toFixed(1)):0;
 }
+/**
+ * Calculates gross pay for one employee for one attendance record.
+ * @param {Object} emp - Employee (pay_type, salary, daily_rate, hourly_rate, contracted_hours)
+ * @param {Object} rec - Attendance record (date, hours, status, bonus, overtime_hours)
+ * @returns {{ base: number, ot: number, total: number, type: string }}
+ */
 function calcPay(emp,rec){
-  const pt=emp.pay_type||'hourly';
+  const payType=emp.pay_type||'hourly';
   const dt=new Date(rec.date+'T00:00:00');
   // Use the rate that was effective ON THIS RECORD'S DATE (from salary_history), not today's rate
-  const histRate=getRateForDate(emp,pt,rec.date);
+  const histRate=getRateForDate(emp,payType,rec.date);
   // Weekend multipliers: use sat/sun mult if set, default 1.0
   const satM=isSat(dt)?(emp.sat_mult!=null&&emp.sat_mult!==''?parseFloat(emp.sat_mult):1):1;
   const sunM=isSun(dt)?(emp.sun_mult!=null&&emp.sun_mult!==''?parseFloat(emp.sun_mult):1):1;
@@ -1849,16 +1875,16 @@ function calcPay(emp,rec){
     let otM;
     if(hasOwnMult){
       otM=parseFloat(emp.ot_mult); // 0 = track hours, pay £0
-    } else if(pt==='daily'){
+    } else if(payType==='daily'){
       otM=0; // daily wage default: track OT hours, pay £0 unless set
     } else {
       otM=parseFloat(cfg.rate_ot)||1.5; // hourly/fixed: use global default
     }
     if(otM>0){
       let bh=0;
-      if(pt==='hourly')bh=histRate;
-      else if(pt==='daily'){const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;bh=ch>0?histRate/ch:0;}
-      else if(pt==='fixed'){const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;const wDays=workDaysInMonth(emp,dt.getFullYear(),dt.getMonth());bh=(ch>0&&wDays>0)?(histRate/wDays)/ch:0;}
+      if(payType==='hourly')bh=histRate;
+      else if(payType==='daily'){const contractedHrs=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;bh=contractedHrs>0?histRate/contractedHrs:0;}
+      else if(payType==='fixed'){const contractedHrs=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;const wDays=workDaysInMonth(emp,dt.getFullYear(),dt.getMonth());bh=(contractedHrs>0&&wDays>0)?(histRate/wDays)/contractedHrs:0;}
       otRate=bh*otM;
     }
   }
@@ -1866,44 +1892,44 @@ function calcPay(emp,rec){
 
   // Base pay
   let basePay=0;
-  if(pt==='hourly'){
+  if(payType==='hourly'){
     const r=histRate;
-    const h=parseFloat(rec.hours)||0;
-    const regularH=Math.max(0,h-ot); // hours not counting OT
+    const workedHrs=parseFloat(rec.hours)||0;
+    const regularH=Math.max(0,workedHrs-ot); // hours not counting OT
     basePay=parseFloat((regularH*r*wkM).toFixed(2));
-  } else if(pt==='daily'){
+  } else if(payType==='daily'){
     const r=histRate;
-    const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS; // contracted hours per day
-    const workedH=parseFloat(rec.hours)||0;
-    const hourlyEquiv=ch>0?r/ch:0; // £/hr equivalent
+    const contractedHrs=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS; // contracted hours per day
+    const workedHrs=parseFloat(rec.hours)||0;
+    const hourlyEquiv=contractedHrs>0?r/contractedHrs:0; // £/hr equivalent
     if(rec.status==='HD'){
       basePay=parseFloat((r*0.5*wkM).toFixed(2));
-    } else if(workedH>0&&workedH<ch){
+    } else if(workedHrs>0&&workedHrs<contractedHrs){
       // Short hours: deduct proportionally
-      const shortfall=ch-workedH;
+      const shortfall=contractedHrs-workedHrs;
       const deduction=parseFloat((shortfall*hourlyEquiv).toFixed(2));
       basePay=parseFloat(((r-deduction)*wkM).toFixed(2));
     } else {
       basePay=parseFloat((r*wkM).toFixed(2));
     }
-  } else if(pt==='fixed'){
+  } else if(payType==='fixed'){
     const monthlySalary=histRate;
-    const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
+    const contractedHrs=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     // Calculate how many working days are in this month
     const dt2=new Date(rec.date+'T00:00:00');
     const yr=dt2.getFullYear(), mo=dt2.getMonth();
     const workDays=workDaysInMonth(emp,yr,mo);
     const dailyEquiv=workDays>0?parseFloat((monthlySalary/workDays).toFixed(2)):0;
-    const hrlyEquiv=ch>0?parseFloat((dailyEquiv/ch).toFixed(4)):0;
-    const workedH=parseFloat(rec.hours)||0;
+    const hrlyEquiv=contractedHrs>0?parseFloat((dailyEquiv/contractedHrs).toFixed(4)):0;
+    const workedHrs=parseFloat(rec.hours)||0;
     if(rec.status==='HD'){
       basePay=parseFloat((dailyEquiv*0.5*wkM).toFixed(2));
-    } else if(workedH>0&&workedH<ch){
+    } else if(workedHrs>0&&workedHrs<contractedHrs){
       // Short hours: deduct proportionally
-      const shortfall=ch-workedH;
+      const shortfall=contractedHrs-workedHrs;
       const deduction=parseFloat((shortfall*hrlyEquiv).toFixed(2));
       basePay=parseFloat(((dailyEquiv-deduction)*wkM).toFixed(2));
-    } else if(workedH>0){
+    } else if(workedHrs>0){
       basePay=parseFloat((dailyEquiv*wkM).toFixed(2));
     } else {
       // Not present — no pay for this day
@@ -1921,16 +1947,33 @@ function calcPay(emp,rec){
 
 let payrollSummaries=[]; // cache loaded from Supabase
 
+/**
+ * Returns true if the given month/year has been locked by admin.
+ * Locked months block all attendance, expense and payroll writes.
+ * @param {number} month - 0-indexed
+ * @param {number} year - Full year
+ * @returns {boolean}
+ */
 function isPayrollLocked(month,year){
   // Locked if cfg.locked_months has the key (legacy) OR any payroll_summary row for this month is locked
   if((cfg.locked_months||[]).includes(`${year}_${month}`))return true;
   return payrollSummaries.some(p=>p.month===month&&p.year===year&&p.locked);
 }
 
+/**
+ * Single source of truth for all pay calculations.
+ * Calculates complete payroll for one employee for one month.
+ * Called by savePayrollSummary — results saved to Supabase payroll_summary table.
+ * All display pages should read from payrollSummaries cache, not call this directly.
+ * @param {string} employeeId - UUID
+ * @param {number} month - 0-indexed (0=Jan, 11=Dec)
+ * @param {number} year - Full year e.g. 2026
+ * @returns {Object} Payroll row ready for Supabase upsert
+ */
 function calculatePayrollForEmployeeMonth(employeeId,month,year){
-  const emp=employees.find(e=>e.id===employeeId);
+  const emp=employeeMap?.get(employeeId);
   if(!emp)return null;
-  const pt=emp.pay_type||'hourly';
+  const payType=emp.pay_type||'hourly';
   const mRecs=attendance.filter(r=>{
     if(r.employee_id!==employeeId)return false;
     const d=new Date(r.date+'T00:00:00');
@@ -1951,15 +1994,15 @@ function calculatePayrollForEmployeeMonth(employeeId,month,year){
 
   // Expected (full-hours) base for deduction calculation — use same per-day rate as calcPay to stay consistent
   let expectedBase=basePay;
-  if(emp.contracted_hours&&(pt==='daily'||pt==='fixed')){
-    const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
-    if(pt==='daily'){
+  if(emp.contracted_hours&&(payType==='daily'||payType==='fixed')){
+    const contractedHrs=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
+    if(payType==='daily'){
       // Expected = sum of daily rates for each present day (using historical rate per day)
       expectedBase=aR.reduce((s,r)=>{
         const rate=getRateForDate(emp,'daily',r.date);
         return s+rate;
       },0);
-    } else if(pt==='fixed'){
+    } else if(payType==='fixed'){
       // Expected = sum of daily-equivalent for each present day
       // MUST round per-day to 2dp to match calcPay — prevents phantom deductions
       expectedBase=aR.reduce((s,r)=>{
@@ -1970,12 +2013,12 @@ function calculatePayrollForEmployeeMonth(employeeId,month,year){
       },0);
       expectedBase=parseFloat(expectedBase.toFixed(2));
     }
-  } else if(pt==='hourly'&&emp.contracted_hours&&emp.hourly_rate){
-    const ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
+  } else if(payType==='hourly'&&emp.contracted_hours&&emp.hourly_rate){
+    const contractedHrs=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     // Expected = contracted hours per day * days present * historical rate per day
     expectedBase=aR.reduce((s,r)=>{
       const rate=getRateForDate(emp,'hourly',r.date);
-      return s+ch*rate;
+      return s+contractedHrs*rate;
     },0);
   }
   const deductionTotal=Math.max(0,parseFloat((parseFloat(expectedBase.toFixed(2))-parseFloat(basePay.toFixed(2))).toFixed(2)));
@@ -2123,6 +2166,14 @@ function startAdminAutoRefresh(){
 // Queues a background recalculate + save so all pages see fresh data
 const _invalidateQ=new Set();
 let _invalidateTimer=null;
+/**
+ * Central trigger for payroll recalculation.
+ * Call this after ANY change that affects pay: attendance, expenses, salary, settings.
+ * Debounces 800ms and queues a background savePayrollSummary call.
+ * @param {string} employeeId - UUID
+ * @param {number} month - 0-indexed
+ * @param {number} year - Full year
+ */
 function invalidatePayroll(employeeId,month,year){
   const key=`${employeeId}_${month}_${year}`;
   _invalidateQ.add(key);
@@ -2151,7 +2202,7 @@ function invalidatePayroll(employeeId,month,year){
 
 // Invalidate all employees for a month (e.g. settings change)
 function _showSaveRetryToast(empId,month,year){
-  const emp=employees.find(e=>e.id===empId);
+  const emp=employeeMap?.get(empId);
   const name=emp?.name||'Employee';
   const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   let secs=30;
@@ -2484,6 +2535,13 @@ async function loadAllData(){
       };
     });
     setSyncStatus('saved');
+    // ── PERFORMANCE MAPS — built once after load ────────────────────
+    window.employeeMap=new Map(employees.map(e=>[e.id,e]));
+    const _mkFn=r=>{if(r.date&&!r._monthKey)r._monthKey=r.date.slice(0,7);};
+    attendance.forEach(_mkFn);expenses.forEach(_mkFn);
+    window.attByEmp=attendance.reduce((m,r)=>{(m[r.employee_id]??=[]).push(r);return m;},{});
+    window.expByEmp=expenses.reduce((m,e)=>{(m[e.employee_id]??=[]).push(e);return m;},{});
+    // ────────────────────────────────────────────────────────────────
     initSelectors();
     navigate('dashboard');
     updateBadges();
@@ -2500,6 +2558,8 @@ async function loadAllData(){
     },11000);
     // employeeDocuments already loaded above - no separate call needed
   }catch(e){
+    // Ignore CORS/manifest errors from file:// protocol — these are not real data errors
+    if(e&&e.message&&(e.message.includes('CORS')||e.message.includes('manifest')||e.message.includes('fetch')))return;
     setSyncStatus('err');
     console.error('Load error:',e);
     // Show retry countdown toast
@@ -3128,7 +3188,7 @@ function renderDashboard(){
   if(pbSub)pbSub.textContent=`${pendingTotal} pending · ${pendingTime} time, ${pendingExp} expense`;
   let pbHtml='';
   pendingBatches.slice(0,5).forEach(b=>{
-    const emp2=employees.find(e=>e.id===b.employee_id);
+    const emp2=employeeMap?.get(b.employee_id);
     const amt=b.total_amount!=null?`${C}${parseFloat(b.total_amount).toFixed(0)}`:'';
     const dt=b.submitted_at?new Date(b.submitted_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'';
     pbHtml+=`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:0.5px solid var(--bdr);">
@@ -3138,7 +3198,7 @@ function renderDashboard(){
     </div>`;
   });
   pendingTimeReqs.slice(0,3).forEach(r=>{
-    const emp2=employees.find(e=>e.id===r.employee_id);
+    const emp2=employeeMap?.get(r.employee_id);
     const dt=r.date?new Date(r.date+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'';
     pbHtml+=`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:0.5px solid var(--bdr);">
       <span class="ava" style="background:${avcol(r.employee_id)};flex-shrink:0;">${inits(emp2?.name||'?')}</span>
@@ -3233,7 +3293,7 @@ function renderDashboard(){
     else{
       const now2=new Date();
       docEl.innerHTML=urgent.map(doc=>{
-        const emp2=employees.find(e=>e.id===doc.employee_id);
+        const emp2=employeeMap?.get(doc.employee_id);
         const st=getDocStatus(doc);
         const def=DOC_TYPES[doc.doc_type]||{icon:'fa-file',color:'#64748b'};
         const daysLeft=doc.expiry_date?Math.ceil((new Date(doc.expiry_date+'T00:00:00')-now2)/(1000*60*60*24)):null;
@@ -3373,7 +3433,7 @@ function onMC(el){
     const hEl=document.getElementById(`hr-${empId}`);
     const otEl=document.getElementById(`ot-${empId}`);
     if(hEl&&otEl){
-      const emp=employees.find(e=>e.id===empId);
+      const emp=employeeMap?.get(empId);
       const ot=calcOT(parseFloat(hEl.value)||0,emp);
       otEl.value=ot>0?ot:'';
     }
@@ -3428,7 +3488,7 @@ function recalcHOT(empId){
     si.style.outline='';so.style.outline='';
     const errEl=document.getElementById(`timeErr-${empId}`);if(errEl)errEl.remove();
     if(hEl)hEl.value=h;
-    const emp=employees.find(e=>e.id===empId);
+    const emp=employeeMap?.get(empId);
     const ot=calcOT(h,emp);
     if(otEl)otEl.value=ot>0?ot:'';
     // ── Auto-update status based on times vs contracted hours ──
@@ -3549,7 +3609,7 @@ async function doClearDay(){
   // Calculate total pay at stake
   let totalPay=0;
   dayRecs.forEach(r=>{
-    const emp2=employees.find(e=>e.id===r.employee_id);if(!emp2||!isP(r.status))return;
+    const emp2=employeeMap?.get(r.employee_id);if(!emp2||!isP(r.status))return;
     const savedRow=payrollSummaries.find(p=>p.employee_id===r.employee_id&&p.month===markDate.getMonth()&&p.year===markDate.getFullYear());
     if(savedRow){totalPay+=(parseFloat(savedRow.base_pay)||0)/(savedRow.present_days||1);}
     else{const p=calcPay(emp2,r);totalPay+=p.base+p.ot;}
@@ -3668,6 +3728,11 @@ function pickLedAC(merchant,category){
 function hideLedAC(){var ac=document.getElementById('ledAC');if(ac)ac.style.display='none';}
 
 function renderLedger(){
+  // Debounced — rapid successive calls (tag edits, approvals) only trigger one rebuild
+  if(renderLedger._debounceTimer)clearTimeout(renderLedger._debounceTimer);
+  renderLedger._debounceTimer=setTimeout(_doRenderLedger, 80);
+}
+function _doRenderLedger(){
   // Staff pills
   const sp=document.getElementById('staffPills');
   if(sp){sp.innerHTML='';if(!ledgerStaff&&employees.length>0)ledgerStaff=employees[0].id;employees.forEach(e=>{const isEx=e.status==='ex';const pill=document.createElement('div');pill.className=`pill${e.id===ledgerStaff?' on':''}${isEx?' ex':''}`;pill.textContent=e.name;pill.onclick=()=>{ledgerStaff=e.id;renderLedger();};sp.appendChild(pill);});}
@@ -3676,7 +3741,7 @@ function renderLedger(){
   if(mp){mp.innerHTML='';MONTHS.forEach((m,i)=>{const ms=String(i+1).padStart(2,'0');const pill=document.createElement('div');pill.className=`pill${ms===ledgerMonth?' on':''}`;pill.textContent=m.slice(0,3);pill.onclick=()=>{ledgerMonth=ms;renderLedger();};mp.appendChild(pill);});}
   document.getElementById('ledgerYrDisp').textContent=ledgerYear;
   if(!ledgerStaff)return;
-  const emp=employees.find(e=>e.id===ledgerStaff);if(!emp)return;
+  const emp=employeeMap?.get(ledgerStaff);if(!emp)return;
   const isEx=emp.status==='ex';
   const C=cur();
   // Filter expenses for this employee/month/year — blank rows always sorted last
@@ -3746,8 +3811,9 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
       <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)" onfocus="this.closest('tr').style.opacity='1'" onblur="this.closest('tr').style.opacity=this.value?'1':'0.45'"></td>
       <td>
         <input type="text" class="shi" placeholder="Type to add new expense..." value="" ${isEx?'disabled':''} autocomplete="off" oninput="updateExp('${row.id}','merchant',this.value);this.closest('tr').style.opacity='1';checkAutoNextRow('${row.id}',${i<0?0:i},${totalRows||1});ledMerchantAC(this,'${row.id}')" onblur="setTimeout(hideLedAC,200)">
-        <div style="display:flex;align-items:center;gap:4px;margin-top:3px;"><label title="Attach receipt" style="width:22px;height:22px;border-radius:5px;border:1px dashed var(--bdr);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--txtm);font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label></div>
-      </td>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:3px;"><label title="Attach receipt" style="width:22px;height:22px;border-radius:5px;border:1px dashed var(--bdr);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--txtm);font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label>
+        <button type="button" title="Paste receipt from clipboard" onclick="pasteAdminReceipt('${row.id}')" style="background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.25);border-radius:6px;padding:3px 7px;cursor:pointer;color:var(--acc);font-size:11px;margin-left:4px;"><i class="fa-solid fa-clipboard"></i></button>
+      </div></td>
       <td><input type="text" class="shi cat-inp" list="ledCatList" placeholder="Category" value="" style="" ${isEx?'disabled':''} oninput="updateExp('${row.id}','category',this.value);this.style.cssText=getCatStyle(this.value)" onfocus="this.closest('tr').style.opacity='1'"></td>
       <td><div class="tc" id="tc-${row.id}">${tagsHtml}</div></td>
       <td><input type="number" class="shi amt-i" placeholder="0.00" step="0.01" min="0" value="" ${isEx?'disabled':''} oninput="updateExp('${row.id}','amount',parseFloat(this.value)||0);this.closest('tr').style.opacity='1'" onblur="renderLedger()" onfocus="this.closest('tr').style.opacity='1'"></td>
@@ -3910,7 +3976,7 @@ async function addLedRowSilent(){
   const tbody=document.getElementById('ledBody');
   if(!tbody)return;
   const C=cur();
-  const isEx=employees.find(e=>e.id===ledgerStaff)?.status==='ex';
+  const isEx=employeeMap?.get(ledgerStaff)?.status==='ex';
   const runningTotal=expenses.filter(e=>{
     const d=new Date(e.date+'T00:00:00');
     return e.employee_id===ledgerStaff&&d.getFullYear()===ledgerYear&&String(d.getMonth()+1).padStart(2,'0')===ledgerMonth;
@@ -4049,7 +4115,7 @@ async function submitBatch(){
   const data=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===ledgerStaff&&d.getFullYear()===ledgerYear&&String(d.getMonth()+1).padStart(2,'0')===ledgerMonth;});
   const total=data.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   if(total===0){toast('No expenses to submit','e');return;}
-  const emp=employees.find(e=>e.id===ledgerStaff);
+  const emp=employeeMap?.get(ledgerStaff);
   if(!confirm(`Submit ${emp?.name} — ${MONTHS[parseInt(ledgerMonth)-1]} ${ledgerYear} (${fmt(total)}) for approval?`))return;
   // Remove existing pending batch for same period
   const existing=batches.find(b=>b.employee_id===ledgerStaff&&b.month===ledgerMonth&&b.year===ledgerYear&&b.status==='pending');
@@ -4068,7 +4134,7 @@ function renderApprovals(){
   data=[...data].sort((a,b)=>b.submitted_at?.localeCompare(a.submitted_at)||0);
   const C=cur();
   if(!data.length){document.getElementById('aprBody').innerHTML='<div class="es"><i class="fa-solid fa-check-circle"></i><h3>No submissions</h3></div>';return;}
-  document.getElementById('aprBody').innerHTML='<div class="approvals-wrap">'+data.map(a=>{const emp=employees.find(e=>e.id===a.employee_id);const mn=MONTHS[parseInt(a.month)-1];return`<div class="apr-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:7px;"><div><strong style="font-size:14px;">${emp?.name||'—'}</strong> — ${mn} ${a.year}<br><span style="font-size:11px;color:var(--txtm);">Submitted: ${new Date(a.submitted_at).toLocaleDateString('en-GB')}</span></div><div style="display:flex;align-items:center;gap:7px;"><span class="apr-st ${a.status}">${a.status.charAt(0).toUpperCase()+a.status.slice(1)}</span><strong style="font-size:15px;color:var(--grn);">${C}${parseFloat(a.total).toFixed(2)}</strong></div></div>${a.status==='pending'?`<div style="display:flex;gap:7px;"><button class="btn btn-s btn-sm" onclick="reviewBatch('${a.id}','approved')"><i class="fa-solid fa-check"></i>Approve</button><button class="btn btn-d btn-sm" onclick="reviewBatch('${a.id}','rejected')"><i class="fa-solid fa-xmark"></i>Reject</button></div>`:`<div style="display:flex;align-items:center;gap:9px;"><span style="font-size:12px;color:var(--txtm);">${a.reviewed_at?'Reviewed: '+new Date(a.reviewed_at).toLocaleDateString('en-GB'):''}</span><button class="btn btn-o btn-sm" onclick="reviewBatch('${a.id}','pending')"><i class="fa-solid fa-rotate-left"></i>Undo</button></div>`}</div>`;}).join('')+'</div>';
+  document.getElementById('aprBody').innerHTML='<div class="approvals-wrap">'+data.map(a=>{const emp=employeeMap?.get(a.employee_id);const mn=MONTHS[parseInt(a.month)-1];return`<div class="apr-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:7px;"><div><strong style="font-size:14px;">${emp?.name||'—'}</strong> — ${mn} ${a.year}<br><span style="font-size:11px;color:var(--txtm);">Submitted: ${new Date(a.submitted_at).toLocaleDateString('en-GB')}</span></div><div style="display:flex;align-items:center;gap:7px;"><span class="apr-st ${a.status}">${a.status.charAt(0).toUpperCase()+a.status.slice(1)}</span><strong style="font-size:15px;color:var(--grn);">${C}${parseFloat(a.total).toFixed(2)}</strong></div></div>${a.status==='pending'?`<div style="display:flex;gap:7px;"><button class="btn btn-s btn-sm" onclick="reviewBatch('${a.id}','approved')"><i class="fa-solid fa-check"></i>Approve</button><button class="btn btn-d btn-sm" onclick="reviewBatch('${a.id}','rejected')"><i class="fa-solid fa-xmark"></i>Reject</button></div>`:`<div style="display:flex;align-items:center;gap:9px;"><span style="font-size:12px;color:var(--txtm);">${a.reviewed_at?'Reviewed: '+new Date(a.reviewed_at).toLocaleDateString('en-GB'):''}</span><button class="btn btn-o btn-sm" onclick="reviewBatch('${a.id}','pending')"><i class="fa-solid fa-rotate-left"></i>Undo</button></div>`}</div>`;}).join('')+'</div>';
 }
 async function reviewBatch(id,status){
   const r=await sb.from('expense_batches').update({status,reviewed_at:status!=='pending'?new Date().toISOString():null}).eq('id',id);
@@ -4265,7 +4331,7 @@ async function renderEmpReport(){
   const month=parseInt(document.getElementById('erMonth')?.value);
   const year=parseInt(document.getElementById('erYear')?.value);
   if(!empId)return;_lastEmpId=empId;
-  const emp=employees.find(e=>e.id===empId);if(!emp)return;
+  const emp=employeeMap?.get(empId);if(!emp)return;
   const days=dim(year,month);
   const att=attendance.filter(r=>r.employee_id===empId);
   const mRecs=att.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===month&&d.getFullYear()===year;});
@@ -4590,7 +4656,7 @@ function printTimesheet(){
   const empId=_ptSel?.value;
   const month=parseInt(document.getElementById('erMonth')?.value);
   const year=parseInt(document.getElementById('erYear')?.value);
-  const emp=employees.find(e=>e.id===empId);if(!emp)return;
+  const emp=employeeMap?.get(empId);if(!emp)return;
   const days=dim(year,month);const att=attendance.filter(r=>r.employee_id===empId);const co=cfg.company||'DAM Pro';
   const allDays=[];for(let d=1;d<=days;d++)allDays.push(new Date(year,month,d));
   const weeks=[];let wk=[];
@@ -4670,10 +4736,14 @@ function renderYearly(){
     const ot=recs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
     const bonus=recs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
     const suns=recs.filter(r=>isSun(new Date(r.date+'T00:00:00'))&&isP(r.status)).length;
-    // Use saved payroll_summary if available — single source of truth
-    const _ySaved=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===month&&p.year===selYear);
-    const recPay=_ySaved?(parseFloat(_ySaved.base_pay)||0)+(parseFloat(_ySaved.overtime_pay)||0):recs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).total,0);
-    const gross=_ySaved?(parseFloat(_ySaved.gross_pay)||0):(recPay+bonus);
+    // Use saved payroll_summary rows for the full year — sum all 12 months
+    const _ySavedRows=payrollSummaries.filter(p=>p.employee_id===emp.id&&p.year===year);
+    const recPay=_ySavedRows.length>0
+      ?(parseFloat(_ySavedRows.reduce((s,p)=>s+(parseFloat(p.base_pay)||0)+(parseFloat(p.overtime_pay)||0),0))||0)
+      :recs.filter(r=>isP(r.status)).reduce((s,r)=>s+calcPay(emp,r).total,0);
+    const gross=_ySavedRows.length>0
+      ?(parseFloat(_ySavedRows.reduce((s,p)=>s+(parseFloat(p.gross_pay)||0),0))||0)
+      :(recPay+bonus);
     const pct=empYWD>0?Math.round(present/empYWD*100):0;const pc=pct>=80?'var(--grn)':pct>=60?'var(--amb)':'var(--red)';
     const mB=MONTHS.map((_,mi)=>recs.filter(r=>new Date(r.date+'T00:00:00').getMonth()===mi&&isWD(new Date(r.date+'T00:00:00'))&&isP(r.status)).length);
     return`<tr><td><span class="ava" style="background:${avcol(emp.id)}">${inits(emp.name)}</span>${emp.name}</td>${mB.map(n=>`<td style="text-align:center;font-size:11px;color:${n>20?'var(--grn)':n>0?'var(--txt2)':'var(--txtm)'}">${n||'—'}</td>`).join('')}<td style="font-weight:700;color:var(--grn);">${present}</td><td style="font-weight:700;color:var(--red);">${absent}</td><td style="font-weight:700;">${totalH.toFixed(0)}h</td><td style="font-weight:700;color:var(--amb);">${ot.toFixed(0)}h</td><td style="color:#4338ca;font-weight:700;">${suns}</td><td style="font-weight:700;color:var(--grn);">${emp.pay_type||emp.hourly_rate?C+gross.toFixed(2):'—'}</td><td style="font-weight:700;color:${pc};">${pct}%</td></tr>`;
@@ -4696,8 +4766,8 @@ function renderSearch(q){
   if(query.length<2){document.getElementById('srchResults').innerHTML='<div class="es"><i class="fa-solid fa-magnifying-glass"></i><h3>Start typing</h3><p>Min 2 characters</p></div>';return;}
   const results=[];
   employees.forEach(emp=>{if(emp.name.toLowerCase().includes(query)||emp.role?.toLowerCase().includes(query))results.push({type:'Employee',name:emp.name,detail:emp.role||emp.contract_type||'',action:()=>editEmpModal(emp.id)});});
-  attendance.forEach(r=>{const emp=employees.find(e=>e.id===r.employee_id);if(!emp)return;const s=`${escapeHtml(emp.name)} ${r.date} ${r.status} ${escapeHtml(r.notes||'')}`.toLowerCase();if(s.includes(query))results.push({type:'Attendance',name:emp.name,detail:`${fmtDate(r.date)} — ${STATUSES.find(st=>st.c===r.status)?.l||r.status}`,action:()=>jumpToMark(r.date)});});
-  expenses.forEach(r=>{const emp=employees.find(e=>e.id===r.employee_id);const s=`${emp?.name||''} ${r.merchant||''} ${r.category||''} ${r.date||''}`.toLowerCase();if(s.includes(query))results.push({type:'Expense',name:r.merchant||'—',detail:`${emp?.name||'?'} · ${r.category||''} · ${fmt(r.amount)} · ${r.date||''}`,action:()=>{}});});
+  attendance.forEach(r=>{const emp=employeeMap?.get(r.employee_id);if(!emp)return;const s=`${escapeHtml(emp.name)} ${r.date} ${r.status} ${escapeHtml(r.notes||'')}`.toLowerCase();if(s.includes(query))results.push({type:'Attendance',name:emp.name,detail:`${fmtDate(r.date)} — ${STATUSES.find(st=>st.c===r.status)?.l||r.status}`,action:()=>jumpToMark(r.date)});});
+  expenses.forEach(r=>{const emp=employeeMap?.get(r.employee_id);const s=`${emp?.name||''} ${r.merchant||''} ${r.category||''} ${r.date||''}`.toLowerCase();if(s.includes(query))results.push({type:'Expense',name:r.merchant||'—',detail:`${emp?.name||'?'} · ${r.category||''} · ${fmt(r.amount)} · ${r.date||''}`,action:()=>{}});});
   if(!results.length){document.getElementById('srchResults').innerHTML='<div class="es"><i class="fa-solid fa-magnifying-glass"></i><h3>No results</h3></div>';return;}
   const tc={Employee:'var(--blu)',Attendance:'var(--grn)',Expense:'var(--amb)'};
   document.getElementById('srchResults').innerHTML=`<div style="font-size:12px;color:var(--txtm);margin-bottom:9px;">${results.length} result${results.length!==1?'s':''} for "${q}"</div><div style="display:flex;flex-direction:column;gap:5px;">${results.slice(0,50).map((r,i)=>`<div style="background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);padding:9px 13px;cursor:pointer;display:flex;align-items:center;gap:9px;" onclick="srchActions[${i}]()" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background='var(--card)'"><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;background:${tc[r.type]}20;color:${tc[r.type]};white-space:nowrap;">${r.type}</span><div><div style="font-size:13px;font-weight:600;">${r.name}</div><div style="font-size:11px;color:var(--txtm);">${r.detail}</div></div></div>`).join('')}</div>`;
@@ -4725,7 +4795,7 @@ function renderPayroll(){
     const _from=`${_y}-${String(_m+1).padStart(2,'0')}-01`;
     if(_from<_dataFromDate){
       // Historical month — load on demand if not already fetched
-      const alreadyLoaded=attendance.some(a=>a.date.startsWith(_from.slice(0,7)));
+      const alreadyLoaded=attendance.some(a=>a._monthKey===_from.slice(0,7));
       if(!alreadyLoaded)await loadMonthData(_m,_y);
     }
   })();
@@ -4857,7 +4927,7 @@ function renderPayroll(){
 }
 async function updateBankAmt(el,rowTotal){
   const empId=el.dataset.eid;const val=parseFloat(el.value)||0;
-  const emp=employees.find(e=>e.id===empId);if(!emp)return;
+  const emp=employeeMap?.get(empId);if(!emp)return;
   emp.bank_amt=val||null;
   const _baR=await sb.from('employees').update({bank_amt:val||null}).eq('id',empId);
   if(_baR.error){toast('Could not save bank amount: '+_baR.error.message,'e');}
@@ -5027,7 +5097,7 @@ async function markEmpActive(id){const idx=employees.findIndex(e=>e.id===id);if(
 
 function initDangerTab(){
   const id=document.getElementById('empId').value;
-  const emp=employees.find(e=>e.id===id);
+  const emp=employeeMap?.get(id);
   if(!emp){document.getElementById('dangerTabContent').innerHTML='<p style="color:var(--txtm);font-size:13px;text-align:center;padding:20px;">Save the employee first.</p>';return;}
   const isEx=emp.status==='ex';
   const box=document.getElementById('dangerTabContent');
@@ -5127,7 +5197,7 @@ function openEmpModal(){
 }
 async function editEmpModal(id){
   const _fr=await sb.from('employees').select('*').eq('id',id).single();
-  const emp=(!_fr.error&&_fr.data)?_fr.data:employees.find(e=>e.id===id);
+  const emp=(!_fr.error&&_fr.data)?_fr.data:employeeMap?.get(id);
   if(!emp)return;
   const _li=employees.findIndex(e=>e.id===id);
   if(_li>=0&&!_fr.error)employees[_li]=emp;
@@ -5199,7 +5269,7 @@ async function editEmpModal(id){
 function closeEmpModal(){document.getElementById('empModal').classList.remove('open');}
 async function deleteEmployee(){
   const id=document.getElementById('empId').value;
-  const emp=employees.find(e=>e.id===id);if(!emp)return;
+  const emp=employeeMap?.get(id);if(!emp)return;
   // Show Archive vs Permanently Delete modal
   const existing=document.getElementById('deleteEmpModal');if(existing)existing.remove();
   const modal=document.createElement('div');
@@ -5246,9 +5316,20 @@ async function _confirmHardDelete(id,name){
   });
 }
 async function _doDeleteEmployee(id,empName){
-  const _delTables=['salary_history','attendance_requests','payroll_summary','employee_documents'];
-  for(const t of _delTables){await sb.from(t).delete().eq('employee_id',id);}
-  await sb.from('messages').delete().or(`sender.eq.${id},receiver.eq.${id}`);
+  const _delTables=['salary_history','attendance_requests','payroll_summary','employee_documents','attendance','expenses','salary_history'];
+  for(const t of [...new Set(_delTables)]){
+    try{
+      const dr=await sb.from(t).delete().eq('employee_id',id);
+      if(dr.error)throw dr.error;
+    }catch(err){
+      toast(`Could not delete ${empName}'s data from ${t}: ${err.message}`,'e');
+      return; // stop — don't delete employee record if related data can't be cleaned
+    }
+  }
+  try{
+    const msgR=await sb.from('messages').delete().or(`sender.eq.${id},receiver.eq.${id}`);
+    if(msgR.error)throw msgR.error;
+  }catch(err){toast('Could not delete messages: '+err.message,'e');return;}
   const r=await sb.from('employees').delete().eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   employees=employees.filter(e=>e.id!==id);
@@ -5314,6 +5395,7 @@ async function saveEmployee(){
   async function trySave(d){
     if(id){
       const r=await sb.from('employees').update(d).eq('id',id).select().single();
+      if(r.error){toast('Failed to save employee: '+r.error.message,'e');return r;}
       return r;
     }else{
       const r=await sb.from('employees').insert(d).select().single();
@@ -5335,7 +5417,7 @@ async function saveEmployee(){
   // Patch photo_url into saved data (column may not be in select response if newly added)
   if(data.photo_url!==undefined)saved.photo_url=data.photo_url;
 
-  if(id){const idx=employees.findIndex(e=>e.id===id);if(idx>=0)employees[idx]={...employees[idx],...saved,photo_url:data.photo_url!==undefined?data.photo_url:employees.find(e=>e.id===id)?.photo_url};}
+  if(id){const idx=employees.findIndex(e=>e.id===id);if(idx>=0)employees[idx]={...employees[idx],...saved,photo_url:data.photo_url!==undefined?data.photo_url:employeeMap?.get(id)?.photo_url};}
   else{employees.push(saved);}
 
   if(!id){
@@ -5590,7 +5672,7 @@ function removeEmpPhoto(){
   document.getElementById('empPhotoUrl').value='__removed__';
   document.getElementById('empPhotoUrl').dataset.pending='';
   const empId=document.getElementById('empId').value;
-  const emp=employees.find(e=>e.id===empId);
+  const emp=employeeMap?.get(empId);
   const prev=document.getElementById('empPhotoPreview');
   if(prev){prev.innerHTML=`<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;">${inits(emp?.name||'?')}</span>`;prev.style.background=emp?avcol(emp.id):'var(--acc)';}
   document.getElementById('empPhotoRemoveBtn').style.display='none';
@@ -5694,7 +5776,7 @@ async function populateMsgEmpList(){
 async function clearChat(){
   const empId=document.getElementById('msgEmpSel').value;
   if(!empId)return;
-  const emp=employees.find(e=>e.id===empId);
+  const emp=employeeMap?.get(empId);
   if(!confirm(`Delete ALL messages with ${emp?.name||'this employee'}? This cannot be undone.`))return;
   const r=await sb.from('messages').delete().eq('employee_id',empId);
   if(r.error){toast(r.error.message,'e');return;}
@@ -5708,7 +5790,7 @@ async function loadMessages(empId){
   const cb=document.getElementById('clearChatBtn');if(cb)cb.style.display='none';
   return;}
   const cb=document.getElementById('clearChatBtn');if(cb)cb.style.display='inline-flex';
-  const emp=employees.find(e=>e.id===empId);
+  const emp=employeeMap?.get(empId);
   document.getElementById('msgTitle').textContent=`Messages — ${emp?.name||''}`;
   const msgs=messages.filter(m=>m.employee_id===empId).sort((a,b)=>a.created_at.localeCompare(b.created_at));
   // Mark as read
@@ -5735,7 +5817,7 @@ function renderFlags(){
   const flagged=expenses.filter(e=>e.flagged);
   if(!flagged.length){document.getElementById('flagBody').innerHTML='<div class="es"><i class="fa-solid fa-flag"></i><h3>No flagged items</h3><p>Employees can flag transactions from the employee portal</p></div>';return;}
   const C=cur();
-  document.getElementById('flagBody').innerHTML=flagged.map(e=>{const emp=employees.find(x=>x.id===e.employee_id);return`<div class="flag-card"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:7px;margin-bottom:7px;"><div><strong>${emp?.name||'?'}</strong> — ${e.merchant||'—'}<br><span style="font-size:12px;color:var(--txt2);">${fmtDate(e.date)} · ${e.category||'—'} · ${C}${parseFloat(e.amount||0).toFixed(2)}</span></div><span class="bdg" style="background:var(--redl);color:var(--red);">Flagged</span></div>${e.flag_note?`<p style="font-size:12px;color:var(--txt2);margin-bottom:7px;">"${e.flag_note}"</p>`:''}<button class="btn btn-s btn-sm" onclick="resolveFlag('${e.id}')"><i class="fa-solid fa-check"></i>Mark Resolved</button></div>`;}).join('');
+  document.getElementById('flagBody').innerHTML=flagged.map(e=>{const emp=employeeMap?.get(e.employee_id);return`<div class="flag-card"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:7px;margin-bottom:7px;"><div><strong>${emp?.name||'?'}</strong> — ${e.merchant||'—'}<br><span style="font-size:12px;color:var(--txt2);">${fmtDate(e.date)} · ${e.category||'—'} · ${C}${parseFloat(e.amount||0).toFixed(2)}</span></div><span class="bdg" style="background:var(--redl);color:var(--red);">Flagged</span></div>${e.flag_note?`<p style="font-size:12px;color:var(--txt2);margin-bottom:7px;">"${e.flag_note}"</p>`:''}<button class="btn btn-s btn-sm" onclick="resolveFlag('${e.id}')"><i class="fa-solid fa-check"></i>Mark Resolved</button></div>`;}).join('');
 }
 async function resolveFlag(id){
   await safeWrite(()=>sb.from('expenses').update({flagged:false,flag_note:null}).eq('id',id),'Flag resolved');
@@ -5900,7 +5982,7 @@ async function saveDoc(){
 // ── DOCUMENT REMINDERS on dashboard ──────────────
 
 function openDocForEmp(empId){
-  const emp=employees.find(e=>e.id===empId);
+  const emp=employeeMap?.get(empId);
   if(!emp)return;
   editEmpModal(empId);
   setTimeout(()=>{
@@ -6026,7 +6108,7 @@ async function loadSalaryHistory(empId){
 function openPayRiseModal(){
   const empId=document.getElementById('empId').value;
   if(!empId){toast('Save the employee first before adding a pay change','e');return;}
-  const emp=employees.find(e=>e.id===empId);if(!emp)return;
+  const emp=employeeMap?.get(empId);if(!emp)return;
   const pt=emp.pay_type||'fixed';
   const currentRate=pt==='fixed'?parseFloat(emp.salary)||0:pt==='daily'?parseFloat(emp.daily_rate)||0:parseFloat(emp.hourly_rate)||0;
   const C=cur();
@@ -6042,7 +6124,7 @@ function openPayRiseModal(){
 }
 function updatePayRisePreview(){
   const empId=document.getElementById('empId').value;
-  const emp=employees.find(e=>e.id===empId);if(!emp)return;
+  const emp=employeeMap?.get(empId);if(!emp)return;
   const pt=emp.pay_type||'fixed';
   const C=cur();
   const currentRate=pt==='fixed'?parseFloat(emp.salary)||0:pt==='daily'?parseFloat(emp.daily_rate)||0:parseFloat(emp.hourly_rate)||0;
@@ -6062,7 +6144,7 @@ function updatePayRisePreview(){
 }
 async function savePayRise(){
   const empId=document.getElementById('empId').value;
-  const emp=employees.find(e=>e.id===empId);if(!emp)return;
+  const emp=employeeMap?.get(empId);if(!emp)return;
   const newRate=parseFloat(document.getElementById('prNewRate').value)||0;
   const effectiveFrom=document.getElementById('prEffectiveFrom').value;
   const reason=document.getElementById('prReason').value;
@@ -6223,16 +6305,16 @@ async function markPaid(empId,m,y,type,checked,bankAmt,cashAmt){
     cell.innerHTML=renderPayStatus(empId,m,y,bA+cA,bA,cA,cur());
   }
   if(checked){
-    const emp=employees.find(e=>e.id===empId);
+    const emp=employeeMap?.get(empId);
     toast(`${emp?.name||''} — ${type==='bank'?'Bank transfer':'Cash payment'} marked ✓`,'s');
   }
   // Update payroll_summary so employee app sees paid status (skip if locked — Lock already wrote final paid state)
   const existing=payrollSummaries.find(p=>p.employee_id===empId&&p.month===m&&p.year===y);
   if(existing&&!existing.locked){
-    const r=await sb.from('payroll_summary').update({
+    const r=await safeWrite(()=>sb.from('payroll_summary').update({
       bank_paid:paymentStatuses[key].bank_paid,
       cash_paid:paymentStatuses[key].cash_paid
-    }).eq('employee_id',empId).eq('month',m).eq('year',y).select().single();
+    }).eq('employee_id',empId).eq('month',m).eq('year',y).select().single(),'Payment status saved');
     if(!r.error&&r.data){
       const idx=payrollSummaries.findIndex(p=>p.employee_id===empId&&p.month===m&&p.year===y);
       if(idx>=0)payrollSummaries[idx]=r.data;
@@ -6261,7 +6343,7 @@ function openDocViewer(docId){
   _dvmDocId=null;_dvmEmpId=null; // reset to prevent stale ID bug
   const doc=employeeDocuments.find(d=>d.id===docId);
   if(!doc)return;
-  const emp=employees.find(e=>e.id===doc.employee_id);
+  const emp=employeeMap?.get(doc.employee_id);
   const def=DOC_TYPES[doc.doc_type]||{icon:'fa-file',color:'#64748b'};
   const st=getDocStatus(doc);
   _dvmDocId=docId;_dvmEmpId=doc.employee_id;
@@ -6351,10 +6433,10 @@ function renderAttRequests(){
   const C=cur();
   if(!data.length){document.getElementById('attReqBody').innerHTML='<div class="es"><i class="fa-solid fa-inbox"></i><h3>No requests</h3></div>';return;}
   document.getElementById('attReqBody').innerHTML=data.map(req=>{
-    const emp=employees.find(e=>e.id===req.employee_id);
+    const emp=employeeMap?.get(req.employee_id);
     const dt=new Date(req.date+'T00:00:00');
     const existing=attendance.find(a=>a.employee_id===req.employee_id&&a.date===req.date);
-    const _reqEmp=employees.find(e=>e.id===req.employee_id);
+    const _reqEmp=employeeMap?.get(req.employee_id);
     const stdStart=(_reqEmp&&_reqEmp.work_start)||cfg.work_start||'09:00';
     const stdEnd=(_reqEmp&&_reqEmp.work_end)||cfg.work_end||'17:00';
     const lateBy=req.sign_in&&req.sign_in>stdStart?`Started late (${req.sign_in} vs ${stdStart})`:'';
@@ -6395,9 +6477,9 @@ async function reviewAttReq(id,status,officeNote){
   if(idx>=0){attRequests[idx].status=status;attRequests[idx].office_note=officeNote||null;attRequests[idx].reviewed_at=new Date().toISOString();}
   // If approved: upsert into attendance table
   if(status==='approved'&&req){
-    const emp=employees.find(e=>e.id===req.employee_id);
+    const emp=employeeMap?.get(req.employee_id);
     // Calculate if late/early to determine status
-    const _aEmp=employees.find(e=>e.id===req.employee_id);
+    const _aEmp=employeeMap?.get(req.employee_id);
     const _wsStr=(_aEmp&&_aEmp.work_start)||cfg.work_start||'09:00';
     const [_wsH,_wsM]=_wsStr.split(':').map(Number);
     const _wsMins=_wsH*60+_wsM;
@@ -6426,7 +6508,7 @@ function promptRejectAtt(id){
 
 function editAttReq(id){
   const req=attRequests.find(r=>r.id===id);if(!req)return;
-  const emp=employees.find(e=>e.id===req.employee_id);
+  const emp=employeeMap?.get(req.employee_id);
   const newIn=prompt(`Edit start time for ${emp?.name||'?'} on ${req.date}:`,req.sign_in);
   if(!newIn)return;
   const newOut=prompt('Edit end time:',req.sign_out);
@@ -7489,6 +7571,36 @@ async function downloadReceiptAsPDF(expId,url,date,merchant){
 }
 
 
+
+async function pasteAdminReceipt(expId){
+  try{
+    if(!navigator.clipboard||!navigator.clipboard.read){toast('Use Ctrl+V on keyboard — clipboard API not available','e');return;}
+    toast('Reading clipboard...','i');
+    const items=await navigator.clipboard.read();
+    let found=false;
+    for(const item of items){
+      const imgType=item.types.find(t=>t.startsWith('image/'));
+      if(imgType){const blob=await item.getType(imgType);const file=new File([blob],'clipboard-receipt.'+imgType.split('/')[1],{type:imgType});await _uploadFileAsReceipt(expId,file);found=true;break;}
+    }
+    if(!found)toast('No image in clipboard — copy a screenshot first','e');
+  }catch(err){
+    if(err.name==='NotAllowedError')toast('Clipboard access denied — allow it in browser settings','e');
+    else toast('Could not read clipboard: '+err.message,'e');
+  }
+}
+async function _uploadFileAsReceipt(expId,file){
+  if(!file)return;
+  if(file.size>CONFIG_APP.MAX_FILE_BYTES){toast('File must be under 5MB','e');return;}
+  const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+  const path=`ledger-receipts/${expId}/${Date.now()}.${ext}`;
+  const {error}=await sb.storage.from('employee-docs').upload(path,file,{upsert:true});
+  if(error){toast('Upload failed: '+error.message,'e');return;}
+  const {data:ud}=sb.storage.from('employee-docs').getPublicUrl(path);
+  const url=ud?.publicUrl;if(!url){toast('Could not get file URL','e');return;}
+  await safeWrite(()=>sb.from('expenses').update({receipt_url:url}).eq('id',expId),'Receipt saved');
+  const idx=expenses.findIndex(e=>e.id===expId);if(idx>=0)expenses[idx].receipt_url=url;
+  toast('Receipt saved from clipboard ✓','s');
+}
 // ══ LEDGER RECEIPT UPLOAD ══
 async function uploadLedReceipt(expId, input){
   const file=input.files[0];
