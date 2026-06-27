@@ -1845,17 +1845,56 @@ async function pasteReceipt(){
     const items=await navigator.clipboard.read();
     let found=false;
     for(const clipItem of items){
-      const imgType=clipItem.types.find(t=>t.startsWith('image/'));
-      if(imgType){
-        const blob=await clipItem.getType(imgType);
-        const file=new File([blob],'clipboard-receipt.'+imgType.split('/')[1],{type:imgType});
-        _setRcptFile(file);found=true;break;
+      console.log('Clipboard types:', clipItem.types);
+      // Priority order: try all supported types
+      // iOS may label images differently depending on source
+      const typePriority=[
+        // Standard image types
+        'image/png','image/jpeg','image/jpg','image/gif','image/webp','image/heic','image/heif',
+        // PDF
+        'application/pdf',
+        // iOS/Safari may serve copied images as these
+        'image/tiff','image/bmp',
+        // Fallback: any image/*
+        ...(clipItem.types.filter(t=>t.startsWith('image/'))),
+        // Web clipboard types Safari uses
+        'web image','com.apple.uikit.image',
+      ];
+      let usedType=null;
+      for(const tryType of typePriority){
+        if(clipItem.types.includes(tryType)){usedType=tryType;break;}
+      }
+      if(usedType){
+        try{
+          const blob=await clipItem.getType(usedType);
+          // Determine extension
+          const extMap={'image/png':'png','image/jpeg':'jpg','image/jpg':'jpg',
+            'image/gif':'gif','image/webp':'webp','image/heic':'heic','image/heif':'heif',
+            'image/tiff':'tiff','application/pdf':'pdf','image/bmp':'bmp'};
+          const ext=extMap[usedType]||usedType.split('/')[1]||'jpg';
+          // Force jpeg for unknown image types (iOS compatibility)
+          const mimeType=usedType.startsWith('image/')?usedType:'application/pdf';
+          const file=new File([blob],'clipboard-receipt.'+ext,{type:mimeType});
+          _setRcptFile(file);found=true;break;
+        }catch(typeErr){
+          console.warn('Could not read type',usedType,typeErr);
+          continue; // try next type
+        }
       }
     }
-    if(!found)toast('No image in clipboard — screenshot a receipt first','e');
+    if(!found){
+      // Last resort: tell user exactly what's in clipboard
+      const allTypes=items.flatMap(i=>i.types).join(', ');
+      console.log('All clipboard types found:', allTypes);
+      toast('Could not read receipt from clipboard. Try: screenshot the receipt instead of copying it','e');
+    }
   }catch(err){
-    if(err.name==='NotAllowedError')toast('Allow clipboard access in Settings > Safari','e');
-    else toast('Could not read clipboard — try again','e');
+    if(err.name==='NotAllowedError'){
+      toast('Allow clipboard access: Settings → Safari → Paste from Other Apps → Allow','e');
+    }else{
+      console.error('Paste error:',err);
+      toast('Clipboard error — screenshot the receipt and paste that instead','e');
+    }
   }finally{
     if(btn)btn.innerHTML='<i class="fa-solid fa-clipboard"></i> Paste Receipt from Clipboard';
   }
