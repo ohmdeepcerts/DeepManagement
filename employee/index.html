@@ -247,6 +247,10 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .bubble.me{background:linear-gradient(135deg,#2563eb,#1d4ed8);box-shadow:0 2px 8px rgba(37,99,235,0.25);}
 .bubble.them{box-shadow:0 1px 4px rgba(0,0,0,0.06);}
 
+
+/* ── Paste receipt button ── */
+.paste-receipt-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;margin-top:8px;background:rgba(37,99,235,0.07);border:1.5px dashed rgba(37,99,235,0.35);border-radius:12px;cursor:pointer;font-size:13px;font-weight:700;color:var(--acc);transition:all .2s;-webkit-tap-highlight-color:transparent;}
+.paste-receipt-btn:active{background:rgba(37,99,235,0.14);transform:scale(.98);}
 /* Receipt zone polish */
 .receipt-zone{position:relative;overflow:hidden;}
 .receipt-zone::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(37,99,235,0.02),transparent);}
@@ -755,6 +759,11 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
             <p style="font-size:12px;margin:0;"><strong>Browse</strong><br><span style="font-size:10px;">PDF or image</span></p>
           </div>
         </div>
+
+        <!-- Paste button — clipboard API (iOS 16+) -->
+        <button type="button" class="paste-receipt-btn" onclick="pasteReceipt()">
+          <i class="fa-solid fa-clipboard"></i> Paste Receipt from Clipboard
+        </button>
         <img class="receipt-preview" id="rcptPreview">
         <div id="rcptFileName" style="font-size:11px;color:var(--grn);font-weight:600;margin-bottom:8px;display:none;"></div>
         <input type="file" id="rcptCamera" accept="image/*" capture="environment" style="display:none;" onchange="rcptChosen(this)">
@@ -1800,6 +1809,52 @@ function hideExpAC(){
   if(ac)ac.style.display='none';
 }
 let _rcptFile=null;
+
+// ── RECEIPT PASTE (clipboard) ──────────────────────────────────
+async function pasteReceipt(){
+  const btn=document.querySelector('.paste-receipt-btn');
+  try{
+    if(!navigator.clipboard||!navigator.clipboard.read){
+      toast('Clipboard not supported — try a different browser','e');return;
+    }
+    if(btn)btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Reading...';
+    const items=await navigator.clipboard.read();
+    let found=false;
+    for(const clipItem of items){
+      const imgType=clipItem.types.find(t=>t.startsWith('image/'));
+      if(imgType){
+        const blob=await clipItem.getType(imgType);
+        const file=new File([blob],'clipboard-receipt.'+imgType.split('/')[1],{type:imgType});
+        _setRcptFile(file);found=true;break;
+      }
+    }
+    if(!found)toast('No image in clipboard — screenshot a receipt first','e');
+  }catch(err){
+    if(err.name==='NotAllowedError')toast('Allow clipboard access in Settings > Safari','e');
+    else toast('Could not read clipboard — try again','e');
+  }finally{
+    if(btn)btn.innerHTML='<i class="fa-solid fa-clipboard"></i> Paste Receipt from Clipboard';
+  }
+}
+
+function _setRcptFile(file){
+  if(!file)return;
+  if(file.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');return;}
+  _rcptFile=file;
+  const fnEl=document.getElementById('rcptFileName');
+  if(fnEl){fnEl.textContent='✓ '+file.name;fnEl.style.display='block';}
+  const isPdf=/\.pdf$/i.test(file.name);
+  if(!isPdf){
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const img=document.getElementById('rcptPreview');
+      if(img){img.src=ev.target.result;img.style.display='block';}
+    };
+    reader.readAsDataURL(file);
+  }
+  toast('Receipt ready — tap Submit to upload','s');
+}
+// ─────────────────────────────────────────────────────────────
 function rcptChosen(input){
   _rcptFile=input.files[0];if(!_rcptFile)return;
   const fnEl=document.getElementById('rcptFileName');
