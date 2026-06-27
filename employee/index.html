@@ -251,6 +251,20 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 /* ── Paste receipt button ── */
 .paste-receipt-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;margin-top:8px;background:rgba(37,99,235,0.07);border:1.5px dashed rgba(37,99,235,0.35);border-radius:12px;cursor:pointer;font-size:13px;font-weight:700;color:var(--acc);transition:all .2s;-webkit-tap-highlight-color:transparent;}
 .paste-receipt-btn:active{background:rgba(37,99,235,0.14);transform:scale(.98);}
+
+/* Receipt preview & remove */
+.rcpt-preview-wrap{position:relative;margin-bottom:8px;display:none;}
+.rcpt-preview-wrap img{width:100%;max-height:160px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid rgba(0,0,0,0.08);}
+.rcpt-remove-btn{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.rcpt-remove-btn i{color:#fff;font-size:12px;}
+.rcpt-preview-tap{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,0.5);color:#fff;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;backdrop-filter:blur(4px);}
+/* Full-screen receipt popup */
+.rcpt-popup-bg{position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;}
+.rcpt-popup-bg.open{display:flex;}
+.rcpt-popup-img{max-width:100%;max-height:80vh;border-radius:12px;object-fit:contain;}
+.rcpt-popup-close{margin-top:20px;padding:12px 32px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:30px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.rcpt-pdf-wrap{display:flex;align-items:center;gap:10px;padding:12px;background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.2);border-radius:10px;margin-bottom:8px;position:relative;}
+.rcpt-pdf-remove{position:absolute;top:8px;right:8px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:3px 8px;cursor:pointer;color:var(--red);font-size:11px;font-weight:700;}
 /* Receipt zone polish */
 .receipt-zone{position:relative;overflow:hidden;}
 .receipt-zone::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(37,99,235,0.02),transparent);}
@@ -764,8 +778,18 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
         <button type="button" class="paste-receipt-btn" onclick="pasteReceipt()">
           <i class="fa-solid fa-clipboard"></i> Paste Receipt from Clipboard
         </button>
-        <img class="receipt-preview" id="rcptPreview">
-        <div id="rcptFileName" style="font-size:11px;color:var(--grn);font-weight:600;margin-bottom:8px;display:none;"></div>
+        <!-- Receipt preview wrap (image) -->
+        <div class="rcpt-preview-wrap" id="rcptPreviewWrap">
+          <img id="rcptPreview" src="" alt="receipt" onclick="openRcptPopup()">
+          <button class="rcpt-remove-btn" onclick="removeReceipt()" title="Remove"><i class="fa-solid fa-xmark"></i></button>
+          <span class="rcpt-preview-tap">Tap to preview</span>
+        </div>
+        <!-- PDF / non-image file indicator -->
+        <div class="rcpt-pdf-wrap" id="rcptPdfWrap" style="display:none;">
+          <i class="fa-solid fa-file-lines" style="font-size:22px;color:var(--acc);"></i>
+          <div><div id="rcptFileName" style="font-size:13px;font-weight:700;color:var(--txt);">file.pdf</div><div style="font-size:11px;color:var(--txtm);">Attached — tap Submit to upload</div></div>
+          <button class="rcpt-pdf-remove" onclick="removeReceipt()"><i class="fa-solid fa-xmark"></i> Remove</button>
+        </div>
         <input type="file" id="rcptCamera" accept="image/*" capture="environment" style="display:none;" onchange="rcptChosen(this)">
         <input type="file" id="rcptFile" accept="image/*,.pdf,.jpg,.jpeg,.png" style="display:none;" onchange="rcptChosen(this)">
         <button class="btn btn-p" onclick="submitExp()"><i class="fa-solid fa-paper-plane"></i>Submit Expense</button>
@@ -1837,22 +1861,64 @@ async function pasteReceipt(){
   }
 }
 
+
+// ── RECEIPT PREVIEW & REMOVE ─────────────────────────────────
+function openRcptPopup(){
+  const src=document.getElementById('rcptPreview')?.src;
+  if(!src||src===window.location.href)return;
+  const popup=document.getElementById('rcptPopupBg');
+  const img=document.getElementById('rcptPopupImg');
+  if(popup&&img){img.src=src;popup.classList.add('open');}
+}
+function closeRcptPopup(){
+  const popup=document.getElementById('rcptPopupBg');
+  if(popup)popup.classList.remove('open');
+}
+function removeReceipt(){
+  _rcptFile=null;
+  // Hide preview wrap
+  const wrap=document.getElementById('rcptPreviewWrap');
+  if(wrap)wrap.style.display='none';
+  const img=document.getElementById('rcptPreview');
+  if(img){img.src='';img.style.display='';}
+  // Hide PDF wrap
+  const pdfWrap=document.getElementById('rcptPdfWrap');
+  if(pdfWrap)pdfWrap.style.display='none';
+  const fn=document.getElementById('rcptFileName');
+  if(fn)fn.textContent='';
+  // Reset file inputs
+  const rc=document.getElementById('rcptCamera');if(rc)rc.value='';
+  const rf=document.getElementById('rcptFile');if(rf)rf.value='';
+  toast('Receipt removed','i');
+}
+// ─────────────────────────────────────────────────────────────
 function _setRcptFile(file){
   if(!file)return;
   if(file.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');return;}
   _rcptFile=file;
-  const fnEl=document.getElementById('rcptFileName');
-  if(fnEl){fnEl.textContent='✓ '+file.name;fnEl.style.display='block';}
-  const isPdf=/\.pdf$/i.test(file.name);
+  const isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
   if(!isPdf){
+    // Image — show preview wrap with thumbnail
+    const wrap=document.getElementById('rcptPreviewWrap');
+    const img=document.getElementById('rcptPreview');
+    const pdfWrap=document.getElementById('rcptPdfWrap');
+    if(pdfWrap)pdfWrap.style.display='none';
     const reader=new FileReader();
     reader.onload=ev=>{
-      const img=document.getElementById('rcptPreview');
-      if(img){img.src=ev.target.result;img.style.display='block';}
+      if(img){img.src=ev.target.result;}
+      if(wrap)wrap.style.display='block';
     };
     reader.readAsDataURL(file);
+  }else{
+    // PDF or doc — show file name with remove button
+    const wrap=document.getElementById('rcptPreviewWrap');
+    if(wrap)wrap.style.display='none';
+    const pdfWrap=document.getElementById('rcptPdfWrap');
+    const fn=document.getElementById('rcptFileName');
+    if(fn)fn.textContent=file.name;
+    if(pdfWrap)pdfWrap.style.display='flex';
   }
-  toast('Receipt ready — tap Submit to upload','s');
+  toast('Receipt attached — tap preview to check, Submit when ready','s');
 }
 // ─────────────────────────────────────────────────────────────
 function rcptChosen(input){
@@ -1895,7 +1961,10 @@ async function submitExp(){
   const r=await sb.from('expenses').insert({employee_id:emp.id,date,merchant,category:document.getElementById('expCat').value||null,amount:amt,notes:document.getElementById('expNotes').value||null,receipt_url:fileUrl,status:'pending',tags:document.getElementById('expVAT')?.checked?['VAT']:[],flagged:false}).select().single();
   if(r.error){_submittingExp=false;toast(r.error.message,'e');return;}
   myExp.unshift(r.data);
-  document.getElementById('expMerchant').value='';document.getElementById('expAmt').value='';document.getElementById('expNotes').value='';document.getElementById('expCat').value='';const rp=document.getElementById('rcptPreview');if(rp){rp.style.display='none';rp.src='';}
+  document.getElementById('expMerchant').value='';document.getElementById('expAmt').value='';document.getElementById('expNotes').value='';document.getElementById('expCat').value='';const rp=document.getElementById('rcptPreview');if(rp){rp.src='';}
+  const rpw=document.getElementById('rcptPreviewWrap');if(rpw)rpw.style.display='none';
+  const pdfw=document.getElementById('rcptPdfWrap');if(pdfw)pdfw.style.display='none';
+  const fnEl=document.getElementById('rcptFileName');if(fnEl)fnEl.textContent='';
   _rcptFile=null;
   const rc=document.getElementById('rcptCamera');if(rc)rc.value='';
   const rf=document.getElementById('rcptFile');if(rf)rf.value='';
@@ -2411,6 +2480,7 @@ function closeMarkModal(){
 }
 
 let _submittingAtt=false;
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeRcptPopup();});
 window.addEventListener('beforeunload',e=>{if(_submittingAtt){e.preventDefault();e.returnValue='Submission in progress.';return e.returnValue;}});
 let _empPageAC=new AbortController();
 function _resetEmpListeners(){_empPageAC.abort();_empPageAC=new AbortController();}
@@ -2748,5 +2818,11 @@ function startElecCanvas(){
 })();
 
 </script>
+
+<!-- Receipt full-screen preview popup -->
+<div class="rcpt-popup-bg" id="rcptPopupBg" onclick="if(event.target===this)closeRcptPopup()">
+  <img class="rcpt-popup-img" id="rcptPopupImg" src="" alt="receipt preview">
+  <button class="rcpt-popup-close" onclick="closeRcptPopup()"><i class="fa-solid fa-xmark" style="margin-right:6px;"></i>Close Preview</button>
+</div>
 </body>
 </html>
