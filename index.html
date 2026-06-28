@@ -1132,7 +1132,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <!-- SETTINGS -->
     <div class="page" id="page-settings">
       <div class="ph"><div><h1>Settings &amp; Tools</h1></div><button class="btn btn-p" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div>
-      <div class="tabs"><div class="tab active" onclick="setSettTab('general',this)">General</div><div class="tab" onclick="setSettTab('att',this)">Attendance</div><div class="tab" onclick="setSettTab('pay',this)">Pay</div><div class="tab" onclick="setSettTab('exp',this)">Expenses</div><div class="tab" onclick="setSettTab('admin',this)">Password</div><div class="tab" onclick="setSettTab('data',this)"><i class="fa-solid fa-database" style="margin-right:4px;"></i>Data</div></div>
+      <div class="tabs"><div class="tab active" onclick="setSettTab('general',this)">General</div><div class="tab" onclick="setSettTab('att',this)">Attendance</div><div class="tab" onclick="setSettTab('pay',this)">Pay</div><div class="tab" onclick="setSettTab('exp',this)">Expenses</div><div class="tab" onclick="setSettTab('admin',this)">Password</div><div class="tab" onclick="setSettTab('ai',this)"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:4px;"></i>AI</div><div class="tab" onclick="setSettTab('ai',this)"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:4px;"></i>AI</div><div class="tab" onclick="setSettTab('data',this)"><i class="fa-solid fa-database" style="margin-right:4px;"></i>Data</div></div>
       <div class="sett-sec active" id="settTab-general"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl" style="grid-column:1/-1"><label>Company Name</label><input type="text" id="sCompany" placeholder="OHM Electrical"></div><div class="fgl"><label>Currency</label><select id="sCurrency"><option value="£">£ GBP</option><option value="$">$ USD</option><option value="€">€ EUR</option></select></div><div class="fgl"><label>Attendance Warning %</label><input type="number" id="sThreshold" min="0" max="100" placeholder="80"></div></div></div></div></div>
       <div class="sett-sec" id="settTab-att"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl"><label>Default Work Start</label><input type="time" id="sWStart" value="08:00"></div><div class="fgl"><label>Default Work End</label><input type="time" id="sWEnd" value="17:00"></div><div class="fgl"><label>OT After (hours/day)</label><input type="number" id="sOT" min="1" max="24" step="0.5" placeholder="8"></div></div></div></div>
         <div class="card" style="margin-top:13px;"><div class="ch"><div class="ct">Bank Account Names</div></div><div class="cb"><div id="bankList" style="display:flex;flex-direction:column;gap:7px;margin-bottom:11px;"></div><div style="display:flex;gap:7px;"><input type="text" id="newBank" placeholder="e.g. GB Electrical" style="flex:1;padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;"><button class="btn btn-p btn-sm" onclick="addBank()"><i class="fa-solid fa-plus"></i>Add</button></div></div></div>
@@ -1142,7 +1142,18 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       <div class="sett-sec" id="settTab-admin"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl"><label>New Password (min 6 characters)</label><input type="password" id="newPin" placeholder="New password"></div><div class="fgl"><label>Confirm Password</label><input type="password" id="confirmPin" placeholder="New password"></div></div><button class="btn btn-p" style="margin-top:11px;" onclick="changePin()"><i class="fa-solid fa-key"></i>Update PIN</button><p style="font-size:12px;color:var(--txtm);margin-top:8px;">Default PIN: 1234 — change this immediately.</p></div></div>
       </div>
 
-      <div class="sett-sec" id="settTab-data">
+      <div class="sett-sec" id="settTab-ai">
+          <div class="card">
+            <div class="ch"><div><div class="ct"><i class="fa-solid fa-wand-magic-sparkles" style="color:#7c3aed;margin-right:6px;"></i><strong>AI Receipt Scanner</strong></div><div class="cs">Gemini API — employees tap Auto-fill after attaching a receipt photo</div></div></div>
+            <div class="cb">
+              <div class="fg fg2">
+                <div class="fgl" style="grid-column:1/-1"><label>Gemini API Key</label><input type="password" id="sGeminiKey" placeholder="Paste key from aistudio.google.com" style="font-family:monospace;font-size:12px;width:100%;"></div>
+              </div>
+              <div style="font-size:11px;color:var(--txtm);margin-top:6px;">Free at <a href="https://aistudio.google.com" target="_blank" style="color:var(--acc);">aistudio.google.com</a> — 1,500 free scans/day. Save once here, all employees get it automatically.</div>
+            </div>
+          </div>
+        </div>
+        <div class="sett-sec" id="settTab-data">
         <div class="card" style="margin-bottom:14px;">
           <div class="ch"><div><div class="ct"><i class="fa-solid fa-file-export" style="color:var(--grn);margin-right:6px;"></i>Export Data</div><div class="cs">Choose what to export and download</div></div></div>
           <div class="cb">
@@ -1238,6 +1249,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div class="fgl"><label>Role / Trade</label><input type="text" id="eRole" placeholder="e.g. Electrician"></div>
         <div class="fgl"><label>Contract Type</label><select id="eContract"><option value="PAYE">PAYE</option><option value="Subcontractor">Subcontractor</option></select></div>
         <div class="fgl"><label>Phone</label><input type="tel" id="ePhone" placeholder="07700 900000"></div>
+        <div class="fgl"><label>Email (for payslips)</label><input type="email" id="eEmail" placeholder="name@email.com" autocomplete="off"></div>
         <div class="fgl"><label>Join Date</label><input type="date" id="eJoin"></div>
         <div class="fgl"><label>Left Date</label><input type="date" id="eLeft"></div>
         <div class="fgl" style="grid-column:1/-1"><label>Notes</label><textarea id="eNotes" placeholder="Any notes..."></textarea></div>
@@ -2495,6 +2507,10 @@ async function loadMonthData(month,year){
 
 async function loadAllData(){
   setSyncStatus('saving');
+  // Load shared merchant→category map in background (non-blocking)
+  sb.from('merchant_categories').select('merchant,category').then(({data})=>{
+    if(data)window._merchantCatMap=Object.fromEntries(data.map(r=>[r.merchant.trim().toLowerCase(),r.category]));
+  });
   try{
     // Core tables - must succeed
     const [empR,cfgR,attR,expR,batR,msgR]=await Promise.all([
@@ -3512,6 +3528,17 @@ function recalcHOT(empId){
       if(stEl.value!==newStatus){
         stEl.value=newStatus;
         _touched.add(empId);
+        // Update row background class to match new status
+        const row=document.getElementById(`mr-${empId}`);
+        if(row){
+          row.className=row.className.replace(/\bmr-\S+/g,'').trim();
+          if(newStatus)row.classList.add(`mr-${newStatus}`);
+        }
+        // Update glow dot colour
+        const dot=document.getElementById(`sd-${empId}`);
+        if(dot){dot.className=`st-dot st-dot-${newStatus}`;}
+        // Show a subtle toast so admin knows status changed
+        toast(`${(employeeMap?.get(empId)?.name||'Employee')} → ${newStatus==='EL'?'Left Early':'Late Arrival'}${newStatus==='EL'?' (auto-detected)':' (auto-detected)'}`, 'i');
       }
     }
   }
@@ -3915,6 +3942,13 @@ async function updateExp(id,field,val){
     if(field==='amount'||field==='date'||field==='category'){
       const d=new Date((field==='date'?val:exp.date)+'T00:00:00');
       recalcEmployeeMonth(exp.employee_id,d.getMonth(),d.getFullYear());
+      // Save merchant→category mapping when admin categorises an expense
+      if(field==='category'&&val&&exp.merchant){
+        const mKey=exp.merchant.trim().toLowerCase();
+        if(!window._merchantCatMap)window._merchantCatMap={};
+        window._merchantCatMap[mKey]=val;
+        sb.from('merchant_categories').upsert({merchant:exp.merchant.trim(),category:val},{onConflict:'merchant'});
+      }
       // If date changed, also recalc the old month
       if(field==='date'&&val!==exp.date){
         const dOld=new Date(exp.date+'T00:00:00');
@@ -4917,6 +4951,9 @@ function renderPayroll(){
       <td style="min-width:130px;" id="pst-${emp.id}-${m}-${y}">
         ${renderPayStatus(emp.id,m,y,rowTotal,bankAmt,cashAmt,C)}
       </td>
+      <td style="min-width:50px;text-align:center;">
+        ${emp.email?`<button onclick="sendPayslipEmail('${emp.id}',${m},${y})" title="Email payslip to ${emp.email||''}" style="background:none;border:1px solid var(--bdr);border-radius:7px;padding:5px 8px;cursor:pointer;color:var(--tel);font-size:13px;"><i class="fa-solid fa-envelope"></i></button>`:`<span title="No email set — edit employee to add email" style="color:var(--txtm);font-size:13px;cursor:help;"><i class="fa-solid fa-envelope-circle-xmark"></i></span>`}
+      </td>
     </tr>`;
   });
   rows+=`<tr class="pl-tot"><td colspan="3" style="text-align:right;padding-right:11px;">TOTALS</td><td style="font-weight:700;color:var(--grn);">${C}${gBase.toFixed(2)}</td><td style="font-weight:700;color:var(--amb);">${C}${gOT.toFixed(2)}</td><td style="font-weight:700;color:var(--grn);">${C}${gBonus.toFixed(2)}</td><td style="font-weight:700;color:${gExp<0?'var(--red)':`var(--tel)`};">${gExp<0?'-'+C+Math.abs(gExp).toFixed(2):C+gExp.toFixed(2)}</td><td style="font-weight:700;color:var(--grn);font-size:14px;">${C}${gTotal.toFixed(2)}</td><td><div style="font-size:12px;line-height:1.7;"><div><i class="fa-solid fa-building-columns" style="color:var(--tel);font-size:10px;margin-right:3px;"></i><strong>${C}${gBank.toFixed(2)}</strong> bank</div><div><i class="fa-solid fa-money-bill-wave" style="color:var(--grn);font-size:10px;margin-right:3px;"></i><strong>${C}${gCash.toFixed(2)}</strong> cash</div></div></td></tr>`;
@@ -4977,6 +5014,97 @@ async function recalcPayrollBtn(){
     toast('Recalculate failed: '+e.message,'e');
   }finally{
     if(btn){btn.disabled=false;btn.querySelector('i').classList.remove('fa-spin');}
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// SEND PAYSLIP BY EMAIL (Resend API — free 3,000/month)
+// ══════════════════════════════════════════════════════════════
+async function sendPayslipEmail(empId,month,year){
+  const emp=employeeMap?.get(empId);
+  if(!emp){toast('Employee not found','e');return;}
+  if(!emp.email){toast('No email set for this employee — edit their profile first','e');return;}
+  if(!confirm(`Send payslip to ${emp.email}?`))return;
+  toast('Sending payslip...','i');
+  // Build payslip data from payrollSummaries
+  const prRow=payrollSummaries.find(p=>p.employee_id===empId&&p.month===month&&p.year===year);
+  const C='£';
+  const monthName=MONTHS[month];
+  const basePay=prRow?parseFloat(prRow.base_pay)||0:0;
+  const otPay=prRow?parseFloat(prRow.overtime_pay)||0:0;
+  const bonusPay=prRow?parseFloat(prRow.bonus_pay)||0:0;
+  const expTotal=prRow?parseFloat(prRow.expense_total)||0:0;
+  const deductions=prRow?parseFloat(prRow.deduction_total)||0:0;
+  const netPay=prRow?parseFloat(prRow.net_pay)||0:(basePay+otPay+bonusPay+expTotal);
+  const bankAmt=prRow?parseFloat(prRow.bank_amount)||0:0;
+  const cashAmt=prRow?parseFloat(prRow.cash_amount)||0:0;
+  // Build HTML email body
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;padding:20px;}
+    .wrap{max-width:520px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);}
+    .hdr{background:#0f172a;color:#fff;padding:24px 28px;}
+    .hdr h1{margin:0;font-size:20px;}
+    .hdr p{margin:4px 0 0;font-size:13px;color:#94a3b8;}
+    .body{padding:24px 28px;}
+    .row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:14px;}
+    .row.total{font-weight:700;font-size:16px;border-bottom:none;padding-top:16px;color:#0f172a;}
+    .label{color:#64748b;}
+    .val{color:#0f172a;}
+    .val.grn{color:#16a34a;}
+    .val.red{color:#dc2626;}
+    .split{background:#f8fafc;border-radius:8px;padding:12px 14px;margin-top:14px;font-size:13px;}
+    .split-row{display:flex;justify-content:space-between;margin-bottom:4px;}
+    .footer{background:#f8fafc;padding:14px 28px;font-size:11px;color:#94a3b8;text-align:center;}
+  </style></head><body>
+  <div class="wrap">
+    <div class="hdr">
+      <h1>OHM Electrical — Payslip</h1>
+      <p>${monthName} ${year} · ${emp.name}</p>
+    </div>
+    <div class="body">
+      <div class="row"><span class="label">Employee</span><span class="val">${emp.name}</span></div>
+      <div class="row"><span class="label">Role</span><span class="val">${emp.role||'—'}</span></div>
+      <div class="row"><span class="label">Pay Type</span><span class="val">${emp.pay_type==='fixed'?'Monthly Salary':emp.pay_type==='daily'?'Daily Rate':'Hourly Rate'}</span></div>
+      <div class="row"><span class="label">Period</span><span class="val">${monthName} ${year}</span></div>
+      <div class="row"><span class="label">Basic Pay</span><span class="val">${C}${basePay.toFixed(2)}</span></div>
+      ${otPay>0?`<div class="row"><span class="label">Overtime</span><span class="val grn">+${C}${otPay.toFixed(2)}</span></div>`:''}
+      ${bonusPay>0?`<div class="row"><span class="label">Bonus</span><span class="val grn">+${C}${bonusPay.toFixed(2)}</span></div>`:''}
+      ${expTotal>0?`<div class="row"><span class="label">Expenses</span><span class="val grn">+${C}${expTotal.toFixed(2)}</span></div>`:''}
+      ${deductions>0?`<div class="row"><span class="label">Deductions</span><span class="val red">−${C}${deductions.toFixed(2)}</span></div>`:''}
+      <div class="row total"><span>Net Pay</span><span class="val grn">${C}${netPay.toFixed(2)}</span></div>
+      ${(bankAmt>0||cashAmt>0)?`<div class="split">
+        <div style="font-weight:600;margin-bottom:8px;color:#374151;">Payment Split</div>
+        ${bankAmt>0?`<div class="split-row"><span>Bank Transfer</span><span>${C}${bankAmt.toFixed(2)}</span></div>`:''}
+        ${cashAmt>0?`<div class="split-row"><span>Cash</span><span>${C}${cashAmt.toFixed(2)}</span></div>`:''}
+      </div>`:''}
+    </div>
+    <div class="footer">OHM Electrical · This is an automatically generated payslip · ${new Date().toLocaleDateString('en-GB')}</div>
+  </div></body></html>`;
+  try{
+    const r=await fetch('https://api.resend.com/emails',{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${RESEND_KEY}`,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        from:FROM_EMAIL,
+        to:[emp.email],
+        subject:`OHM Electrical — Payslip ${monthName} ${year}`,
+        html
+      })
+    });
+    const data=await r.json();
+    if(r.ok){
+      toast(`Payslip sent to ${emp.email} ✅`,'s');
+    } else {
+      console.error('Resend error:',data);
+      if(RESEND_KEY==='YOUR_RESEND_API_KEY'){
+        toast('Resend key not set — get a free key at resend.com','e');
+      } else {
+        toast(`Email failed: ${data.message||'check Resend account'}`,'e');
+      }
+    }
+  }catch(err){
+    console.error('sendPayslipEmail:',err);
+    toast('Email failed — check internet connection','e');
   }
 }
 function exportPayrollCSV(){
@@ -5208,6 +5336,7 @@ async function editEmpModal(id){
   document.getElementById('eRole').value=emp.role||'';
   document.getElementById('eContract').value=emp.contract_type||'PAYE';
   document.getElementById('ePhone').value=emp.phone||'';
+  document.getElementById('eEmail').value=emp.email||'';
   document.getElementById('eJoin').value=emp.join_date||'';
   document.getElementById('eLeft').value=emp.left_date||'';
   document.getElementById('eNotes').value=emp.notes||'';
@@ -5357,6 +5486,7 @@ async function saveEmployee(){
     role:document.getElementById('eRole').value,
     contract_type:document.getElementById('eContract').value,
     phone:document.getElementById('ePhone').value,
+    email:document.getElementById('eEmail').value.trim()||null,
     join_date:document.getElementById('eJoin').value||null,
     left_date:document.getElementById('eLeft').value||null,
     notes:document.getElementById('eNotes').value,
@@ -5848,6 +5978,7 @@ function loadSettings(){
   document.getElementById('sCurrency').value=cfg.currency||'£';
   document.getElementById('sThreshold').value=cfg.threshold||80;
   document.getElementById('sWStart').value=cfg.work_start||'08:00';
+  const gkEl=document.getElementById('sGeminiKey');if(gkEl)gkEl.value=cfg.gemini_key||'';
   document.getElementById('sWEnd').value=cfg.work_end||'17:00';
   document.getElementById('sOT').value=cfg.ot_threshold||CONFIG_APP.DEFAULT_HOURS;
   document.getElementById('sOTMult').value=cfg.rate_ot||1.5;
@@ -5863,6 +5994,7 @@ async function saveSettings(){
     work_start:document.getElementById('sWStart').value,
     work_end:document.getElementById('sWEnd').value,
     ot_threshold:parseFloat(document.getElementById('sOT').value)||8,
+    gemini_key:document.getElementById('sGeminiKey')?.value.trim()||cfg.gemini_key||'',
     rate_ot:parseFloat(document.getElementById('sOTMult').value)||1.5,
     rate_sat:parseFloat(document.getElementById('sSat').value)||1.0,
     rate_sun:parseFloat(document.getElementById('sSun').value)||1.0,
