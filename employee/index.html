@@ -21,6 +21,7 @@
 <title>OHM Employee Portal</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
@@ -758,7 +759,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
         <div class="fg"><label>Date *</label><input type="date" id="expDate"></div>
         <div class="fg" style="position:relative;">
           <label>Merchant / Supplier *</label>
-          <input type="text" id="expMerchant" placeholder="e.g. Screwfix, Costa Coffee, Fuel" autocomplete="off" oninput="expMerchantInput(this.value)" onblur="setTimeout(()=>hideExpAC(),200)" onfocus="expMerchantInput(this.value)">
+          <input type="text" id="expMerchant" placeholder="e.g. Screwfix, Costa Coffee, Fuel" autocomplete="off" oninput="expMerchantInput(this.value)" onblur="setTimeout(()=>{hideExpAC();autoFillCatFromMerchant(this.value);},200)" onfocus="expMerchantInput(this.value)">
           <div id="expAC" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:200;max-height:220px;overflow-y:auto;margin-top:3px;"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -768,7 +769,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
         <div class="fg"><label>Notes</label><textarea id="expNotes" placeholder="Any details..."></textarea></div>
         <div style="display:flex;align-items:center;gap:11px;background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--rs);padding:11px 13px;margin-bottom:12px;">
           <i class="fa-solid fa-tag" style="color:var(--amb);font-size:16px;flex-shrink:0;"></i>
-          <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--amb);">VAT Receipt</div><div style="font-size:11px;color:var(--txt2);">Toggle if this receipt has VAT you want to reclaim</div></div>
+          <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--amb);">VAT Receipt</div><div style="font-size:11px;color:var(--txt2);">Toggle if this receipt includes VAT</div></div>
           <label id="vatToggleLabel" onclick="toggleVATvis(event)" style="position:relative;display:inline-block;width:48px;height:26px;flex-shrink:0;cursor:pointer;">
             <input type="checkbox" id="expVAT" style="opacity:0;width:0;height:0;position:absolute;">
             <span id="vatToggleVis" style="position:absolute;inset:0;background:var(--bdr);border-radius:13px;transition:0.25s;"></span>
@@ -790,6 +791,12 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
         <button type="button" class="paste-receipt-btn" onclick="pasteReceipt()">
           <i class="fa-solid fa-clipboard"></i> Paste Screenshot from Clipboard
         </button>
+
+        <!-- Gemini AI scan button — appears only when receipt attached -->
+        <button type="button" id="geminiScanBtn" class="paste-receipt-btn" onclick="scanReceiptWithAI()" style="display:none;background:#fff;border:2px solid #1a73e8;color:#1a73e8;font-weight:700;margin-top:8px;">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt
+        </button>
+        <div id="geminiScanStatus" style="display:none;font-size:12px;color:var(--acc);text-align:center;margin-top:6px;font-weight:600;"></div>
 
         <!-- Receipt preview wrap (image) -->
         <div class="rcpt-preview-wrap" id="rcptPreviewWrap">
@@ -1399,6 +1406,10 @@ async function silentSync(){
 
 // ── DATA LOADING ──
 async function loadAll(){
+  // Load shared merchant→category map (background, non-blocking)
+  sb.from('merchant_categories').select('merchant,category').then(({data})=>{
+    if(data)window._merchantCatMap=Object.fromEntries(data.map(r=>[r.merchant.trim().toLowerCase(),r.category]));
+  });
   const [attR,expR,msgR,batR,salR,payStR,attReqR,prSumR]=await Promise.all([
     sb.from('attendance').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
     sb.from('expenses').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
@@ -1799,6 +1810,31 @@ function buildExpHistory(){
   });
   return Object.values(map).sort((a,b)=>b.count-a.count);
 }
+
+function autoFillCatFromMerchant(merchantVal){
+  if(!merchantVal||!merchantVal.trim())return;
+  const key=merchantVal.trim().toLowerCase();
+  // Check shared map first, then local expense history
+  const shared=(window._merchantCatMap||{})[key];
+  if(shared){
+    const sel=document.getElementById('expCat');
+    if(sel&&!sel.value){
+      const opt=Array.from(sel.options).find(o=>o.value.toLowerCase()===shared.toLowerCase());
+      if(opt){sel.value=opt.value;}
+    }
+    return;
+  }
+  // Fall back to local history
+  const hist=buildExpHistory();
+  const match=hist.find(h=>h.merchant.trim().toLowerCase()===key);
+  if(match&&match.category){
+    const sel=document.getElementById('expCat');
+    if(sel&&!sel.value){
+      const opt=Array.from(sel.options).find(o=>o.value.toLowerCase()===match.category.toLowerCase());
+      if(opt){sel.value=opt.value;}
+    }
+  }
+}
 function expMerchantInput(val){
   const ac=document.getElementById('expAC');
   if(!ac)return;
@@ -1831,11 +1867,13 @@ function expMerchantInput(val){
 function pickExpAC(merchant,category){
   const inp=document.getElementById('expMerchant');
   if(inp)inp.value=merchant;
-  // Auto-fill category if we have one and it exists in the dropdown
-  if(category){
+  // Check shared merchant map first, then fall back to local history category
+  const sharedCat=(window._merchantCatMap||{})[merchant.trim().toLowerCase()];
+  const useCat=sharedCat||category;
+  if(useCat){
     const sel=document.getElementById('expCat');
     if(sel){
-      const opt=Array.from(sel.options).find(o=>o.value.toLowerCase()===category.toLowerCase());
+      const opt=Array.from(sel.options).find(o=>o.value.toLowerCase()===useCat.toLowerCase());
       if(opt)sel.value=opt.value;
     }
   }
@@ -1848,6 +1886,107 @@ function hideExpAC(){
 let _rcptFile=null;
 
 // ── RECEIPT PASTE (clipboard) ──────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════
+// GEMINI AI RECEIPT SCANNER
+// ══════════════════════════════════════════════════════════════
+let _geminiKey=''; // loaded from Supabase settings on login
+
+async function scanReceiptWithAI(){
+  if(!_rcptFile){toast('Attach a receipt first','e');return;}
+  const btn=document.getElementById('geminiScanBtn');
+  const st=document.getElementById('geminiScanStatus');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Scanning...';}
+  if(st){st.style.display='block';st.textContent='Reading receipt...';}
+  try{
+    // Convert image file to base64
+    const b64=await new Promise((res,rej)=>{
+      const r=new FileReader();
+      r.onload=()=>res(r.result.split(',')[1]);
+      r.onerror=rej;
+      r.readAsDataURL(_rcptFile);
+    });
+    const mimeType=_rcptFile.type||'image/jpeg';
+    // Key loaded from Supabase settings on login — never hardcoded in this file
+    if(!_geminiKey){
+      toast('AI scanner not set up — contact admin','e');
+      if(st){st.textContent='Not configured — admin must add Gemini key in Settings → AI';st.style.color='var(--red)';}
+      if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt';}
+      return;
+    }
+    const yr=new Date().getFullYear();
+    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {"merchant":"store name","amount":0.00,"date":"YYYY-MM-DD","category":"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other","vat_amount":0.00}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear.`;
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${_geminiKey}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mimeType,data:b64}},{text:prompt}]}]})
+    });
+        if(!resp.ok) throw new Error(`Gemini error ${resp.status}`);
+    const data=await resp.json();
+    const raw=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    // Parse JSON — strip any accidental markdown
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const result=JSON.parse(clean);
+    // Auto-fill form fields
+    let filled=[];
+    if(result.merchant){
+      document.getElementById('expMerchant').value=result.merchant;
+      filled.push('merchant');
+    }
+    if(result.amount!=null&&result.amount>0){
+      document.getElementById('expAmt').value=parseFloat(result.amount).toFixed(2);
+      filled.push('amount');
+    }
+    if(result.date){
+      document.getElementById('expDate').value=result.date;
+      filled.push('date');
+    }
+    // Check shared merchant memory first — overrides Gemini's guess
+    const _mKey=(result.merchant||'').trim().toLowerCase();
+    const _savedCat=_mKey&&window._merchantCatMap?window._merchantCatMap[_mKey]:null;
+    const _useCat=_savedCat||result.category;
+    if(_useCat){
+      const catEl=document.getElementById('expCat');
+      if(catEl){
+        const opts=[...catEl.options].map(o=>o.value);
+        const match=opts.find(o=>o.toLowerCase()===_useCat.toLowerCase());
+        if(match){catEl.value=match;filled.push('category'+((_savedCat)?' (remembered)':''));}
+      }
+    }
+    if(result.vat_amount!=null&&result.vat_amount>0){
+      // Auto-toggle VAT on if Gemini detected VAT on the receipt
+      const vatBox=document.getElementById('expVAT');
+      if(vatBox&&!vatBox.checked){
+        vatBox.checked=true;
+        // Also update the visual toggle to match
+        const vis=document.getElementById('vatToggleVis');
+        const knob=document.getElementById('vatToggleKnob');
+        if(vis)vis.style.background='var(--grn)';
+        if(knob)knob.style.transform='translateX(22px)';
+        filled.push('VAT');
+      }
+    }
+    if(filled.length>0){
+      if(st){st.textContent=`✅ Filled: ${filled.join(', ')} — check and adjust if needed`;st.style.color='var(--grn)';}
+      toast(`Receipt scanned — ${filled.length} fields filled`,'s');
+    } else {
+      if(st){st.textContent='Could not read receipt clearly — fill in manually';st.style.color='var(--amb)';}
+      toast('Could not read receipt — please fill in manually','e');
+    }
+  }catch(err){
+    console.error('Gemini scan error:',err);
+    const msg=err.message||'';
+    if(msg.includes('400')||msg.includes('403')||msg.includes('Worker')){
+      if(st){st.textContent='Scanner not set up yet — contact admin';st.style.color='var(--red)';}
+      toast('Receipt scanner not ready — contact admin','e');
+    } else {
+      if(st){st.textContent='Scan failed — fill in manually';st.style.color='var(--amb)';}
+      toast('Could not scan receipt — fill in manually','e');
+    }
+  } finally {
+    if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt';}
+  }
+}
 async function pasteReceipt(){
   const btn=document.querySelector('.paste-receipt-btn');
   try{
@@ -1942,44 +2081,109 @@ function removeReceipt(){
   const rc=document.getElementById('rcptCamera');if(rc)rc.value='';
   const rf=document.getElementById('rcptFile');if(rf)rf.value='';
   toast('Receipt removed','i');
+  // Hide AI scan button + status
+  const scanBtn=document.getElementById('geminiScanBtn');
+  const scanSt=document.getElementById('geminiScanStatus');
+  if(scanBtn)scanBtn.style.display='none';
+  if(scanSt){scanSt.style.display='none';scanSt.textContent='';}
 }
 // ─────────────────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════
+// PDF → JPEG CONVERTER (PDF.js — client-side, no server needed)
+// ══════════════════════════════════════════════════════════════
+let _convertedJpegBlob = null; // stores the converted JPEG for upload
+
+async function pdfToJpegBase64(pdfFile) {
+  // Set worker src for PDF.js
+  if(typeof pdfjsLib === 'undefined') throw new Error('PDF.js not loaded');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+  // Read PDF as ArrayBuffer
+  const arrayBuffer = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsArrayBuffer(pdfFile);
+  });
+
+  // Load PDF document
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  
+  // Render first page (receipts are always 1 page)
+  const page = await pdf.getPage(1);
+  
+  // Scale up for better Gemini read accuracy (2x = good quality)
+  const viewport = page.getViewport({ scale: 2.0 });
+  
+  // Draw to canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  
+  // Convert canvas → JPEG blob (0.92 quality = good balance)
+  const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
+  const base64 = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+  
+  return { base64, blob, dataUrl: canvas.toDataURL('image/jpeg', 0.92) };
+}
 function _setRcptFile(file){
   if(!file)return;
   if(file.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');return;}
   _rcptFile=file;
   const isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
+  const wrap=document.getElementById('rcptPreviewWrap');
+  const img=document.getElementById('rcptPreview');
+  const pdfWrap=document.getElementById('rcptPdfWrap');
+  const scanBtn=document.getElementById('geminiScanBtn');
+  const scanSt=document.getElementById('geminiScanStatus');
   if(!isPdf){
-    // Image — show preview wrap with thumbnail
-    const wrap=document.getElementById('rcptPreviewWrap');
-    const img=document.getElementById('rcptPreview');
-    const pdfWrap=document.getElementById('rcptPdfWrap');
+    // Image — show preview thumbnail immediately
     if(pdfWrap)pdfWrap.style.display='none';
     const reader=new FileReader();
-    reader.onload=ev=>{
-      if(img){img.src=ev.target.result;}
-      if(wrap)wrap.style.display='block';
-    };
+    reader.onload=ev=>{if(img){img.src=ev.target.result;}if(wrap)wrap.style.display='block';};
     reader.readAsDataURL(file);
+    if(scanBtn)scanBtn.style.display='block';
+    toast('Receipt attached','s');
   }else{
-    // PDF or doc — show file name with remove button
-    const wrap=document.getElementById('rcptPreviewWrap');
+    // PDF — convert to JPEG automatically
+    if(pdfWrap)pdfWrap.style.display='none';
     if(wrap)wrap.style.display='none';
-    const pdfWrap=document.getElementById('rcptPdfWrap');
-    const fn=document.getElementById('rcptFileName');
-    if(fn)fn.textContent=file.name;
-    if(pdfWrap)pdfWrap.style.display='flex';
+    if(scanBtn){scanBtn.style.display='block';scanBtn.disabled=true;scanBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Converting PDF...';}
+    if(scanSt){scanSt.style.display='block';scanSt.textContent='Converting PDF to image...';scanSt.style.color='var(--acc)';}
+    pdfToJpegBase64(file).then(({blob,dataUrl})=>{
+      // Replace _rcptFile with the JPEG blob — Supabase gets a clean JPEG
+      _rcptFile=new File([blob], file.name.replace(/\.pdf$/i,'.jpg'), {type:'image/jpeg'});
+      // Show JPEG preview (employee can see what Gemini will read)
+      if(img){img.src=dataUrl;}
+      if(wrap)wrap.style.display='block';
+      if(scanBtn){scanBtn.disabled=false;scanBtn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt';}
+      if(scanSt){scanSt.textContent='PDF converted ✅ — tap Auto-fill or Submit';scanSt.style.color='var(--grn)';}
+      toast('PDF converted to image — ready to scan','s');
+    }).catch(err=>{
+      console.error('PDF convert error:',err);
+      // Fallback: keep original PDF file, hide scan button
+      if(scanBtn){scanBtn.style.display='none';}
+      const fn=document.getElementById('rcptFileName');
+      if(fn)fn.textContent=file.name;
+      if(pdfWrap)pdfWrap.style.display='flex';
+      if(scanSt){scanSt.textContent='Could not convert PDF — will upload as PDF';scanSt.style.color='var(--amb)';}
+      toast('PDF attached (could not preview)','i');
+    });
   }
-  toast('Receipt attached — tap preview to check, Submit when ready','s');
 }
 // ─────────────────────────────────────────────────────────────
 function rcptChosen(input){
-  _rcptFile=input.files[0];if(!_rcptFile)return;
-  const fnEl=document.getElementById('rcptFileName');
-  if(fnEl){fnEl.textContent='<i class="fa-solid fa-paperclip"></i> '+_rcptFile.name;fnEl.style.display='block';}
-  const isPdf=/\.pdf$/i.test(_rcptFile.name);
-  if(!isPdf){const r=new FileReader();r.onload=e=>{const img=document.getElementById('rcptPreview');img.src=e.target.result;img.style.display='block';};r.readAsDataURL(_rcptFile);}
-  else{const img=document.getElementById('rcptPreview');img.style.display='none';} // PDF: show name only
+  const file=input.files[0];
+  if(!file)return;
+  _setRcptFile(file);
 }
 function toggleVATvis(e){
   if(e){e.preventDefault();e.stopPropagation();}
@@ -2018,6 +2222,11 @@ async function submitExp(){
   const pdfw=document.getElementById('rcptPdfWrap');if(pdfw)pdfw.style.display='none';
   const fnEl=document.getElementById('rcptFileName');if(fnEl)fnEl.textContent='';
   _rcptFile=null;
+  // Hide AI scan button after submit
+  const scanBtnClr=document.getElementById('geminiScanBtn');
+  const scanStClr=document.getElementById('geminiScanStatus');
+  if(scanBtnClr)scanBtnClr.style.display='none';
+  if(scanStClr){scanStClr.style.display='none';scanStClr.textContent='';}
   const rc=document.getElementById('rcptCamera');if(rc)rc.value='';
   const rf=document.getElementById('rcptFile');if(rf)rf.value='';
   const fn=document.getElementById('rcptFileName');if(fn){fn.textContent='';fn.style.display='none';}
@@ -2026,6 +2235,14 @@ async function submitExp(){
   const vknob=document.getElementById('vatToggleKnob');if(vknob)vknob.style.transform='translateX(0)';
   _submittingExp=false;
   toast('Expense added!','s');renderExpenses();
+  // Save merchant→category mapping for future auto-fill (shared across all employees)
+  if(merchant && document.getElementById('expCat').value){
+    const cat=document.getElementById('expCat').value;
+    const key=merchant.trim().toLowerCase();
+    if(!window._merchantCatMap)window._merchantCatMap={};
+    window._merchantCatMap[key]=cat;
+    sb.from('merchant_categories').upsert({merchant:merchant.trim(),category:cat},{onConflict:'merchant'});
+  }
 }
 function renderExpenses(){
   const m=expM,y=expY;
@@ -2080,43 +2297,106 @@ function renderExpenses(){
 }
 async function editAndResendExp(id){
   const e=myExp.find(x=>x.id===id);if(!e)return;
-  // Pre-fill form with existing data
+
+  // Pre-fill all form fields
   document.getElementById('expMerchant').value=e.merchant||'';
   document.getElementById('expAmt').value=e.amount||'';
   document.getElementById('expNotes').value=e.notes||'';
   document.getElementById('expDate').value=e.date||dk(new Date());
   document.getElementById('expCat').value=e.category||'';
-  // Restore VAT toggle state (checkbox + visual)
+
+  // Restore VAT toggle
   const hasVAT=(e.tags||[]).includes('VAT');
   const vcb=document.getElementById('expVAT');if(vcb)vcb.checked=hasVAT;
   const vvis=document.getElementById('vatToggleVis');if(vvis)vvis.style.background=hasVAT?'var(--grn)':'var(--bdr)';
   const vknob=document.getElementById('vatToggleKnob');if(vknob)vknob.style.transform=hasVAT?'translateX(22px)':'translateX(0)';
-  // Show edit mode notice
+
+  // Show existing receipt so employee can see it and decide to replace
+  _rcptFile=null;
+  const prevWrap=document.getElementById('rcptPreviewWrap');
+  const prevImg=document.getElementById('rcptPreview');
+  const prevPdfWrap=document.getElementById('rcptPdfWrap');
+  const prevFn=document.getElementById('rcptFileName');
+  const scanBtn=document.getElementById('geminiScanBtn');
+  const scanSt=document.getElementById('geminiScanStatus');
+  if(e.receipt_url){
+    const isImg=/\.(jpg|jpeg|png|gif|webp)/i.test(e.receipt_url);
+    if(isImg){
+      if(prevPdfWrap)prevPdfWrap.style.display='none';
+      if(prevImg)prevImg.src=e.receipt_url;
+      if(prevWrap)prevWrap.style.display='block';
+      if(scanBtn)scanBtn.style.display='block';
+    } else {
+      if(prevWrap)prevWrap.style.display='none';
+      if(prevFn)prevFn.textContent='Current receipt (PDF)';
+      if(prevPdfWrap)prevPdfWrap.style.display='flex';
+    }
+    if(scanSt){scanSt.style.display='block';scanSt.textContent='Existing receipt shown — attach a new one below to replace it';scanSt.style.color='var(--txtm)';}
+  } else {
+    if(prevWrap)prevWrap.style.display='none';
+    if(prevPdfWrap)prevPdfWrap.style.display='none';
+    if(scanBtn)scanBtn.style.display='none';
+    if(scanSt){scanSt.style.display='none';scanSt.textContent='';}
+  }
+
+  // Navigate to expense page then scroll form to top
   showPg('exp');
-  // Scroll to form
-  document.getElementById('pg-exp').scrollTop=0;
-  // Change submit button to update mode
+  setTimeout(()=>{
+    const pg=document.getElementById('pg-exp');
+    if(pg)pg.scrollTo({top:0,behavior:'smooth'});
+  },80);
+
+  // Switch button to Update mode
   const btn=document.querySelector('#pg-exp .btn-p');
   if(btn){
-    btn.innerHTML='<i class="fa-solid fa-paper-plane"></i>Update & Resend';
+    btn.innerHTML='<i class="fa-solid fa-rotate"></i> Update & Resubmit';
     btn.onclick=async()=>{
       const merchant=document.getElementById('expMerchant').value.trim();
       const amt=parseFloat(document.getElementById('expAmt').value);
-      if(!merchant||!amt){toast('Fill in merchant and amount','e');return;}
-  if(isNaN(parseFloat(amt))){toast('Amount must be a number','e');return;}
-      const r=await sb.from('expenses').update({merchant,amount:amt,category:document.getElementById('expCat').value||null,notes:document.getElementById('expNotes').value||null,status:'pending',flagged:false,flag_note:null,date:document.getElementById('expDate').value,tags:document.getElementById('expVAT')&&document.getElementById('expVAT').checked?['VAT']:[]}).eq('id',id);
-      if(r.error){toast(r.error.message,'e');return;}
-      const idx=myExp.findIndex(x=>x.id===id);if(idx>=0){myExp[idx]={...myExp[idx],merchant,amount:amt,status:'pending',flagged:false,flag_note:null,tags:document.getElementById('expVAT')&&document.getElementById('expVAT').checked?['VAT']:[]};}
-      // Reset button
-      btn.innerHTML='<i class="fa-solid fa-paper-plane"></i>Submit Expense';btn.onclick=submitExp;
-      ['expMerchant','expAmt','expNotes'].forEach(x=>{document.getElementById(x).value='';});
-      const vcb2=document.getElementById('expVAT');if(vcb2)vcb2.checked=false;
-      const vvis2=document.getElementById('vatToggleVis');if(vvis2)vvis2.style.background='var(--bdr)';
-      const vknob2=document.getElementById('vatToggleKnob');if(vknob2)vknob2.style.transform='translateX(0)';
-      toast('Expense updated and resubmitted!','s');renderExpenses();
+      if(!merchant||isNaN(amt)||amt===0){toast('Fill in merchant and amount','e');return;}
+      btn.disabled=true;
+      btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Updating...';
+      // Upload new receipt if employee attached one
+      let fileUrl=e.receipt_url||null;
+      if(_rcptFile){
+        if(_rcptFile.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-rotate"></i> Update & Resubmit';return;}
+        const ext=_rcptFile.name.split('.').pop()||'jpg';
+        const path=`receipts/${emp.id}/${Date.now()}.${ext}`;
+        const {error:upErr}=await sb.storage.from('employee-docs').upload(path,_rcptFile,{upsert:true});
+        if(!upErr){const {data:ud}=sb.storage.from('employee-docs').getPublicUrl(path);fileUrl=ud?.publicUrl||fileUrl;}
+        else{toast('Receipt upload failed — saving without new receipt','e');}
+      }
+      const updData={merchant,amount:amt,category:document.getElementById('expCat').value||null,notes:document.getElementById('expNotes').value||null,date:document.getElementById('expDate').value,status:'pending',flagged:false,flag_note:null,tags:document.getElementById('expVAT')?.checked?['VAT']:[],receipt_url:fileUrl};
+      const r=await sb.from('expenses').update(updData).eq('id',id);
+      if(r.error){toast(r.error.message,'e');btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-rotate"></i> Update & Resubmit';return;}
+      const eIdx=myExp.findIndex(x=>x.id===id);
+      if(eIdx>=0)myExp[eIdx]={...myExp[eIdx],...updData};
+      _resetExpForm();
+      btn.disabled=false;
+      btn.innerHTML='<i class="fa-solid fa-paper-plane"></i> Submit Expense';
+      btn.onclick=submitExp;
+      toast('Expense updated and resubmitted ✅','s');
+      renderExpenses();
     };
   }
-  toast('Edit the expense above and tap Update & Resend','i');
+  toast('Edit details above then tap Update & Resubmit','i');
+}
+
+function _resetExpForm(){
+  ['expMerchant','expAmt','expNotes'].forEach(x=>{const el=document.getElementById(x);if(el)el.value='';});
+  const catEl=document.getElementById('expCat');if(catEl)catEl.value='';
+  const vcb=document.getElementById('expVAT');if(vcb)vcb.checked=false;
+  const vvis=document.getElementById('vatToggleVis');if(vvis)vvis.style.background='var(--bdr)';
+  const vknob=document.getElementById('vatToggleKnob');if(vknob)vknob.style.transform='translateX(0)';
+  _rcptFile=null;
+  const rc=document.getElementById('rcptCamera');if(rc)rc.value='';
+  const rf=document.getElementById('rcptFile');if(rf)rf.value='';
+  const wrap=document.getElementById('rcptPreviewWrap');if(wrap)wrap.style.display='none';
+  const img=document.getElementById('rcptPreview');if(img)img.src='';
+  const pdfWrap=document.getElementById('rcptPdfWrap');if(pdfWrap)pdfWrap.style.display='none';
+  const fn=document.getElementById('rcptFileName');if(fn)fn.textContent='';
+  const scanBtn=document.getElementById('geminiScanBtn');if(scanBtn)scanBtn.style.display='none';
+  const scanSt=document.getElementById('geminiScanStatus');if(scanSt){scanSt.style.display='none';scanSt.textContent='';}
 }
 
 async function toggleFlag(id){
@@ -2623,7 +2903,7 @@ async function tryAutoLogin(){
   if(savedId&&Date.now()-savedTs<sevenDays){
     const r=await sb.from('employees').select('*').eq('id',savedId).single();
     const cfgR=await sb.from('settings').select('*').eq('id',1).single();
-    if(cfgR.data)cfg=cfgR.data;
+    if(cfgR.data){cfg=cfgR.data;_geminiKey=cfgR.data.gemini_key||'';}
     if(!r.error&&r.data&&r.data.status==='Active'&&r.data.pin){
       allEmps=[r.data];
       try{await enterApp(r.data);}catch(e){console.error('enterApp error:',e);}
