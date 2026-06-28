@@ -1915,7 +1915,7 @@ async function scanReceiptWithAI(){
       return;
     }
     const yr=new Date().getFullYear();
-    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {"merchant":"store name","amount":0.00,"date":"YYYY-MM-DD","category":"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other","vat_amount":0.00}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear.`;
+    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"bbox\":{\"x\":0,\"y\":0,\"w\":100,\"h\":100},\"is_bent\":false}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. bbox=bounding box of the receipt as percentages of image (x=left%, y=top%, w=width%, h=height%), set null if receipt fills whole image with no background. is_bent=true if receipt is curved/bent/folded, false if flat.`;
     const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${_geminiKey}`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -1927,6 +1927,23 @@ async function scanReceiptWithAI(){
     // Parse JSON — strip any accidental markdown
     const clean=raw.replace(/```json|```/g,'').trim();
     const result=JSON.parse(clean);
+    // ── SMART CROP ─────────────────────────────────────────────
+    // Gemini returned bbox — crop the receipt out of the background
+    // Flat receipt: 3% padding. Bent/curved receipt: 12% padding.
+    if(result.bbox){
+      if(st){st.textContent='Cropping receipt...';st.style.color='var(--acc)';}
+      try{
+        const croppedFile=await _cropReceiptFromBbox(b64,mimeType,result.bbox,!!result.is_bent);
+        if(croppedFile){
+          _rcptFile=croppedFile;
+          const imgEl=document.getElementById('rcptPreview');
+          const wrapEl=document.getElementById('rcptPreviewWrap');
+          if(imgEl){imgEl.src=URL.createObjectURL(croppedFile);}
+          if(wrapEl)wrapEl.style.display='block';
+        }
+      }catch(cropErr){console.warn('Crop failed (using original):',cropErr);}
+    }
+    // ────────────────────────────────────────────────────────────
     // Auto-fill form fields
     let filled=[];
     if(result.merchant){
@@ -1986,6 +2003,38 @@ async function scanReceiptWithAI(){
   } finally {
     if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt';}
   }
+}
+// Smart receipt crop — called after Gemini returns bbox
+// Flat (is_bent=false): 3% padding. Bent/curved (is_bent=true): 12% padding.
+// If crop area < 20% of image, skip (bbox probably unreliable).
+async function _cropReceiptFromBbox(b64,mimeType,bbox,isBent){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const W=img.naturalWidth, H=img.naturalHeight;
+        const pad=isBent?0.12:0.03;
+        let sx=Math.round((bbox.x/100)*W - W*pad);
+        let sy=Math.round((bbox.y/100)*H - H*pad);
+        let sw=Math.round((bbox.w/100)*W + W*pad*2);
+        let sh=Math.round((bbox.h/100)*H + H*pad*2);
+        sx=Math.max(0,sx); sy=Math.max(0,sy);
+        if(sx+sw>W)sw=W-sx; if(sy+sh>H)sh=H-sy;
+        // Skip if crop < 20% of image (Gemini bbox was probably wrong)
+        if(sw*sh<W*H*0.20){resolve(null);return;}
+        const canvas=document.createElement('canvas');
+        canvas.width=sw; canvas.height=sh;
+        canvas.getContext('2d').drawImage(img,sx,sy,sw,sh,0,0,sw,sh);
+        const outMime=mimeType==='image/png'?'image/png':'image/jpeg';
+        canvas.toBlob(blob=>{
+          if(!blob){resolve(null);return;}
+          resolve(new File([blob],'receipt_cropped.'+(outMime==='image/png'?'png':'jpg'),{type:outMime}));
+        },outMime,0.92);
+      }catch(e){reject(e);}
+    };
+    img.onerror=reject;
+    img.src=`data:${mimeType};base64,${b64}`;
+  });
 }
 async function pasteReceipt(){
   const btn=document.querySelector('.paste-receipt-btn');
