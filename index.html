@@ -102,7 +102,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .sidebar.col .ver{display:none;}
 
 /* MAIN */
-.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
 .topbar{background:var(--card);border-bottom:1px solid var(--bdr);padding:0 22px;height:52px;display:flex;align-items:center;gap:11px;flex-shrink:0;box-shadow:var(--sh);}
 .tb-toggle{width:30px;height:30px;border-radius:7px;border:none;background:var(--card2);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:var(--tr);}
 .tb-toggle:hover{background:var(--bdr);color:var(--txt);}
@@ -128,12 +128,12 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .sync.err{background:var(--redl);color:var(--red);}
 
 /* CONTENT */
-.content{flex:1;overflow-y:auto;padding:18px 22px;}
+.content{flex:1;overflow-y:auto;padding:18px 22px;min-height:0;}
 .content.ledger-mode{padding:0;overflow:hidden;}
 .page{display:none;}
 .page.active{display:block;animation:pageIn 0.2s ease forwards;}
 @keyframes pageIn{from{opacity:0;transform:translateX(8px);}to{opacity:1;transform:translateX(0);}}
-.page-lf.active{display:flex!important;flex-direction:column;padding:0;overflow:hidden;}
+.page-lf.active{display:flex!important;flex-direction:column;padding:0;overflow:hidden;height:100%;min-height:0;}
 
 /* ══ UNIVERSAL NAV PILLS — Today · ‹ Day › · ‹ Month › · ‹ Year › ══ */
 /* Each segment is its own pill — independent, consistent, readable */
@@ -224,9 +224,9 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 
 /* ── Ledger structure ── */
 .led-hbar{padding:11px 17px;background:var(--card);border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
-.led-main{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr);}
-.led-right{width:255px;flex-shrink:0;overflow-y:auto;padding:14px;background:var(--card2);}
-.led-scroll{flex:1;overflow-y:auto;}
+.led-main{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr);min-height:0;}
+.led-right{width:255px;flex-shrink:0;overflow-y:scroll;padding:14px;background:var(--card2);scrollbar-width:thin;scrollbar-color:var(--bdr) transparent;}
+.led-scroll{flex:1;overflow-y:auto;min-height:0;}
 .led-foot{padding:9px 17px;background:var(--card);border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .led-tot{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--grn);}
 .led-table{width:100%;border-collapse:separate;border-spacing:0;}
@@ -444,10 +444,19 @@ tr.rsun td{background:var(--sut)!important;}
 .qe-bar input{background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.35);border-radius:8px;padding:7px 11px;color:#fff;font-size:13px;flex:1;font-family:inherit;outline:none;}
 .qe-bar input::placeholder{color:rgba(255,255,255,0.65);}
 .led-split{display:flex;gap:0;flex:1;min-height:0;overflow:hidden;}
-.led-main{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr);}
-.led-right{width:260px;flex-shrink:0;overflow-y:auto;padding:14px;background:var(--card2);}
+.led-main{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr);min-height:0;}
+.led-right{width:260px;flex-shrink:0;overflow-y:scroll;padding:14px;background:var(--card2);scrollbar-width:thin;scrollbar-color:var(--bdr) transparent;}
+.led-right::-webkit-scrollbar{width:6px;}
+.led-right::-webkit-scrollbar-track{background:transparent;}
+.led-right::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:6px;}
+.led-right::-webkit-scrollbar-thumb:hover{background:var(--txtm);}
 .led-hbar{padding:10px 16px;background:var(--card);border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
-.led-scroll{flex:1;overflow-y:auto;}
+.led-scroll{flex:1;overflow-y:auto;min-height:0;scrollbar-width:thin;scrollbar-color:var(--bdr) transparent;}
+.led-scroll::-webkit-scrollbar{width:6px;}
+.led-scroll::-webkit-scrollbar-track{background:transparent;}
+.led-scroll::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:6px;}
+.led-scroll::-webkit-scrollbar-thumb:hover{background:var(--txtm);}
+#ledBody tr:last-child td{padding-bottom:8px;}
 .led-table{width:100%;border-collapse:separate;border-spacing:0;}
 .led-table th{position:sticky;top:0;background:var(--card2);padding:7px 9px;font-size:11px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--bdr);z-index:10;}
 .led-table td{padding:5px 7px;border-bottom:0.5px solid var(--bdr);vertical-align:middle;}
@@ -1132,7 +1141,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <!-- SETTINGS -->
     <div class="page" id="page-settings">
       <div class="ph"><div><h1>Settings &amp; Tools</h1></div><button class="btn btn-p" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div>
-      <div class="tabs"><div class="tab active" onclick="setSettTab('general',this)">General</div><div class="tab" onclick="setSettTab('att',this)">Attendance</div><div class="tab" onclick="setSettTab('pay',this)">Pay</div><div class="tab" onclick="setSettTab('exp',this)">Expenses</div><div class="tab" onclick="setSettTab('admin',this)">Password</div><div class="tab" onclick="setSettTab('ai',this)"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:4px;"></i>AI</div><div class="tab" onclick="setSettTab('ai',this)"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:4px;"></i>AI</div><div class="tab" onclick="setSettTab('data',this)"><i class="fa-solid fa-database" style="margin-right:4px;"></i>Data</div></div>
+      <div class="tabs"><div class="tab active" onclick="setSettTab('general',this)">General</div><div class="tab" onclick="setSettTab('att',this)">Attendance</div><div class="tab" onclick="setSettTab('pay',this)">Pay</div><div class="tab" onclick="setSettTab('exp',this)">Expenses</div><div class="tab" onclick="setSettTab('admin',this)">Password</div><div class="tab" onclick="setSettTab('data',this)"><i class="fa-solid fa-database" style="margin-right:4px;"></i>Data</div></div>
       <div class="sett-sec active" id="settTab-general"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl" style="grid-column:1/-1"><label>Company Name</label><input type="text" id="sCompany" placeholder="OHM Electrical"></div><div class="fgl"><label>Currency</label><select id="sCurrency"><option value="£">£ GBP</option><option value="$">$ USD</option><option value="€">€ EUR</option></select></div><div class="fgl"><label>Attendance Warning %</label><input type="number" id="sThreshold" min="0" max="100" placeholder="80"></div></div></div></div></div>
       <div class="sett-sec" id="settTab-att"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl"><label>Default Work Start</label><input type="time" id="sWStart" value="08:00"></div><div class="fgl"><label>Default Work End</label><input type="time" id="sWEnd" value="17:00"></div><div class="fgl"><label>OT After (hours/day)</label><input type="number" id="sOT" min="1" max="24" step="0.5" placeholder="8"></div></div></div></div>
         <div class="card" style="margin-top:13px;"><div class="ch"><div class="ct">Bank Account Names</div></div><div class="cb"><div id="bankList" style="display:flex;flex-direction:column;gap:7px;margin-bottom:11px;"></div><div style="display:flex;gap:7px;"><input type="text" id="newBank" placeholder="e.g. GB Electrical" style="flex:1;padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;"><button class="btn btn-p btn-sm" onclick="addBank()"><i class="fa-solid fa-plus"></i>Add</button></div></div></div>
@@ -1142,18 +1151,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       <div class="sett-sec" id="settTab-admin"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl"><label>New Password (min 6 characters)</label><input type="password" id="newPin" placeholder="New password"></div><div class="fgl"><label>Confirm Password</label><input type="password" id="confirmPin" placeholder="New password"></div></div><button class="btn btn-p" style="margin-top:11px;" onclick="changePin()"><i class="fa-solid fa-key"></i>Update PIN</button><p style="font-size:12px;color:var(--txtm);margin-top:8px;">Default PIN: 1234 — change this immediately.</p></div></div>
       </div>
 
-      <div class="sett-sec" id="settTab-ai">
-          <div class="card">
-            <div class="ch"><div><div class="ct"><i class="fa-solid fa-wand-magic-sparkles" style="color:#7c3aed;margin-right:6px;"></i><strong>AI Receipt Scanner</strong></div><div class="cs">Gemini API — employees tap Auto-fill after attaching a receipt photo</div></div></div>
-            <div class="cb">
-              <div class="fg fg2">
-                <div class="fgl" style="grid-column:1/-1"><label>Gemini API Key</label><input type="password" id="sGeminiKey" placeholder="Paste key from aistudio.google.com" style="font-family:monospace;font-size:12px;width:100%;"></div>
-              </div>
-              <div style="font-size:11px;color:var(--txtm);margin-top:6px;">Free at <a href="https://aistudio.google.com" target="_blank" style="color:var(--acc);">aistudio.google.com</a> — 1,500 free scans/day. Save once here, all employees get it automatically.</div>
-            </div>
-          </div>
-        </div>
-        <div class="sett-sec" id="settTab-data">
+      <div class="sett-sec" id="settTab-data">
         <div class="card" style="margin-bottom:14px;">
           <div class="ch"><div><div class="ct"><i class="fa-solid fa-file-export" style="color:var(--grn);margin-right:6px;"></i>Export Data</div><div class="cs">Choose what to export and download</div></div></div>
           <div class="cb">
@@ -2507,10 +2505,6 @@ async function loadMonthData(month,year){
 
 async function loadAllData(){
   setSyncStatus('saving');
-  // Load shared merchant→category map in background (non-blocking)
-  sb.from('merchant_categories').select('merchant,category').then(({data})=>{
-    if(data)window._merchantCatMap=Object.fromEntries(data.map(r=>[r.merchant.trim().toLowerCase(),r.category]));
-  });
   try{
     // Core tables - must succeed
     const [empR,cfgR,attR,expR,batR,msgR]=await Promise.all([
@@ -3942,13 +3936,6 @@ async function updateExp(id,field,val){
     if(field==='amount'||field==='date'||field==='category'){
       const d=new Date((field==='date'?val:exp.date)+'T00:00:00');
       recalcEmployeeMonth(exp.employee_id,d.getMonth(),d.getFullYear());
-      // Save merchant→category mapping when admin categorises an expense
-      if(field==='category'&&val&&exp.merchant){
-        const mKey=exp.merchant.trim().toLowerCase();
-        if(!window._merchantCatMap)window._merchantCatMap={};
-        window._merchantCatMap[mKey]=val;
-        sb.from('merchant_categories').upsert({merchant:exp.merchant.trim(),category:val},{onConflict:'merchant'});
-      }
       // If date changed, also recalc the old month
       if(field==='date'&&val!==exp.date){
         const dOld=new Date(exp.date+'T00:00:00');
@@ -5978,7 +5965,6 @@ function loadSettings(){
   document.getElementById('sCurrency').value=cfg.currency||'£';
   document.getElementById('sThreshold').value=cfg.threshold||80;
   document.getElementById('sWStart').value=cfg.work_start||'08:00';
-  const gkEl=document.getElementById('sGeminiKey');if(gkEl)gkEl.value=cfg.gemini_key||'';
   document.getElementById('sWEnd').value=cfg.work_end||'17:00';
   document.getElementById('sOT').value=cfg.ot_threshold||CONFIG_APP.DEFAULT_HOURS;
   document.getElementById('sOTMult').value=cfg.rate_ot||1.5;
@@ -5994,7 +5980,6 @@ async function saveSettings(){
     work_start:document.getElementById('sWStart').value,
     work_end:document.getElementById('sWEnd').value,
     ot_threshold:parseFloat(document.getElementById('sOT').value)||8,
-    gemini_key:document.getElementById('sGeminiKey')?.value.trim()||cfg.gemini_key||'',
     rate_ot:parseFloat(document.getElementById('sOTMult').value)||1.5,
     rate_sat:parseFloat(document.getElementById('sSat').value)||1.0,
     rate_sun:parseFloat(document.getElementById('sSun').value)||1.0,
@@ -7513,15 +7498,89 @@ function checkAnniversaries(){
 // RECEIPT LIGHTBOX
 // ══════════════════════════════════════════════════════
 function openLightbox(url){
+  // Remove any existing lightbox
+  var existing=document.getElementById('dam-lightbox');
+  if(existing)existing.remove();
+
+  var isPdf=url.toLowerCase().includes('.pdf')||url.toLowerCase().includes('pdf');
+
   var lb=document.createElement('div');
-  lb.className='lightbox';
-  if(url.endsWith('.pdf')||url.includes('.pdf')){
-    lb.innerHTML='<iframe src="'+url+'" style="width:90vw;height:90vh;border-radius:8px;"></iframe>';
+  lb.id='dam-lightbox';
+  lb.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.82);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;backdrop-filter:blur(4px);animation:lbFadeIn 0.18s ease;';
+
+  var inner=document.createElement('div');
+  inner.style.cssText='position:relative;max-width:92vw;max-height:92vh;display:flex;flex-direction:column;align-items:center;';
+
+  // Button row — flex so they never overlap
+  var btnRow=document.createElement('div');
+  btnRow.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:10px;align-self:flex-end;';
+
+  // Open-in-new-tab button
+  var extBtn=document.createElement('a');
+  extBtn.href=url;
+  extBtn.target='_blank';
+  extBtn.innerHTML='<i class="fa-solid fa-arrow-up-right-from-square"></i>';
+  extBtn.title='Open in new tab';
+  extBtn.style.cssText='background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;text-decoration:none;transition:background 0.15s;';
+  extBtn.onmouseover=function(){this.style.background='rgba(255,255,255,0.22)';};
+  extBtn.onmouseout=function(){this.style.background='rgba(255,255,255,0.12)';};
+  extBtn.onclick=function(e){e.stopPropagation();};
+
+  // Close button
+  var closeBtn=document.createElement('button');
+  closeBtn.innerHTML='<i class="fa-solid fa-xmark"></i> Close Preview';
+  closeBtn.style.cssText='background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background 0.15s;';
+  closeBtn.onmouseover=function(){this.style.background='rgba(255,255,255,0.25)';};
+  closeBtn.onmouseout=function(){this.style.background='rgba(255,255,255,0.15)';};
+
+  btnRow.appendChild(extBtn);
+  btnRow.appendChild(closeBtn);
+
+  // Content
+  var content;
+  if(isPdf){
+    content=document.createElement('iframe');
+    content.src=url;
+    content.style.cssText='width:88vw;height:82vh;border:none;border-radius:10px;background:#fff;';
   } else {
-    lb.innerHTML='<img src="'+url+'" alt="Receipt">';
+    content=document.createElement('img');
+    content.src=url;
+    content.alt='Receipt';
+    content.style.cssText='max-width:88vw;max-height:82vh;border-radius:10px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.5);display:block;';
+    content.onerror=function(){
+      this.style.display='none';
+      var err=document.createElement('div');
+      err.style.cssText='color:#fff;text-align:center;padding:40px;';
+      err.innerHTML='<i class="fa-solid fa-triangle-exclamation" style="font-size:32px;margin-bottom:12px;display:block;color:#f59e0b;"></i>Could not load image.<br><a href="'+url+'" target="_blank" style="color:#60a5fa;margin-top:8px;display:inline-block;">Open directly →</a>';
+      inner.appendChild(err);
+    };
   }
-  lb.onclick=function(){lb.remove();};
+
+  // Hint text
+  var hint=document.createElement('div');
+  hint.style.cssText='color:rgba(255,255,255,0.45);font-size:11px;margin-top:10px;text-align:center;';
+  hint.textContent='Click outside or press Esc to close';
+
+  inner.appendChild(btnRow);
+  inner.appendChild(content);
+  inner.appendChild(hint);
+  lb.appendChild(inner);
   document.body.appendChild(lb);
+
+  // Add fade-in keyframe if not already present
+  if(!document.getElementById('lb-style')){
+    var st=document.createElement('style');
+    st.id='lb-style';
+    st.textContent='@keyframes lbFadeIn{from{opacity:0;transform:scale(0.97)}to{opacity:1;transform:scale(1)}}';
+    document.head.appendChild(st);
+  }
+
+  function closeLb(){lb.remove();document.removeEventListener('keydown',onKey);}
+  function onKey(e){if(e.key==='Escape')closeLb();}
+
+  closeBtn.onclick=closeLb;
+  lb.onclick=function(e){if(e.target===lb)closeLb();};
+  document.addEventListener('keydown',onKey);
 }
 
 // ══════════════════════════════════════════════════════
