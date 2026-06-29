@@ -1327,7 +1327,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       </div>
       <!-- NEW EMPLOYEE ONLY: initial rate entry -->
       <div id="newEmpRateBox" style="display:none;border-top:1px solid var(--bdr);padding-top:13px;margin-top:13px;background:var(--grnl);border-radius:var(--r);padding:14px 16px;border:1.5px solid rgba(22,163,74,0.25);">
-        <div style="font-size:13px;font-weight:700;color:var(--grn);margin-bottom:11px;"><i class="fa-solid fa-circle-plus" style="margin-right:6px;"></i>Set Starting Rate</div>
+        <div style="font-size:13px;font-weight:700;color:var(--grn);margin-bottom:4px;"><i class="fa-solid fa-circle-plus" style="margin-right:6px;"></i>Set Starting Rate <span style="font-size:11px;font-weight:400;color:var(--txtm);">(optional — can be added after saving)</span></div>
         <div class="fg fg2">
           <div class="fgl" id="newRateFixedG"><label>Monthly Salary (£)</label><input type="number" id="eNewSalary" min="0" step="50" placeholder="e.g. 2500" oninput="syncNewRate()"></div>
           <div class="fgl" id="newRateDailyG" style="display:none;"><label>Daily Rate (£)</label><input type="number" id="eNewDailyRate" min="0" step="5" placeholder="e.g. 120" oninput="syncNewRate()"></div>
@@ -5114,6 +5114,8 @@ function exportPayrollCSV(){
 // EMPLOYEES
 // ═══════════════════════════════════════════════════
 function renderEmployees(){
+  // Always rebuild employeeMap so new/edited employees are immediately accessible
+  window.employeeMap=new Map(employees.map(e=>[e.id,e]));
   const emps=empTabFilter==='all'?employees:employees.filter(e=>e.status===empTabFilter);
   const active=employees.filter(e=>e.status==='Active').length,ex=employees.filter(e=>e.status==='ex').length;
   document.getElementById('empCount').textContent=`${active} active · ${ex} ex-employees`;
@@ -5436,7 +5438,7 @@ async function _doDeleteEmployee(id,empName){
     }
   }
   try{
-    const msgR=await sb.from('messages').delete().or(`sender.eq.${id},receiver.eq.${id}`);
+    const msgR=await sb.from('messages').delete().eq('employee_id',id);
     if(msgR.error)throw msgR.error;
   }catch(err){toast('Could not delete messages: '+err.message,'e');return;}
   const r=await sb.from('employees').delete().eq('id',id);
@@ -5463,7 +5465,7 @@ async function saveEmployee(){
   const bkName=bkSel==='custom'?document.getElementById('eBankCustom').value:bkSel;
   const data={
     name,status:document.getElementById('eStatus').value,
-    role:document.getElementById('eRole').value,
+    role:document.getElementById('eRole').value.trim(),
     contract_type:document.getElementById('eContract').value,
     phone:document.getElementById('ePhone').value,
     email:document.getElementById('eEmail').value.trim()||null,
@@ -5529,6 +5531,8 @@ async function saveEmployee(){
 
   if(id){const idx=employees.findIndex(e=>e.id===id);if(idx>=0)employees[idx]={...employees[idx],...saved,photo_url:data.photo_url!==undefined?data.photo_url:employeeMap?.get(id)?.photo_url};}
   else{employees.push(saved);}
+  // Rebuild map immediately so employeeMap.get() works for new employees
+  window.employeeMap=new Map(employees.map(e=>[e.id,e]));
 
   if(!id){
     // New employee — save initial rate from newEmpRateBox inputs
@@ -5547,7 +5551,25 @@ async function saveEmployee(){
       if(!hr.error){salaryHistory.unshift(hr.data);invalidatePayrollFromDate(emp.id,histRow.effective_from||new Date().toISOString().slice(0,10));}
     }
     // Photo is included in main save above
-    toast(`${name} added!`,'s');
+    _resetSaveBtn();
+    renderEmployees();initSelectors();
+    // Re-open in edit mode so user can add rate / view Pay History immediately
+    const noRate=(!newRate||newRate===0);
+    setTimeout(()=>{
+      editEmpModal(saved.id).then(()=>{
+        if(noRate){
+          // Auto-switch to Pay History tab so they can set a rate
+          setTimeout(()=>{
+            const salTab=document.querySelector('.mo-tab[onclick*=\'salary\']');
+            switchEmpTab('salary',salTab||document.querySelector('.mo-tab'));
+            toast(name+' added! No pay rate set — add one here','w');
+          },300);
+        } else {
+          toast(name+' added!','s');
+        }
+      });
+    },150);
+    return;
   } else {
     toast(`${name} saved!`,'s');
   }
@@ -5562,7 +5584,9 @@ async function saveEmployee(){
 function switchEmpTab(tab,el){
   document.querySelectorAll('.mo-tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.mo-sec').forEach(s=>s.classList.remove('active'));
-  if(el)el.classList.add('active');
+  // Support calling with just tab name (no element)
+  const tabEl=el||document.querySelector(`.mo-tab[onclick*="'${tab}'"]`);
+  if(tabEl)tabEl.classList.add('active');
   document.getElementById('empTab-'+tab)?.classList.add('active');
   const empId=document.getElementById('empId').value;
   if(tab==='docs'&&empId)loadEmpDocs(empId);
@@ -6751,7 +6775,7 @@ async function doExport(format){
     const filteredAtt=(fetches.attendance?.data||[]).filter(r=>inRange(r.date)&&empMatch(r.employee_id));
     const filteredExp=(fetches.expenses?.data||[]).filter(r=>inRange(r.date)&&empMatch(r.employee_id));
     const filteredEmps=empF?empData.filter(e=>e.id===empF):empData;
-    const filteredMsgs=(fetches.messages?.data||[]).filter(r=>!empF||(r.sender===empF||r.receiver===empF));
+    const filteredMsgs=(fetches.messages?.data||[]).filter(r=>!empF||(r.sender===empF||r.employee_id===empF));
     const filteredDocs=(fetches.employee_documents?.data||[]).filter(r=>empMatch(r.employee_id));
     const filteredPaySum=(fetches.payroll_summary?.data||[]).filter(r=>empMatch(r.employee_id));
     const filteredSalHist=(fetches.salary_history?.data||[]).filter(r=>empMatch(r.employee_id));
