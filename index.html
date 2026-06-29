@@ -122,10 +122,10 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 [data-theme=dark] .tog-sw::after{left:15px;}
 .shimmer-row{background:linear-gradient(90deg,var(--card) 25%,var(--card2) 50%,var(--card) 75%);background-size:200% 100%;animation:shimmerAnim 1.2s ease infinite;height:48px;border-radius:8px;margin-bottom:4px;}
 @keyframes shimmerAnim{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
-.sync{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;}
-.sync.saved{background:var(--grnl);color:var(--grn);}
-.sync.saving{background:var(--ambl);color:var(--amb);}
-.sync.err{background:var(--redl);color:var(--red);}
+.sync{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;transition:all 0.3s ease;}
+.sync.saved{background:var(--grn);color:#fff;}
+.sync.saving{background:var(--amb);color:#fff;}
+.sync.err{background:var(--red);color:#fff;}
 
 /* CONTENT */
 .content{flex:1;overflow-y:auto;padding:18px 22px;min-height:0;}
@@ -225,7 +225,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 /* ── Ledger structure ── */
 .led-hbar{padding:11px 17px;background:var(--card);border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .led-main{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr);min-height:0;}
-.led-right{width:255px;flex-shrink:0;overflow-y:scroll;padding:14px;background:var(--card2);scrollbar-width:thin;scrollbar-color:var(--bdr) transparent;}
+.led-right{width:255px;flex-shrink:0;overflow-y:scroll;padding:14px;background:var(--card2);scrollbar-width:thin;}
 .led-scroll{flex:1;overflow-y:auto;min-height:0;}
 .led-foot{padding:9px 17px;background:var(--card);border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .led-tot{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--grn);}
@@ -445,18 +445,9 @@ tr.rsun td{background:var(--sut)!important;}
 .qe-bar input::placeholder{color:rgba(255,255,255,0.65);}
 .led-split{display:flex;gap:0;flex:1;min-height:0;overflow:hidden;}
 .led-main{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr);min-height:0;}
-.led-right{width:260px;flex-shrink:0;overflow-y:scroll;padding:14px;background:var(--card2);scrollbar-width:thin;scrollbar-color:var(--bdr) transparent;}
-.led-right::-webkit-scrollbar{width:6px;}
-.led-right::-webkit-scrollbar-track{background:transparent;}
-.led-right::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:6px;}
-.led-right::-webkit-scrollbar-thumb:hover{background:var(--txtm);}
+.led-right{width:260px;flex-shrink:0;overflow-y:scroll;padding:14px;background:var(--card2);scrollbar-width:thin;}
 .led-hbar{padding:10px 16px;background:var(--card);border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
-.led-scroll{flex:1;overflow-y:auto;min-height:0;scrollbar-width:thin;scrollbar-color:var(--bdr) transparent;}
-.led-scroll::-webkit-scrollbar{width:6px;}
-.led-scroll::-webkit-scrollbar-track{background:transparent;}
-.led-scroll::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:6px;}
-.led-scroll::-webkit-scrollbar-thumb:hover{background:var(--txtm);}
-#ledBody tr:last-child td{padding-bottom:8px;}
+.led-scroll{flex:1;overflow-y:auto;min-height:0;}
 .led-table{width:100%;border-collapse:separate;border-spacing:0;}
 .led-table th{position:sticky;top:0;background:var(--card2);padding:7px 9px;font-size:11px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--bdr);z-index:10;}
 .led-table td{padding:5px 7px;border-bottom:0.5px solid var(--bdr);vertical-align:middle;}
@@ -658,7 +649,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       <span class="pg-title" id="pgTitle">DASHBOARD</span>
       <div class="thm-tog" onclick="toggleTheme()"><i class="fa-solid fa-sun"></i><div class="tog-sw"></div><i class="fa-solid fa-moon"></i></div>
       <button id="hardRefreshBtn" onclick="hardRefresh()" title="Refresh data" title="Refresh data from Supabase" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--bdr);background:var(--card);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:var(--tr);"><i class="fa-solid fa-rotate-right"></i></button>
-      <div class="sync saved" id="syncBadge"><i class="fa-solid fa-circle-check"></i><span id="syncTxt">Ready</span></div>
+      <div class="sync saved" id="syncBadge"><i class="fa-solid fa-circle-check"></i><span id="syncTxt">Saved</span></div>
       <!-- ADMIN DROPDOWN -->
       <div style="position:relative;">
         <div id="adminPill" onclick="toggleAdminMenu()" style="display:flex;align-items:center;gap:7px;padding:5px 10px 5px 5px;border-radius:30px;background:var(--card2);border:1px solid var(--bdr);cursor:pointer;transition:var(--tr);" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--bdr)'">
@@ -870,7 +861,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 
     <!-- MARK ATTENDANCE -->
     <div class="page" id="page-mark">
-      <div class="ph"><div><h1>Mark Attendance</h1><p>Dots for quick mark · auto-calculates OT · auto-saves</p></div><button class="btn btn-s" onclick="saveAllAttendance()"><i class="fa-solid fa-floppy-disk"></i>Save All</button></div>
+      <div class="ph"><div><h1>Mark Attendance</h1><p>Changes save automatically</p></div></div>
       <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--sh);">
         <div class="nav-pills">
           <button class="np-today" onclick="setMarkToday()"><i class="fa-solid fa-circle-dot"></i>Today</button>
@@ -1047,7 +1038,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
               <button class="np-seg-btn" onclick="shiftEmpReport(12)"><i class="fa-solid fa-chevron-right"></i></button>
             </div>
           </div>
-          <button class="btn btn-o btn-sm no-print" onclick="window.print()"><i class="fa-solid fa-print"></i>Print</button>
+          <button class="btn btn-o btn-sm no-print" onclick="(function(){var sel=document.getElementById('erEmp');var emp=sel&&sel.value&&employeeMap?employeeMap.get(sel.value):null;var t=document.title;if(emp)document.title='EMPLOYEE — '+emp.name.toUpperCase();window.print();setTimeout(function(){document.title=t;},1500);})()"><i class="fa-solid fa-print"></i>Print</button>
           <label style="display:inline-flex;align-items:center;gap:6px;padding:5px 11px;background:var(--card2);border:1px solid var(--bdr);border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;user-select:none;" class="no-print">
             <input type="checkbox" id="erShowExpenses" style="cursor:pointer;accent-color:var(--tel);" onchange="renderEmpReport()">
             <i class="fa-solid fa-receipt" style="color:var(--tel);font-size:11px;"></i>Show Expenses
@@ -1604,7 +1595,7 @@ const CONFIG_APP = {
   PAGE_SIZE:          20,   // employees per payroll page
   // Debounce timings
   SAVE_DEBOUNCE_MS:  800,   // invalidatePayroll queue debounce
-  ATT_DEBOUNCE_MS: 1500,   // attendance auto-save debounce
+  ATT_DEBOUNCE_MS:  300,   // attendance auto-save debounce
   REFRESH_MS:      50000,   // background auto-refresh interval
   SYNC_REMINDER_MS:30000,   // retry countdown interval
   // Uploads
@@ -1804,18 +1795,15 @@ function setSyncStatus(s,msg=''){
   el.className='sync '+s;
   if(s==='saved'){
     _lastSyncTime=Date.now();
-    tx.textContent='Synced just now';
+    tx.textContent='Saved';
     el.querySelector('i').className='fa-solid fa-circle-check';
-    // Update "X min ago" every minute
     if(_syncAgoIv)clearInterval(_syncAgoIv);
-    _syncAgoIv=setInterval(()=>{
-      if(!_lastSyncTime||!tx)return;
-      const mins=Math.floor((Date.now()-_lastSyncTime)/60000);
-      tx.textContent=mins<1?'Synced just now':mins===1?'Synced 1 min ago':`Synced ${mins} min ago`;
-    },30000);
+  } else if(s==='saving'){
+    tx.textContent='Saving...';
+    el.querySelector('i').className='fa-solid fa-rotate fa-spin';
   } else {
-    tx.textContent=s==='saving'?'Saving...':'Error';
-    el.querySelector('i').className=s==='saving'?'fa-solid fa-rotate fa-spin':'fa-solid fa-wifi-slash';
+    tx.textContent='Error';
+    el.querySelector('i').className='fa-solid fa-wifi-slash';
   }
 }
 function haptic(pattern='click'){
@@ -4641,7 +4629,7 @@ async function renderEmpReport(){
           <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Date</th>
           <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Merchant</th>
           <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Category</th>
-          <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Merchant</th>
+          <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Notes</th>
           <th style="text-align:right;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Amount</th>
         </tr>
       </thead>
@@ -4652,7 +4640,7 @@ async function renderEmpReport(){
             +'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+e.date+'</td>'
             +'<td style="padding:7px 10px;font-weight:600;">'+( e.merchant||'—')+'</td>'
             +'<td style="padding:7px 10px;"><span style="background:var(--card2);padding:2px 7px;border-radius:4px;font-size:11px;">'+(e.category||'—')+'</span></td>'
-            +'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+(e.merchant||e.description||'—')+'</td>'
+            +'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+(e.notes||'—')+'</td>'
             +'<td style="padding:7px 10px;text-align:right;font-weight:700;color:'+(neg?'var(--red)':'var(--tel)')+';">'+(neg?'−':'+')+C+Math.abs(parseFloat(e.amount)).toFixed(2)+(neg?'<div style=\'font-size:10px;font-weight:500;\'>deduction</div>':'')+'</td>'
             +'</tr>';
         }).join('')}
@@ -4702,9 +4690,10 @@ function printTimesheet(){
   var expSection='';
   if(showExp&&mExp.length>0){
     const hasRate=(emp.pay_type==='fixed'&&emp.salary)||(emp.pay_type==='daily'&&emp.daily_rate)||emp.hourly_rate;
-    const totalPay2=attendance.filter(function(r){var d=new Date(r.date+'T00:00:00');return r.employee_id===empId&&d.getMonth()===month&&d.getFullYear()===year&&isP(r.status);});
-    const _ptSav=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===mo&&p.year===yr);
+    const _ptSav=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===month&&p.year===year);
+    const mRecs=attendance.filter(function(r){var d=new Date(r.date+'T00:00:00');return r.employee_id===empId&&d.getMonth()===month&&d.getFullYear()===year;});
     const totalBase=_ptSav?(parseFloat(_ptSav.base_pay)||0):mRecs.filter(r=>isP(r.status)).reduce(function(s,r){return s+calcPay(emp,r).base;},0);
+    const totalPay2=_ptSav?(parseFloat(_ptSav.total_pay)||totalBase):mRecs.filter(r=>isP(r.status)).reduce(function(s,r){const p=calcPay(emp,r);return s+p.base+p.ot+(parseFloat(r.bonus)||0);},0);
     expSection='<div style="page-break-before:always;font-family:sans-serif;padding:20px;">'
       +'<div style="text-align:center;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:8px;">'
       +'<strong style="font-size:15px;">'+(cfg.company||'DAM Pro')+'</strong><br>'
@@ -4712,13 +4701,13 @@ function printTimesheet(){
       +'<span style="font-size:11px;">'+MONTHS[month]+' '+year+'</span>'
       +'</div>'
       +'<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-      +'<thead><tr style="background:#f1f5f9;"><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Date</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Merchant</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Category</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Merchant</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Amount</th></tr></thead>'
+      +'<thead><tr style="background:#f1f5f9;"><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Date</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Merchant</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Category</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Notes</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Amount</th></tr></thead>'
       +'<tbody>'+mExp.sort(function(a,b){return a.date.localeCompare(b.date);}).map(function(e){
         var neg=parseFloat(e.amount)<0;
         return'<tr><td style="padding:5px 7px;border:1px solid #ccc;">'+e.date+'</td>'
           +'<td style="padding:5px 7px;border:1px solid #ccc;font-weight:600;">'+(e.merchant||'—')+'</td>'
           +'<td style="padding:5px 7px;border:1px solid #ccc;">'+(e.category||'—')+'</td>'
-          +'<td style="padding:5px 7px;border:1px solid #ccc;">'+(e.merchant||e.description||'—')+'</td>'
+          +'<td style="padding:5px 7px;border:1px solid #ccc;">'+(e.notes||'—')+'</td>'
           +'<td style="padding:5px 7px;border:1px solid #ccc;text-align:right;font-weight:700;color:'+(neg?'#dc2626':'#0d9488')+';">'+(neg?'−':'+')+C2+Math.abs(parseFloat(e.amount)).toFixed(2)+'</td></tr>';
       }).join('')+'</tbody>'
       +'<tfoot>'
@@ -4726,7 +4715,11 @@ function printTimesheet(){
       +(hasRate?'<tr style="font-weight:bold;font-size:14px;background:#f0fdf4;"><td colspan="4" style="padding:6px 7px;border:2px solid #16a34a;">TOTAL PAYABLE (Pay + Expenses)</td><td style="padding:6px 7px;border:2px solid #16a34a;text-align:right;color:#16a34a;">'+C2+(totalPay2+mExpNet).toFixed(2)+'</td></tr>':'')
       +'</tfoot></table></div>';
   }
-  const c=document.getElementById('tsSheet');c.innerHTML=sheets+expSection;window.print();setTimeout(()=>c.innerHTML='',1500);
+  const c=document.getElementById('tsSheet');c.innerHTML=sheets+expSection;
+  const _origTitle=document.title;
+  document.title='EMPLOYEE — '+emp.name.toUpperCase();
+  window.print();
+  setTimeout(()=>{c.innerHTML='';document.title=_origTitle;},1500);
 }
 
 // ═══════════════════════════════════════════════════
@@ -7346,7 +7339,7 @@ function findSimilarExpense(merchant,amount,date){
 // KEYBOARD SHORTCUTS
 // ═══════════════════════════════════════════════════
 document.addEventListener('keydown',e=>{
-  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();if(currentPage==='mark')saveAllAttendance();else if(currentPage==='settings')saveSettings();}
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();if(currentPage==='settings')saveSettings();}
   if(e.key==='Escape'){document.querySelectorAll('.mo.open').forEach(m=>m.classList.remove('open'));}
 });
 document.getElementById('empModal').addEventListener('click',function(e){if(e.target===this)closeEmpModal();});
