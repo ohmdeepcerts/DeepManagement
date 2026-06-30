@@ -34,7 +34,7 @@
   --bg:#f1f5f9;--card:#ffffff;--card2:#f8fafc;
   --txt:#0f172a;--txt2:#64748b;--txtm:#94a3b8;
   --bdr:#e2e8f0;--acc:#2563eb;--accl:#eff6ff;
-  --grn:#16a34a;--grnl:#dcfce7;--red:#dc2626;--redl:#fee2e2;
+  --grn:#16a34a;--grnl:#dcfce7;--grnlh:#bbf7d0;--red:#dc2626;--redl:#fee2e2;--redlh:#fecaca;
   --amb:#d97706;--ambl:#fef3c7;--blu:#2563eb;--blul:#dbeafe;
   --pur:#7c3aed;--purl:#ede9fe;--tel:#0891b2;--tell:#e0f2fe;
   --wkt:rgba(167,139,250,0.13);--sut:rgba(167,139,250,0.22);
@@ -46,7 +46,7 @@
 [data-theme=dark]{
   --bg:#0f172a;--card:#1e293b;--card2:#162032;
   --txt:#f1f5f9;--txt2:#94a3b8;--txtm:#64748b;--bdr:#2d3f55;
-  --accl:#1e3a5f;--grnl:#14532d;--redl:#7f1d1d;--ambl:#78350f;
+  --accl:#1e3a5f;--grnl:#14532d;--grnlh:#1d6b3a;--redl:#7f1d1d;--redlh:#9b2424;--ambl:#78350f;
   --blul:#1e3a5f;--purl:#3b0764;--tell:#0c3444;
   --wkt:rgba(139,92,246,0.12);--sut:rgba(139,92,246,0.22);
   --sh:0 1px 3px rgba(0,0,0,0.3);--shm:0 4px 6px rgba(0,0,0,0.3);
@@ -201,7 +201,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 /* ── Ledger table inputs ── */
 .shi{width:100%;padding:5px 8px;border:1px solid transparent;border-radius:5px;font-size:12px;color:var(--txt);background:transparent;font-family:inherit;outline:none;transition:0.15s;}
 .shi:hover{border-color:var(--bdr);}
-.shi:focus{border-color:var(--acc);background:var(--card);box-shadow:0 0 0 2px rgba(37,99,235,0.1);}
+.shi:focus{border-color:var(--acc);background:transparent;box-shadow:0 0 0 2px rgba(37,99,235,0.15);}
 .amt-i{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600;}
 .run-t{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--txtm);}
 
@@ -227,12 +227,16 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .led-main{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bdr);min-height:0;}
 .led-right{width:255px;flex-shrink:0;overflow-y:scroll;padding:14px;background:var(--card2);scrollbar-width:thin;}
 .led-scroll{flex:1;overflow-y:auto;min-height:0;}
-.led-foot{padding:9px 17px;background:var(--card);border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.led-foot{padding:14px 17px;background:var(--card);border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .led-tot{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--grn);}
-.led-table{width:100%;border-collapse:separate;border-spacing:0;}
-.led-table th{position:sticky;top:0;background:var(--card2);padding:7px 9px;font-size:11px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--bdr);z-index:10;}
-.led-table td{padding:4px 6px;border-bottom:0.5px solid var(--bdr);vertical-align:middle;}
-.led-table tbody tr:hover td{background:rgba(37,99,235,0.03);}
+.led-table{width:100%;border-collapse:separate;border-spacing:0 6px;}
+.led-table th{position:sticky;top:0;background:var(--card2);padding:8px 10px;font-size:11px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--bdr);z-index:10;}
+.led-table tbody tr{transition:box-shadow 0.15s ease,transform 0.1s ease;}
+.led-table td{padding:9px 10px;border-top:1px solid var(--bdr);border-bottom:1px solid var(--bdr);vertical-align:middle;background:var(--rowbg,var(--card));}
+.led-table td:first-child{border-left:1px solid var(--bdr);border-radius:10px 0 0 10px;}
+.led-table td:last-child{border-right:1px solid var(--bdr);border-radius:0 10px 10px 0;}
+.led-table tbody tr:hover td{filter:brightness(0.96);box-shadow:0 1px 6px rgba(0,0,0,0.08);}
+#ledBody tr:last-child td{padding-bottom:9px;}
 .led-split{display:flex;flex:1;min-height:0;overflow:hidden;}
 .yr-ctrl{display:flex;align-items:center;justify-content:center;gap:14px;font-weight:800;font-size:1.3rem;margin-bottom:14px;}
 .pill-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:7px;}
@@ -448,12 +452,14 @@ tr.rsun td{background:var(--sut)!important;}
 .led-right{width:260px;flex-shrink:0;overflow-y:scroll;padding:14px;background:var(--card2);scrollbar-width:thin;}
 .led-hbar{padding:10px 16px;background:var(--card);border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .led-scroll{flex:1;overflow-y:auto;min-height:0;}
-.led-table{width:100%;border-collapse:separate;border-spacing:0;}
-.led-table th{position:sticky;top:0;background:var(--card2);padding:7px 9px;font-size:11px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--bdr);z-index:10;}
-.led-table td{padding:5px 7px;border-bottom:0.5px solid var(--bdr);vertical-align:middle;}
+.led-table{width:100%;border-collapse:separate;border-spacing:0 6px;}
+.led-table th{position:sticky;top:0;background:var(--card2);padding:8px 10px;font-size:11px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--bdr);z-index:10;}
+.led-table td{padding:9px 10px;border-top:1px solid var(--bdr);border-bottom:1px solid var(--bdr);vertical-align:middle;background:var(--rowbg,var(--card));}
+.led-table td:first-child{border-left:1px solid var(--bdr);border-radius:10px 0 0 10px;}
+.led-table td:last-child{border-right:1px solid var(--bdr);border-radius:0 10px 10px 0;}
 .shi{width:100%;padding:4px 7px;border:1px solid transparent;border-radius:5px;font-size:12px;color:var(--txt);background:transparent;font-family:inherit;outline:none;transition:0.15s;}
 .shi:hover{border-color:var(--bdr);}
-.shi:focus{border-color:var(--acc);background:var(--card);box-shadow:0 0 0 2px rgba(37,99,235,0.1);}
+.shi:focus{border-color:var(--acc);background:transparent;box-shadow:0 0 0 2px rgba(37,99,235,0.15);}
 .amt-i{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600;}
 .run-t{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--txtm);}
 .tc{display:flex;flex-wrap:wrap;gap:3px;padding:3px;min-height:30px;align-items:center;}
@@ -465,7 +471,7 @@ tr.rsun td{background:var(--sut)!important;}
 .tp-chip{padding:5px 9px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;border:1px solid transparent;transition:0.15s;}
 .tp-chip:hover{opacity:0.85;}
 .tp-chip.on{border-width:1.5px;}
-.led-foot{padding:9px 16px;background:var(--card);border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.led-foot{padding:14px 16px;background:var(--card);border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .led-tot{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;color:var(--grn);}
 .ra-btn{background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:4px;color:var(--txtm);font-size:12px;transition:0.15s;}
 .ra-btn:hover{background:var(--card2);color:var(--txt);}
@@ -2300,7 +2306,7 @@ async function unlockPayrollMonth(month,year){
 let isLoggedIn=false;
 // PIN auth replaced by Supabase Auth
 // ── safeWrite: wraps Supabase writes with error toast + console log ──
-async function escapeHtml(s){
+function escapeHtml(s){
   if(!s)return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
@@ -3832,7 +3838,9 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
       </td>
     </tr>`;
   }
-  return`<tr style="${row.flagged?'background:rgba(220,38,38,0.04);':''}">
+  // All rows use the same blue glass tint; status shown via pill instead of row color
+  const rowTint='rgba(37,99,235,0.06)';
+  return`<tr style="--rowbg:${rowTint};">
     <td style="text-align:center;width:24px;"><span style="font-size:11px;color:var(--txtm);">${i+1}</span>${stBadge}</td>
     <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)"></td>
     <td>
@@ -3845,6 +3853,8 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
     <td><input type="number" class="shi amt-i" placeholder="0.00" step="0.01" min="0" value="${row.amount===0?'':row.amount}" ${isEx?'disabled':''} oninput="updateExp('${row.id}','amount',parseFloat(this.value)||0)" onblur="renderLedger()"></td>
     <td class="run-t">${C}${running.toFixed(2)}</td>
     <td style="text-align:center;white-space:nowrap;">
+      ${st==='approved'?`<span style="font-size:11px;font-weight:600;background:var(--grnl);color:var(--grn);padding:3px 10px;border-radius:20px;margin-right:6px;display:inline-block;">Approved</span>`:''}
+      ${st==='rejected'?`<span style="font-size:11px;font-weight:600;background:var(--redl);color:var(--red);padding:3px 10px;border-radius:20px;margin-right:6px;display:inline-block;">Rejected</span>`:''}
       ${st!=='approved'?`<button class="ra-btn" onclick="approveExp('${row.id}')" title="Approve" style="color:var(--grn);"><i class="fa-solid fa-check"></i></button>`:''}
       ${st!=='rejected'?`<button class="ra-btn del" onclick="rejectExp('${row.id}')" title="Reject"><i class="fa-solid fa-xmark"></i></button>`:''}
       ${!row.flagged?`<button class="ra-btn" onclick="flagExp('${row.id}')" title="Flag" style="color:var(--amb);"><i class="fa-solid fa-flag"></i></button>`:`<button class="ra-btn" onclick="unflagExp('${row.id}')" title="Unflag" style="color:var(--red);"><i class="fa-solid fa-flag"></i></button>`}
