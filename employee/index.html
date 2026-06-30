@@ -1707,8 +1707,8 @@ function renderHome(silent=false){
     el.innerHTML=`<div class="att-day-n">${d}</div><div class="att-box ${cls}${isT?' today':''}">${lbl}</div>`;
     strip.appendChild(el);
   }
-  // Scroll to today
-  setTimeout(()=>{const t=strip.children[now.getDate()-1];if(t)t.scrollIntoView({inline:'center',behavior:'smooth'});},100);
+  // Scroll to today — only on first load, never during silent background sync (was causing unexpected page jumps every 11s)
+  if(!silent)setTimeout(()=>{const t=strip.children[now.getDate()-1];if(t)t.scrollIntoView({inline:'center',behavior:'smooth'});},100);
 
   // Today mark button on home
   buildHomeTodayMark();
