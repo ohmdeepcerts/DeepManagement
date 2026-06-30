@@ -677,8 +677,8 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
     </div>
 
     <!-- MARK ATTENDANCE MODAL -->
-    <div id="markModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:flex-end;justify-content:center;">
-      <div style="background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:20px 18px calc(90px + max(env(safe-area-inset-bottom),10px));max-height:88vh;overflow-y:auto;">
+    <div id="markModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:flex-end;justify-content:center;touch-action:none;">
+      <div style="background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:20px 18px calc(90px + max(env(safe-area-inset-bottom),10px));max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;">
         <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr);margin:0 auto 18px;"></div>
         <div style="font-size:17px;font-weight:800;margin-bottom:4px;" id="markModalTitle">Mark Attendance</div>
         <div style="font-size:12px;color:var(--txtm);margin-bottom:20px;" id="markModalDate"></div>
@@ -752,8 +752,8 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
     </div>
 
     <!-- FLOATING EXPENSE EDIT WINDOW -->
-    <div id="expDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:550;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)closeExpDetailModal()">
-      <div style="background:var(--card);border-radius:20px;width:100%;max-width:400px;padding:20px 18px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div id="expDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:550;align-items:center;justify-content:center;padding:16px;touch-action:none;" onclick="if(event.target===this)closeExpDetailModal()">
+      <div style="background:var(--card);border-radius:20px;width:100%;max-width:400px;padding:20px 18px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
           <div style="font-size:16px;font-weight:800;">Edit Expense</div>
           <button onclick="closeExpDetailModal()" style="background:var(--card2);border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;color:var(--txtm);font-size:14px;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-xmark"></i></button>
@@ -1082,10 +1082,12 @@ function openChangePhoto(){
     _empCrop.src=null;
   }
   document.getElementById('photoModal').style.display='flex';
+  _lockBodyScroll();
 }
 function closePhotoModal(){
   document.getElementById('photoModal').style.display='none';
   _empCrop.dragging=false;
+  _unlockBodyScroll();
 }
 function empPickPhoto(input){
   if(!input.files||!input.files[0])return;
@@ -2563,6 +2565,24 @@ function toggleExpRowActions(id){
 }
 let _edRcptFile=null;
 let _edCurrentExpId=null;
+// ── Reusable body scroll lock for fullscreen modals (fixes mobile touch-scroll bleeding to page underneath) ──
+function _lockBodyScroll(){
+  if(document.body.style.position==='fixed')return; // already locked by another modal
+  document.body.dataset.scrollY=window.scrollY;
+  document.body.style.overflow='hidden';
+  document.body.style.position='fixed';
+  document.body.style.width='100%';
+  document.body.style.top=`-${window.scrollY}px`;
+}
+function _unlockBodyScroll(){
+  const y=document.body.dataset.scrollY;
+  document.body.style.overflow='';
+  document.body.style.position='';
+  document.body.style.width='';
+  document.body.style.top='';
+  delete document.body.dataset.scrollY;
+  if(y)window.scrollTo(0,parseInt(y));
+}
 function openExpDetailModal(id){
   const e=myExp.find(x=>x.id===id);if(!e)return;
   _edCurrentExpId=id;
@@ -2609,10 +2629,12 @@ function openExpDetailModal(id){
   if(scanSt){scanSt.style.display='none';scanSt.textContent='';}
   document.getElementById('edSaveBtn').innerHTML=e.status==='rejected'?'<i class="fa-solid fa-rotate"></i> Resubmit':e.status==='approved'?'<i class="fa-solid fa-rotate"></i> Save & Resend for Approval':'<i class="fa-solid fa-check"></i> Save Changes';
   document.getElementById('expDetailModal').style.display='flex';
+  _lockBodyScroll();
 }
 function closeExpDetailModal(){
   document.getElementById('expDetailModal').style.display='none';
   _edCurrentExpId=null;_edRcptFile=null;
+  _unlockBodyScroll();
 }
 function toggleEdVAT(e){
   if(e){e.preventDefault();e.stopPropagation();}
@@ -2993,6 +3015,7 @@ function openMarkModal(date,isEdit=false){
   modal.style.display='flex';
   modal.dataset.date=date;
   modal.dataset.edit=isEdit?'1':'0';
+  _lockBodyScroll();
 }
 
 function buildHourPicker(containerId,type,from,to){
@@ -3068,6 +3091,7 @@ function fmtMins(m){if(m>=60)return Math.floor(m/60)+'h '+(m%60?m%60+'m':'');ret
 function closeMarkModal(){
   const modal=document.getElementById('markModal');
   modal.style.display='none';
+  _unlockBodyScroll();
 }
 
 let _submittingAtt=false;
