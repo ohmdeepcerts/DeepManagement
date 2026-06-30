@@ -1393,10 +1393,15 @@ async function silentSync(){
   // Don't re-render if mark modal is open
   const markOpen=document.getElementById('markModal')&&document.getElementById('markModal').style.display==='flex';
   if(!userTyping&&!markOpen&&document.getElementById('photoModal').style.display!=='flex'){
-    if(cur==='home')renderHome();
+    // Save scroll position before re-render to prevent page jumping
+    const contentEl=document.querySelector('.content');
+    const savedScroll=contentEl?contentEl.scrollTop:0;
+    if(cur==='home'){renderHome(true);}
     else if(cur==='pay')renderPay();
     else if(cur==='exp')renderExpenses();
     else if(cur==='msg'&&hadNewMsg)renderMsgs();
+    // Restore scroll position after render
+    if(contentEl&&savedScroll>0)requestAnimationFrame(()=>{contentEl.scrollTop=savedScroll;});
   }
   }catch(err){
     console.error('Sync error:',err);
@@ -1519,9 +1524,9 @@ function showPg(id){
 }
 
 // ── HOME ──
-function renderHome(){
+function renderHome(silent=false){
   if(!emp)return;
-  showShimmerEmp('homeContent',3);
+  if(!silent)showShimmerEmp('homeContent',3);
   const showPay=emp.show_pay_tab!==false;
   const showRunning=emp.show_running_pay!==false;
   const salCard=document.getElementById('hmSalCard');
@@ -2309,17 +2314,20 @@ function renderExpenses(){
     const isFlagged=e.flagged;
     const isRejected=e.status==='rejected';
     const isApproved=e.status==='approved';
-    return`<div class="exp-row" onclick="${isApproved?`if(!event.target.closest('a'))editAndResendExp('${e.id}')`:''}" style="cursor:${isApproved?'pointer':'default'};${isFlagged?'background:rgba(220,38,38,0.04);border-radius:10px;padding:8px;':isRejected?'background:rgba(220,38,38,0.03);border-radius:10px;padding:8px;':''}">
+    const isPending=e.status==='pending'&&!isApproved;
+    const canEdit=!isApproved; // pending and rejected can both be edited; only approved is locked
+    return`<div class="exp-row" onclick="${canEdit?`if(!event.target.closest('a'))editAndResendExp('${e.id}')`:''}" style="cursor:${canEdit?'pointer':'default'};${isFlagged?'background:rgba(220,38,38,0.04);border-radius:10px;padding:8px;':isRejected?'background:rgba(220,38,38,0.03);border-radius:10px;padding:8px;':''}">
       <div class="exp-icon" style="background:${col}18;color:${col};"><i class="fa-solid fa-receipt"></i></div>
       <div style="flex:1;">
         <div class="exp-name">${e.merchant||'—'}</div>
         <div class="exp-meta">${e.category||'—'} · ${fmtDS(e.date)}</div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap;">
-          <span class="exp-status ${e.status||'draft'}">${isApproved?'Approved':isRejected?'Rejected':e.status==='pending'?'Pending review':'Draft'}</span>
+          <span class="exp-status ${e.status||'draft'}">${isApproved?'Approved':isRejected?'Rejected':isPending?'Pending review · tap to edit':'Draft'}</span>
           ${e.receipt_url?`<a href="${e.receipt_url}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:var(--txtm);display:inline-flex;align-items:center;gap:2px;text-decoration:none;"><i class="fa-solid fa-paperclip" style="font-size:9px;"></i>receipt</a>`:''}
         </div>
         ${isFlagged?`<div style="font-size:11px;color:var(--red);margin-top:4px;font-weight:600;"><i class="fa-solid fa-flag" style="margin-right:3px;"></i>Flagged by office${e.flag_note?': "'+e.flag_note+'"':''}</div>`:''}
         ${isRejected?`<div style="display:flex;gap:6px;margin-top:7px;"><button onclick="editAndResendExp('${e.id}')" style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;border:1.5px solid var(--acc);background:var(--accl);color:var(--acc);cursor:pointer;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-rotate-left"></i>Edit & Resend</button></div>`:''}
+        ${isPending?`<div style="display:flex;gap:6px;margin-top:7px;"><button onclick="event.stopPropagation();editAndResendExp('${e.id}')" style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--card2);color:var(--txt);cursor:pointer;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-pen"></i>Edit</button></div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0;">
         <div class="exp-amt" style="color:${isApproved?'var(--grn)':isRejected?'var(--red)':'var(--grn)'};">${fmt(e.amount)}</div>
@@ -2398,7 +2406,7 @@ async function editAndResendExp(id){
   // Switch button to Update mode
   const btn=document.querySelector('#pg-exp .btn-p');
   if(btn){
-    btn.innerHTML='<i class="fa-solid fa-rotate"></i> Update & Resubmit';
+    btn.innerHTML=e.status==='rejected'?'<i class="fa-solid fa-rotate"></i> Update & Resubmit':'<i class="fa-solid fa-rotate"></i> Save Changes';
     btn.onclick=async()=>{
       const merchant=document.getElementById('expMerchant').value.trim();
       const amt=parseFloat(document.getElementById('expAmt').value);
@@ -2424,11 +2432,11 @@ async function editAndResendExp(id){
       btn.disabled=false;
       btn.innerHTML='<i class="fa-solid fa-paper-plane"></i> Submit Expense';
       btn.onclick=submitExp;
-      toast('Expense updated and resubmitted ✅','s');
+      toast(e.status==='rejected'?'Expense updated and resubmitted ✅':'Expense updated ✅','s');
       renderExpenses();
     };
   }
-  toast('Edit details above then tap Update & Resubmit','i');
+  toast(e.status==='rejected'?'Edit details above then tap Update & Resubmit':'Edit details above then tap Save Changes','i');
 }
 
 function _resetExpForm(){
