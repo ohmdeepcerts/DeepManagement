@@ -751,6 +751,66 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
       </div>
     </div>
 
+    <!-- FLOATING EXPENSE EDIT WINDOW -->
+    <div id="expDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:550;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)closeExpDetailModal()">
+      <div style="background:var(--card);border-radius:20px;width:100%;max-width:400px;padding:20px 18px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div style="font-size:16px;font-weight:800;">Edit Expense</div>
+          <button onclick="closeExpDetailModal()" style="background:var(--card2);border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;color:var(--txtm);font-size:14px;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div style="font-size:12px;color:var(--txtm);margin-bottom:16px;" id="edEditSub">Update the details below</div>
+        <div class="fg"><label>Date *</label><input type="date" id="edDate"></div>
+        <div class="fg" style="position:relative;">
+          <label>Merchant / Supplier *</label>
+          <input type="text" id="edMerchantInp" placeholder="e.g. Screwfix, Costa Coffee, Fuel" autocomplete="off">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="fg"><label>Category</label><select id="edCat"><option value="">— Select —</option></select></div>
+          <div class="fg"><label>Amount (£) *</label><input type="number" id="edAmtInp" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
+        </div>
+        <div class="fg"><label>Notes</label><textarea id="edNotesInp" placeholder="Any details..."></textarea></div>
+        <div style="display:flex;align-items:center;gap:11px;background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--rs);padding:11px 13px;margin-bottom:14px;">
+          <i class="fa-solid fa-tag" style="color:var(--amb);font-size:16px;flex-shrink:0;"></i>
+          <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--amb);">VAT Receipt</div><div style="font-size:11px;color:var(--txt2);">Toggle if this receipt includes VAT</div></div>
+          <label onclick="toggleEdVAT(event)" style="position:relative;display:inline-block;width:48px;height:26px;flex-shrink:0;cursor:pointer;">
+            <input type="checkbox" id="edVAT" style="opacity:0;width:0;height:0;position:absolute;">
+            <span id="edVATvis" style="position:absolute;inset:0;background:var(--bdr);border-radius:13px;transition:0.25s;"></span>
+            <span id="edVATknob" style="position:absolute;left:3px;top:3px;width:20px;height:20px;background:#fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.25);transition:0.25s;"></span>
+          </label>
+        </div>
+        <div id="edReceiptPreviewWrap" style="display:none;margin-bottom:12px;">
+          <img id="edReceiptPreview" src="" style="width:100%;max-height:140px;object-fit:cover;border-radius:10px;border:1px solid var(--bdr);">
+          <div style="font-size:11px;color:var(--txtm);margin-top:5px;">Current receipt — attach a new one below to replace it</div>
+        </div>
+        <!-- PDF / non-image file indicator -->
+        <div class="rcpt-pdf-wrap" id="edReceiptPdfWrap" style="display:none;">
+          <i class="fa-solid fa-file-lines" style="font-size:22px;color:var(--acc);"></i>
+          <div><div id="edReceiptFileName" style="font-size:13px;font-weight:700;color:var(--txt);">file.pdf</div><div style="font-size:11px;color:var(--txtm);">Attached — tap Save to upload</div></div>
+          <button class="rcpt-pdf-remove" onclick="event.stopPropagation();removeEdReceipt()"><i class="fa-solid fa-xmark"></i> Remove</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+          <div class="receipt-zone" style="padding:14px;margin-bottom:0;" onclick="document.getElementById('edCamera').click()">
+            <i class="fa-solid fa-camera" style="font-size:20px;"></i>
+            <p style="font-size:12px;margin:0;"><strong>Camera</strong></p>
+          </div>
+          <div class="receipt-zone" style="padding:14px;margin-bottom:0;" onclick="document.getElementById('edFile').click()">
+            <i class="fa-solid fa-folder-open" style="font-size:20px;"></i>
+            <p style="font-size:12px;margin:0;"><strong>Files</strong></p>
+          </div>
+        </div>
+        <input type="file" id="edCamera" accept="image/*" capture="environment" style="display:none;" onchange="edRcptChosen(this)">
+        <input type="file" id="edFile" accept="image/*,.pdf,.heic,.heif" style="display:none;" onchange="edRcptChosen(this)">
+        <button type="button" id="edGeminiScanBtn" class="paste-receipt-btn" onclick="scanReceiptWithAI('edit')" style="display:none;background:#fff;border:2px solid #1a73e8;color:#1a73e8;font-weight:700;margin-top:8px;width:100%;">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt
+        </button>
+        <div id="edGeminiScanStatus" style="display:none;font-size:12px;color:var(--acc);text-align:center;margin-top:6px;font-weight:600;"></div>
+        <div style="display:flex;gap:10px;margin-top:6px;">
+          <button class="btn btn-o" onclick="closeExpDetailModal()" style="flex:1;">Cancel</button>
+          <button class="btn btn-p" id="edSaveBtn" onclick="saveExpDetailEdit()" style="flex:1.5;"><i class="fa-solid fa-check"></i> Save Changes</button>
+        </div>
+      </div>
+    </div>
+
     <!-- EXPENSES -->
     <div class="pg" id="pg-exp">
       <!-- Add expense form -->
@@ -945,7 +1005,8 @@ async function checkForUpdateAndReload(isFirstCheck){
       const markOpen=document.getElementById('markModal')&&document.getElementById('markModal').style.display==='flex';
       const changePinOpen=document.getElementById('changePinModal')&&document.getElementById('changePinModal').style.display==='flex';
       const photoOpen=document.getElementById('photoModal')&&document.getElementById('photoModal').style.display==='flex';
-      if(userTyping||markOpen||changePinOpen||photoOpen)return; // try again on the next check
+      const expDetailOpen2=document.getElementById('expDetailModal')&&document.getElementById('expDetailModal').style.display==='flex';
+      if(userTyping||markOpen||changePinOpen||photoOpen||expDetailOpen2)return; // try again on the next check
       sessionStorage.removeItem('dam_page_sig');
       location.reload();
     }
@@ -1390,9 +1451,10 @@ async function silentSync(){
   // Don't re-render if user is actively typing in a form field
   const activeEl=document.activeElement;
   const userTyping=activeEl&&(activeEl.tagName==='INPUT'||activeEl.tagName==='TEXTAREA'||activeEl.tagName==='SELECT');
-  // Don't re-render if mark modal is open
+  // Don't re-render if mark modal or expense detail modal is open
   const markOpen=document.getElementById('markModal')&&document.getElementById('markModal').style.display==='flex';
-  if(!userTyping&&!markOpen&&document.getElementById('photoModal').style.display!=='flex'){
+  const expDetailOpen=document.getElementById('expDetailModal')&&document.getElementById('expDetailModal').style.display==='flex';
+  if(!userTyping&&!markOpen&&!expDetailOpen&&document.getElementById('photoModal').style.display!=='flex'){
     // Save scroll position before re-render to prevent page jumping
     const contentEl=document.querySelector('.content');
     const savedScroll=contentEl?contentEl.scrollTop:0;
@@ -1897,10 +1959,13 @@ let _rcptFile=null;
 // ══════════════════════════════════════════════════════════════
 let _geminiKey=''; // loaded from Supabase settings on login
 
-async function scanReceiptWithAI(){
-  if(!_rcptFile){toast('Attach a receipt first','e');return;}
-  const btn=document.getElementById('geminiScanBtn');
-  const st=document.getElementById('geminiScanStatus');
+async function scanReceiptWithAI(target){
+  target=target||'add';
+  const isEd=target==='edit';
+  const fileVar=isEd?_edRcptFile:_rcptFile;
+  if(!fileVar){toast('Attach a receipt first','e');return;}
+  const btn=document.getElementById(isEd?'edGeminiScanBtn':'geminiScanBtn');
+  const st=document.getElementById(isEd?'edGeminiScanStatus':'geminiScanStatus');
   if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Scanning...';}
   if(st){st.style.display='block';st.textContent='Reading receipt...';}
   try{
@@ -1909,9 +1974,9 @@ async function scanReceiptWithAI(){
       const r=new FileReader();
       r.onload=()=>res(r.result.split(',')[1]);
       r.onerror=rej;
-      r.readAsDataURL(_rcptFile);
+      r.readAsDataURL(fileVar);
     });
-    const mimeType=_rcptFile.type||'image/jpeg';
+    const mimeType=fileVar.type||'image/jpeg';
     // Key loaded from Supabase settings on login — never hardcoded in this file
     if(!_geminiKey){
       toast('AI scanner not set up — contact admin','e');
@@ -1940,49 +2005,58 @@ async function scanReceiptWithAI(){
       try{
         const croppedFile=await _cropReceiptFromBbox(b64,mimeType,result.bbox,!!result.is_bent);
         if(croppedFile){
-          _rcptFile=croppedFile;
-          const imgEl=document.getElementById('rcptPreview');
-          const wrapEl=document.getElementById('rcptPreviewWrap');
-          if(imgEl){imgEl.src=URL.createObjectURL(croppedFile);}
-          if(wrapEl)wrapEl.style.display='block';
+          if(isEd){
+            _edRcptFile=croppedFile;
+            const imgEl=document.getElementById('edReceiptPreview');
+            const wrapEl=document.getElementById('edReceiptPreviewWrap');
+            if(imgEl){imgEl.src=URL.createObjectURL(croppedFile);}
+            if(wrapEl)wrapEl.style.display='block';
+          } else {
+            _rcptFile=croppedFile;
+            const imgEl=document.getElementById('rcptPreview');
+            const wrapEl=document.getElementById('rcptPreviewWrap');
+            if(imgEl){imgEl.src=URL.createObjectURL(croppedFile);}
+            if(wrapEl)wrapEl.style.display='block';
+          }
         }
       }catch(cropErr){console.warn('Crop failed (using original):',cropErr);}
     }
     // ────────────────────────────────────────────────────────────
     // Auto-fill form fields
+    const fMerchant=document.getElementById(isEd?'edMerchantInp':'expMerchant');
+    const fAmt=document.getElementById(isEd?'edAmtInp':'expAmt');
+    const fDate=document.getElementById(isEd?'edDate':'expDate');
+    const fCat=document.getElementById(isEd?'edCat':'expCat');
+    const fVAT=document.getElementById(isEd?'edVAT':'expVAT');
     let filled=[];
     if(result.merchant){
-      document.getElementById('expMerchant').value=result.merchant;
+      fMerchant.value=result.merchant;
       filled.push('merchant');
     }
     if(result.amount!=null&&result.amount>0){
-      document.getElementById('expAmt').value=parseFloat(result.amount).toFixed(2);
+      fAmt.value=parseFloat(result.amount).toFixed(2);
       filled.push('amount');
     }
     if(result.date){
-      document.getElementById('expDate').value=result.date;
+      fDate.value=result.date;
       filled.push('date');
     }
     // Check shared merchant memory first — overrides Gemini's guess
     const _mKey=(result.merchant||'').trim().toLowerCase();
     const _savedCat=_mKey&&window._merchantCatMap?window._merchantCatMap[_mKey]:null;
     const _useCat=_savedCat||result.category;
-    if(_useCat){
-      const catEl=document.getElementById('expCat');
-      if(catEl){
-        const opts=[...catEl.options].map(o=>o.value);
-        const match=opts.find(o=>o.toLowerCase()===_useCat.toLowerCase());
-        if(match){catEl.value=match;filled.push('category'+((_savedCat)?' (remembered)':''));}
-      }
+    if(_useCat&&fCat){
+      const opts=[...fCat.options].map(o=>o.value);
+      const match=opts.find(o=>o.toLowerCase()===_useCat.toLowerCase());
+      if(match){fCat.value=match;filled.push('category'+((_savedCat)?' (remembered)':''));}
     }
     if(result.vat_amount!=null&&result.vat_amount>0){
       // Auto-toggle VAT on if Gemini detected VAT on the receipt
-      const vatBox=document.getElementById('expVAT');
-      if(vatBox&&!vatBox.checked){
-        vatBox.checked=true;
+      if(fVAT&&!fVAT.checked){
+        fVAT.checked=true;
         // Also update the visual toggle to match
-        const vis=document.getElementById('vatToggleVis');
-        const knob=document.getElementById('vatToggleKnob');
+        const vis=document.getElementById(isEd?'edVATvis':'vatToggleVis');
+        const knob=document.getElementById(isEd?'edVATknob':'vatToggleKnob');
         if(vis)vis.style.background='var(--grn)';
         if(knob)knob.style.transform='translateX(22px)';
         filled.push('VAT');
@@ -2141,6 +2215,24 @@ function removeReceipt(){
   if(scanBtn)scanBtn.style.display='none';
   if(scanSt){scanSt.style.display='none';scanSt.textContent='';}
 }
+function removeEdReceipt(){
+  _edRcptFile=null;
+  const wrap=document.getElementById('edReceiptPreviewWrap');
+  if(wrap)wrap.style.display='none';
+  const img=document.getElementById('edReceiptPreview');
+  if(img){img.src='';}
+  const pdfWrap=document.getElementById('edReceiptPdfWrap');
+  if(pdfWrap)pdfWrap.style.display='none';
+  const fn=document.getElementById('edReceiptFileName');
+  if(fn)fn.textContent='';
+  const ec=document.getElementById('edCamera');if(ec)ec.value='';
+  const ef=document.getElementById('edFile');if(ef)ef.value='';
+  toast('Receipt removed','i');
+  const scanBtn=document.getElementById('edGeminiScanBtn');
+  const scanSt=document.getElementById('edGeminiScanStatus');
+  if(scanBtn)scanBtn.style.display='none';
+  if(scanSt){scanSt.style.display='none';scanSt.textContent='';}
+}
 // ─────────────────────────────────────────────────────────────
 
 // ══════════════════════════════════════════════════════════════
@@ -2188,16 +2280,18 @@ async function pdfToJpegBase64(pdfFile) {
   
   return { base64, blob, dataUrl: canvas.toDataURL('image/jpeg', 0.92) };
 }
-function _setRcptFile(file){
+function _setRcptFile(file,target){
   if(!file)return;
+  target=target||'add';
+  const isEd=target==='edit';
   if(file.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');return;}
-  _rcptFile=file;
+  if(isEd){_edRcptFile=file;}else{_rcptFile=file;}
   const isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
-  const wrap=document.getElementById('rcptPreviewWrap');
-  const img=document.getElementById('rcptPreview');
-  const pdfWrap=document.getElementById('rcptPdfWrap');
-  const scanBtn=document.getElementById('geminiScanBtn');
-  const scanSt=document.getElementById('geminiScanStatus');
+  const wrap=document.getElementById(isEd?'edReceiptPreviewWrap':'rcptPreviewWrap');
+  const img=document.getElementById(isEd?'edReceiptPreview':'rcptPreview');
+  const pdfWrap=document.getElementById(isEd?'edReceiptPdfWrap':'rcptPdfWrap');
+  const scanBtn=document.getElementById(isEd?'edGeminiScanBtn':'geminiScanBtn');
+  const scanSt=document.getElementById(isEd?'edGeminiScanStatus':'geminiScanStatus');
   if(!isPdf){
     // Image — show preview thumbnail immediately
     if(pdfWrap)pdfWrap.style.display='none';
@@ -2213,19 +2307,20 @@ function _setRcptFile(file){
     if(scanBtn){scanBtn.style.display='block';scanBtn.disabled=true;scanBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Converting PDF...';}
     if(scanSt){scanSt.style.display='block';scanSt.textContent='Converting PDF to image...';scanSt.style.color='var(--acc)';}
     pdfToJpegBase64(file).then(({blob,dataUrl})=>{
-      // Replace _rcptFile with the JPEG blob — Supabase gets a clean JPEG
-      _rcptFile=new File([blob], file.name.replace(/\.pdf$/i,'.jpg'), {type:'image/jpeg'});
+      // Replace receipt file with the JPEG blob — Supabase gets a clean JPEG
+      const jpegFile=new File([blob], file.name.replace(/\.pdf$/i,'.jpg'), {type:'image/jpeg'});
+      if(isEd){_edRcptFile=jpegFile;}else{_rcptFile=jpegFile;}
       // Show JPEG preview (employee can see what Gemini will read)
       if(img){img.src=dataUrl;}
       if(wrap)wrap.style.display='block';
       if(scanBtn){scanBtn.disabled=false;scanBtn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt';}
-      if(scanSt){scanSt.textContent='PDF converted ✅ — tap Auto-fill or Submit';scanSt.style.color='var(--grn)';}
+      if(scanSt){scanSt.textContent='PDF converted ✅ — tap Auto-fill or Save';scanSt.style.color='var(--grn)';}
       toast('PDF converted to image — ready to scan','s');
     }).catch(err=>{
       console.error('PDF convert error:',err);
       // Fallback: keep original PDF file, hide scan button
       if(scanBtn){scanBtn.style.display='none';}
-      const fn=document.getElementById('rcptFileName');
+      const fn=document.getElementById(isEd?'edReceiptFileName':'rcptFileName');
       if(fn)fn.textContent=file.name;
       if(pdfWrap)pdfWrap.style.display='flex';
       if(scanSt){scanSt.textContent='Could not convert PDF — will upload as PDF';scanSt.style.color='var(--amb)';}
@@ -2237,7 +2332,7 @@ function _setRcptFile(file){
 function rcptChosen(input){
   const file=input.files[0];
   if(!file)return;
-  _setRcptFile(file);
+  _setRcptFile(file,'add');
 }
 function toggleVATvis(e){
   if(e){e.preventDefault();e.stopPropagation();}
@@ -2315,24 +2410,26 @@ function renderExpenses(){
     const isRejected=e.status==='rejected';
     const isApproved=e.status==='approved';
     const isPending=e.status==='pending'&&!isApproved;
-    const canEdit=!isApproved; // pending and rejected can both be edited; only approved is locked
-    return`<div class="exp-row" onclick="${canEdit?`if(!event.target.closest('a'))editAndResendExp('${e.id}')`:''}" style="cursor:${canEdit?'pointer':'default'};${isFlagged?'background:rgba(220,38,38,0.04);border-radius:10px;padding:8px;':isRejected?'background:rgba(220,38,38,0.03);border-radius:10px;padding:8px;':''}">
+    const canEdit=true; // any expense can be edited; editing an approved one sends it back for re-approval
+    return`<div class="exp-row" id="expRow-${e.id}" onclick="${canEdit?`if(!event.target.closest('a,button'))toggleExpRowActions('${e.id}')`:''}" style="cursor:${canEdit?'pointer':'default'};position:relative;${isFlagged?'background:rgba(220,38,38,0.04);border-radius:10px;padding:8px;':isRejected?'background:rgba(220,38,38,0.03);border-radius:10px;padding:8px;':''}">
       <div class="exp-icon" style="background:${col}18;color:${col};"><i class="fa-solid fa-receipt"></i></div>
       <div style="flex:1;">
         <div class="exp-name">${e.merchant||'—'}</div>
         <div class="exp-meta">${e.category||'—'} · ${fmtDS(e.date)}</div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap;">
-          <span class="exp-status ${e.status||'draft'}">${isApproved?'Approved':isRejected?'Rejected':isPending?'Pending review · tap to edit':'Draft'}</span>
+          <span class="exp-status ${e.status||'draft'}">${isApproved?'Approved':isRejected?'Rejected':isPending?'Pending review':'Draft'}</span>
           ${e.receipt_url?`<a href="${e.receipt_url}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:var(--txtm);display:inline-flex;align-items:center;gap:2px;text-decoration:none;"><i class="fa-solid fa-paperclip" style="font-size:9px;"></i>receipt</a>`:''}
         </div>
         ${isFlagged?`<div style="font-size:11px;color:var(--red);margin-top:4px;font-weight:600;"><i class="fa-solid fa-flag" style="margin-right:3px;"></i>Flagged by office${e.flag_note?': "'+e.flag_note+'"':''}</div>`:''}
-        ${isRejected?`<div style="display:flex;gap:6px;margin-top:7px;"><button onclick="editAndResendExp('${e.id}')" style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;border:1.5px solid var(--acc);background:var(--accl);color:var(--acc);cursor:pointer;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-rotate-left"></i>Edit & Resend</button></div>`:''}
-        ${isPending?`<div style="display:flex;gap:6px;margin-top:7px;"><button onclick="event.stopPropagation();editAndResendExp('${e.id}')" style="font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--card2);color:var(--txt);cursor:pointer;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-pen"></i>Edit</button></div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0;">
         <div class="exp-amt" style="color:${isApproved?'var(--grn)':isRejected?'var(--red)':'var(--grn)'};">${fmt(e.amount)}</div>
-        ${!isFlagged&&!isApproved?`<button onclick="toggleFlag('${e.id}')" style="font-size:10px;color:var(--txtm);background:none;border:1px solid var(--bdr);border-radius:5px;padding:2px 6px;cursor:pointer;margin-top:4px;"><i class="fa-solid fa-flag" style="font-size:11px;"></i> Flag</button>`:''}
+        ${!isFlagged&&!isApproved?`<button onclick="event.stopPropagation();toggleFlag('${e.id}')" style="font-size:10px;color:var(--txtm);background:none;border:1px solid var(--bdr);border-radius:5px;padding:2px 6px;cursor:pointer;margin-top:4px;"><i class="fa-solid fa-flag" style="font-size:11px;"></i> Flag</button>`:''}
       </div>
+      ${canEdit?`<div id="expRowActions-${e.id}" style="display:none;position:absolute;inset:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background:rgba(255,255,255,0.45);border-radius:10px;align-items:center;justify-content:center;gap:10px;z-index:5;">
+        <button onclick="event.stopPropagation();toggleExpRowActions('${e.id}')" style="font-size:12px;font-weight:700;padding:8px 16px;border-radius:8px;border:1px solid var(--bdr);background:var(--card);color:var(--txt);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);">Close</button>
+        <button onclick="event.stopPropagation();openExpDetailModal('${e.id}')" style="font-size:12px;font-weight:700;padding:8px 16px;border-radius:8px;border:none;background:var(--acc);color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.18);"><i class="fa-solid fa-pen"></i>Edit</button>
+      </div>`:''}
     </div>`;
   }).join('')+`<div style="border-top:1px solid var(--bdr);padding-top:9px;margin-top:9px;display:flex;justify-content:space-between;"><span style="font-size:13px;font-weight:700;">Total</span><span style="font-family:JetBrains Mono;font-size:14px;font-weight:800;color:var(--grn);">${fmt(total)}</span></div>`:
   '<div class="empty-s"><i class="fa-solid fa-receipt"></i><p>No expenses for this month</p></div>';
@@ -2454,6 +2551,111 @@ function _resetExpForm(){
   const fn=document.getElementById('rcptFileName');if(fn)fn.textContent='';
   const scanBtn=document.getElementById('geminiScanBtn');if(scanBtn)scanBtn.style.display='none';
   const scanSt=document.getElementById('geminiScanStatus');if(scanSt){scanSt.style.display='none';scanSt.textContent='';}
+}
+
+// ── INLINE ROW ACTIONS + FLOATING EDIT WINDOW ──
+function toggleExpRowActions(id){
+  // Close any other open row actions first
+  document.querySelectorAll('[id^="expRowActions-"]').forEach(el=>{if(el.id!=='expRowActions-'+id)el.style.display='none';});
+  const bar=document.getElementById('expRowActions-'+id);
+  if(!bar)return;
+  bar.style.display=bar.style.display==='flex'?'none':'flex';
+}
+let _edRcptFile=null;
+let _edCurrentExpId=null;
+function openExpDetailModal(id){
+  const e=myExp.find(x=>x.id===id);if(!e)return;
+  _edCurrentExpId=id;
+  _edRcptFile=null;
+  // Close the inline action bar on the row
+  const bar=document.getElementById('expRowActions-'+id);if(bar)bar.style.display='none';
+  document.getElementById('edEditSub').textContent=e.status==='rejected'?'Fix the details below and resubmit':e.status==='approved'?'⚠️ This was already approved — saving will send it back for office re-approval':'Update the details below';
+  document.getElementById('edDate').value=e.date||dk(new Date());
+  document.getElementById('edMerchantInp').value=e.merchant||'';
+  document.getElementById('edAmtInp').value=e.amount||'';
+  document.getElementById('edNotesInp').value=e.notes||'';
+  // Populate category select (mirrors populateCats)
+  const catSel=document.getElementById('edCat');
+  catSel.innerHTML='<option value="">— Select —</option>';
+  (cfg.categories||['Travel','Meals','Equipment','Software','Utilities','Accommodation']).forEach(c=>catSel.appendChild(new Option(c,c)));
+  catSel.value=e.category||'';
+  const hasVAT=(e.tags||[]).includes('VAT');
+  document.getElementById('edVAT').checked=hasVAT;
+  document.getElementById('edVATvis').style.background=hasVAT?'var(--grn)':'var(--bdr)';
+  document.getElementById('edVATknob').style.transform=hasVAT?'translateX(22px)':'translateX(0)';
+  const prevWrap=document.getElementById('edReceiptPreviewWrap');
+  const prevImg=document.getElementById('edReceiptPreview');
+  const prevPdfWrap=document.getElementById('edReceiptPdfWrap');
+  const prevFn=document.getElementById('edReceiptFileName');
+  const scanBtn=document.getElementById('edGeminiScanBtn');
+  const scanSt=document.getElementById('edGeminiScanStatus');
+  if(e.receipt_url){
+    const isImg=/\.(jpg|jpeg|png|gif|webp)/i.test(e.receipt_url);
+    if(isImg){
+      if(prevPdfWrap)prevPdfWrap.style.display='none';
+      if(prevImg)prevImg.src=e.receipt_url;
+      if(prevWrap)prevWrap.style.display='block';
+    } else {
+      if(prevWrap)prevWrap.style.display='none';
+      if(prevFn)prevFn.textContent='Current receipt (PDF)';
+      if(prevPdfWrap)prevPdfWrap.style.display='flex';
+    }
+  } else {
+    if(prevWrap)prevWrap.style.display='none';
+    if(prevPdfWrap)prevPdfWrap.style.display='none';
+  }
+  // AI scan only works on a freshly-attached file (existing receipt is a URL, not a File object)
+  if(scanBtn)scanBtn.style.display='none';
+  if(scanSt){scanSt.style.display='none';scanSt.textContent='';}
+  document.getElementById('edSaveBtn').innerHTML=e.status==='rejected'?'<i class="fa-solid fa-rotate"></i> Resubmit':e.status==='approved'?'<i class="fa-solid fa-rotate"></i> Save & Resend for Approval':'<i class="fa-solid fa-check"></i> Save Changes';
+  document.getElementById('expDetailModal').style.display='flex';
+}
+function closeExpDetailModal(){
+  document.getElementById('expDetailModal').style.display='none';
+  _edCurrentExpId=null;_edRcptFile=null;
+}
+function toggleEdVAT(e){
+  if(e){e.preventDefault();e.stopPropagation();}
+  const cb=document.getElementById('edVAT');
+  const vis=document.getElementById('edVATvis');
+  const knob=document.getElementById('edVATknob');
+  const nowOn=!cb.checked;
+  cb.checked=nowOn;
+  vis.style.background=nowOn?'var(--grn)':'var(--bdr)';
+  knob.style.transform=nowOn?'translateX(22px)':'translateX(0)';
+}
+function edRcptChosen(input){
+  const file=input.files[0];if(!file)return;
+  _setRcptFile(file,'edit');
+}
+async function saveExpDetailEdit(){
+  const id=_edCurrentExpId;const e=myExp.find(x=>x.id===id);if(!e)return;
+  const merchant=document.getElementById('edMerchantInp').value.trim();
+  const amt=parseFloat(document.getElementById('edAmtInp').value);
+  if(!merchant||isNaN(amt)||amt===0){toast('Fill in merchant and amount','e');return;}
+  const btn=document.getElementById('edSaveBtn');
+  btn.disabled=true;
+  const origLabel=btn.innerHTML;
+  btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+  let fileUrl=e.receipt_url||null;
+  if(_edRcptFile){
+    if(_edRcptFile.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');btn.disabled=false;btn.innerHTML=origLabel;return;}
+    const ext=_edRcptFile.name.split('.').pop()||'jpg';
+    const path=`receipts/${emp.id}/${Date.now()}.${ext}`;
+    const {error:upErr}=await sb.storage.from('employee-docs').upload(path,_edRcptFile,{upsert:true});
+    if(!upErr){const {data:ud}=sb.storage.from('employee-docs').getPublicUrl(path);fileUrl=ud?.publicUrl||fileUrl;}
+    else{toast('Receipt upload failed — saving without new receipt','e');}
+  }
+  const updData={merchant,amount:amt,category:document.getElementById('edCat').value||null,notes:document.getElementById('edNotesInp').value||null,date:document.getElementById('edDate').value,status:'pending',flagged:false,flag_note:null,tags:document.getElementById('edVAT')?.checked?['VAT']:[],receipt_url:fileUrl};
+  const r=await sb.from('expenses').update(updData).eq('id',id);
+  if(r.error){toast(r.error.message,'e');btn.disabled=false;btn.innerHTML=origLabel;return;}
+  const eIdx=myExp.findIndex(x=>x.id===id);
+  if(eIdx>=0)myExp[eIdx]={...myExp[eIdx],...updData};
+  btn.disabled=false;btn.innerHTML=origLabel;
+  closeExpDetailModal();
+  renderExpenses();
+  const wasApproved=e.status==='approved';
+  toast(wasApproved?'Updated — sent back to office for re-approval':e.status==='rejected'?'Expense updated and resubmitted ✅':'Expense updated ✅','s');
 }
 
 async function toggleFlag(id){
