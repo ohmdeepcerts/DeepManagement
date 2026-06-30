@@ -625,7 +625,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <div class="nav-item" data-page="mark"><i class="fa-solid fa-pen-to-square"></i><span>Mark Attendance</span></div>
     <div class="nav-item" data-page="att-requests"><i class="fa-solid fa-inbox"></i><span>Att. Requests</span><span class="nb" id="attReqBadge" style="display:none;">0</span></div>
     <div class="sb-sec">Expenses</div>
-    <div class="nav-item" data-page="ledger"><i class="fa-solid fa-receipt"></i><span>Expense Ledger</span></div>
+    <div class="nav-item" data-page="ledger"><i class="fa-solid fa-receipt"></i><span>Expense Ledger</span><span class="nb" id="ledgerBadge" style="display:none">0</span></div>
     <div class="nav-item" data-page="approvals"><i class="fa-solid fa-check-circle"></i><span>Approvals</span><span class="nb" id="aprBadge" style="display:none">0</span></div>
     <div class="nav-item" data-page="tags"><i class="fa-solid fa-tags"></i><span>Tags &amp; Analytics</span></div>
     <div class="sb-sec">Reports</div>
@@ -937,7 +937,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <!-- APPROVALS -->
     <div class="page" id="page-approvals">
       <div class="ph"><div><h1>Approvals</h1><p>Review submitted expense batches</p></div></div>
-      <div class="tabs"><div class="tab active" onclick="setAprTab('pending',this)">Pending</div><div class="tab" onclick="setAprTab('approved',this)">Approved</div><div class="tab" onclick="setAprTab('rejected',this)">Rejected</div><div class="tab" onclick="setAprTab('all',this)">All</div></div>
+      <div class="tabs" style="display:flex;align-items:center;justify-content:space-between;"><div style="display:flex;"><div class="tab active" onclick="setAprTab('pending',this)">Pending</div><div class="tab" onclick="setAprTab('approved',this)">Approved</div><div class="tab" onclick="setAprTab('rejected',this)">Rejected</div><div class="tab" onclick="setAprTab('all',this)">All</div></div><button class="btn btn-d btn-sm" onclick="clearOldApprovals()"><i class="fa-solid fa-trash"></i>Clear All Old</button></div>
       <div class="approvals-wrap" id="aprBody"><div class="es"><i class="fa-solid fa-check-circle"></i><h3>No submissions</h3></div></div>
     </div>
 
@@ -2666,6 +2666,8 @@ function handleSearch(q){if(q.trim().length>1){navigate('search');setTimeout(()=
 function updateBadges(){
   const pend=batches.filter(b=>b.status==='pending').length;
   const ab=document.getElementById('aprBadge');if(ab){ab.textContent=pend;ab.style.display=pend>0?'':'none';}
+  const pendingExpenses=expenses.filter(e=>e.status==='pending').length;
+  const lb=document.getElementById('ledgerBadge');if(lb){lb.textContent=pendingExpenses;lb.style.display=pendingExpenses>0?'':'none';}
   const pendReqs=(attRequests||[]).filter(r=>r.status==='pending').length;
   const arb=document.getElementById('attReqBadge');if(arb){arb.textContent=pendReqs;arb.style.display=pendReqs>0?'':'none';}
   const unread=messages.filter(m=>!m.read&&m.sender!=='office').length;
@@ -3750,7 +3752,7 @@ function renderLedger(){
 function _doRenderLedger(){
   // Staff pills
   const sp=document.getElementById('staffPills');
-  if(sp){sp.innerHTML='';if(!ledgerStaff&&employees.length>0)ledgerStaff=employees[0].id;employees.forEach(e=>{const isEx=e.status==='ex';const pill=document.createElement('div');pill.className=`pill${e.id===ledgerStaff?' on':''}${isEx?' ex':''}`;pill.textContent=e.name;pill.onclick=()=>{ledgerStaff=e.id;renderLedger();};sp.appendChild(pill);});}
+  if(sp){sp.innerHTML='';if(!ledgerStaff&&employees.length>0)ledgerStaff=employees[0].id;employees.forEach(e=>{const isEx=e.status==='ex';const pendCount=expenses.filter(x=>x.employee_id===e.id&&x.status==='pending').length;const pill=document.createElement('div');pill.className=`pill${e.id===ledgerStaff?' on':''}${isEx?' ex':''}`;pill.style.cssText+='display:inline-flex;align-items:center;gap:6px;';pill.innerHTML=escapeHtml(e.name)+(pendCount>0?`<span style="background:#dc2626;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;line-height:1.4;">${pendCount}</span>`:'');pill.onclick=()=>{ledgerStaff=e.id;renderLedger();};sp.appendChild(pill);});}
   // Month pills
   const mp=document.getElementById('monthPills');
   if(mp){mp.innerHTML='';MONTHS.forEach((m,i)=>{const ms=String(i+1).padStart(2,'0');const pill=document.createElement('div');pill.className=`pill${ms===ledgerMonth?' on':''}`;pill.textContent=m.slice(0,3);pill.onclick=()=>{ledgerMonth=ms;renderLedger();};mp.appendChild(pill);});}
@@ -3855,6 +3857,7 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
     <td style="text-align:center;white-space:nowrap;">
       ${st==='approved'?`<span style="font-size:11px;font-weight:600;background:var(--grnl);color:var(--grn);padding:3px 10px;border-radius:20px;margin-right:6px;display:inline-block;">Approved</span>`:''}
       ${st==='rejected'?`<span style="font-size:11px;font-weight:600;background:var(--redl);color:var(--red);padding:3px 10px;border-radius:20px;margin-right:6px;display:inline-block;">Rejected</span>`:''}
+      ${st==='pending'?`<span style="font-size:11px;font-weight:600;background:var(--ambl);color:var(--amb);padding:3px 10px;border-radius:20px;margin-right:6px;display:inline-block;">Pending</span>`:''}
       ${st!=='approved'?`<button class="ra-btn" onclick="approveExp('${row.id}')" title="Approve" style="color:var(--grn);"><i class="fa-solid fa-check"></i></button>`:''}
       ${st!=='rejected'?`<button class="ra-btn del" onclick="rejectExp('${row.id}')" title="Reject"><i class="fa-solid fa-xmark"></i></button>`:''}
       ${!row.flagged?`<button class="ra-btn" onclick="flagExp('${row.id}')" title="Flag" style="color:var(--amb);"><i class="fa-solid fa-flag"></i></button>`:`<button class="ra-btn" onclick="unflagExp('${row.id}')" title="Unflag" style="color:var(--red);"><i class="fa-solid fa-flag"></i></button>`}
@@ -4039,7 +4042,7 @@ async function approveExp(id){
   const r=await sb.from('expenses').update({status:'approved'}).eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   const idx=expenses.findIndex(e=>e.id===id);if(idx>=0)expenses[idx].status='approved';
-  renderLedger();toast('Expense approved','s');
+  renderLedger();updateBadges();toast('Expense approved','s');
   const exp=expenses[idx];if(exp){const d=new Date(exp.date+'T00:00:00');recalcEmployeeMonth(exp.employee_id,d.getMonth(),d.getFullYear());}
 }
 async function rejectExp(id){
@@ -4047,7 +4050,7 @@ async function rejectExp(id){
   const r=await sb.from('expenses').update({status:'rejected'}).eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   const idx=expenses.findIndex(e=>e.id===id);if(idx>=0)expenses[idx].status='rejected';
-  renderLedger();toast('Expense rejected','i');
+  renderLedger();updateBadges();toast('Expense rejected','i');
   const exp=expenses[idx];if(exp){const d=new Date(exp.date+'T00:00:00');recalcEmployeeMonth(exp.employee_id,d.getMonth(),d.getFullYear());}
 }
 async function flagExp(id){
@@ -4148,6 +4151,15 @@ async function submitBatch(){
 // APPROVALS
 // ═══════════════════════════════════════════════════
 function setAprTab(f,el){aprTab=f;document.querySelectorAll('#page-approvals .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderApprovals();}
+async function clearOldApprovals(){
+  const reviewed=batches.filter(b=>b.status==='approved'||b.status==='rejected');
+  if(!reviewed.length){toast('No old approval records to clear','i');return;}
+  if(!confirm(`Clear ${reviewed.length} reviewed approval records?\n\nThis only removes these submission records from the Approvals page — the actual expenses stay untouched and remain in the Expense Ledger exactly as they are.`))return;
+  const ids=reviewed.map(b=>b.id);
+  await safeWrite(()=>sb.from('expense_batches').delete().in('id',ids),'Old approval records cleared');
+  batches=batches.filter(b=>!ids.includes(b.id));
+  updateBadges();renderApprovals();toast(`${reviewed.length} old approval records cleared`,'s');
+}
 function renderApprovals(){
   let data=aprTab==='all'?batches:batches.filter(b=>b.status===aprTab);
   data=[...data].sort((a,b)=>b.submitted_at?.localeCompare(a.submitted_at)||0);
@@ -5558,7 +5570,7 @@ async function saveEmployee(){
       if(idx2>=0)employees[idx2][rateField]=newRate;
       const histRow={employee_id:saved.id,pay_type:pt3,old_rate:0,new_rate:newRate,effective_from:fromDate,notes:'Initial rate'};
       const hr=await sb.from('salary_history').insert(histRow).select().single();
-      if(!hr.error){salaryHistory.unshift(hr.data);invalidatePayrollFromDate(emp.id,histRow.effective_from||new Date().toISOString().slice(0,10));}
+      if(!hr.error){salaryHistory.unshift(hr.data);invalidatePayrollFromDate(saved.id,histRow.effective_from||new Date().toISOString().slice(0,10));}
     }
     // Photo is included in main save above
     _resetSaveBtn();
