@@ -753,7 +753,8 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
 
     <!-- FLOATING EXPENSE EDIT WINDOW -->
     <div id="expDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:550;align-items:center;justify-content:center;padding:16px;touch-action:none;" onclick="if(event.target===this)closeExpDetailModal()">
-      <div style="background:var(--card);border-radius:20px;width:100%;max-width:400px;padding:20px 18px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div style="background:var(--card);border-radius:20px;width:100%;max-width:400px;margin-top:calc(env(safe-area-inset-top, 0px) + 64px);margin-bottom:calc(max(env(safe-area-inset-bottom),10px) + 90px);max-height:calc(100vh - env(safe-area-inset-top, 0px) - max(env(safe-area-inset-bottom),10px) - 154px);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);display:flex;flex-direction:column;">
+      <div style="padding:20px 18px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
           <div style="font-size:16px;font-weight:800;">Edit Expense</div>
           <button onclick="closeExpDetailModal()" style="background:var(--card2);border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;color:var(--txtm);font-size:14px;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-xmark"></i></button>
@@ -808,6 +809,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
           <button class="btn btn-o" onclick="closeExpDetailModal()" style="flex:1;">Cancel</button>
           <button class="btn btn-p" id="edSaveBtn" onclick="saveExpDetailEdit()" style="flex:1.5;"><i class="fa-solid fa-check"></i> Save Changes</button>
         </div>
+      </div>
       </div>
     </div>
 
