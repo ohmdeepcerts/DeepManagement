@@ -243,7 +243,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .pill-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:7px;}
 /* Month slider — single scrollable row instead of wrapping to a 2nd line that
    can end up below the fold. Current month gets auto-scrolled into view. */
-#monthPills{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;padding-bottom:2px;}
+#monthPills{flex-wrap:nowrap;overflow-x:auto;justify-content:center;justify-content:safe center;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;padding-bottom:2px;}
 #monthPills .pill{flex-shrink:0;}
 
 /* ── Tag picker ── */
@@ -1797,9 +1797,11 @@ function fmt(v){return cur()+parseFloat(v||0).toFixed(2);}
 // typed after the decimal point. Text + inputmode="decimal" gives us full
 // control over exactly what characters make it into the value.
 function sanitizeAmountInput(el){
+  const neg=el.value.trim().startsWith('-');
   let v=el.value.replace(/[^0-9.]/g,'');
   const firstDot=v.indexOf('.');
   if(firstDot!==-1)v=v.slice(0,firstDot+1)+v.slice(firstDot+1).replace(/\./g,'');
+  if(neg)v='-'+v;
   if(el.value!==v)el.value=v;
   return v;
 }
@@ -3973,8 +3975,9 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
       </td>
     </tr>`;
   }
-  // All rows use the same blue glass tint; status shown via pill instead of row color
-  const rowTint='rgba(37,99,235,0.06)';
+  // Rows with a negative amount (advances, refunds, deductions) get a red
+  // tint instead of the usual blue glass tint, so they stand out at a glance.
+  const rowTint=parseFloat(row.amount)<0?'rgba(220,38,38,0.07)':'rgba(37,99,235,0.06)';
   return`<tr style="--rowbg:${rowTint};">
     <td style="text-align:center;width:24px;"><span style="font-size:11px;color:var(--txtm);">${i+1}</span>${stBadge}</td>
     <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)"></td>
@@ -4955,8 +4958,11 @@ function printExpenseReport(){
   }).sort((a,b)=>a.date.localeCompare(b.date));
   if(!rows.length){toast('No expenses to print for '+MONTHS[month]+' '+year,'e');return;}
   const total=rows.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
-  const vatRows=rows.filter(e=>(e.tags||[]).includes('VAT'));
-  const vatTotal=vatRows.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+  // Positive entries first, deductions/advances (negative amounts) last —
+  // both groups keep date order within themselves — so it reads like
+  // "everything you're owed, then everything taken off" rather than a
+  // strict chronological mix that's harder to total up at a glance.
+  const orderedRows=[...rows.filter(e=>(parseFloat(e.amount)||0)>=0),...rows.filter(e=>(parseFloat(e.amount)||0)<0)];
   const statusLabel=st=>st==='approved'?'Approved':st==='rejected'?'Rejected':st==='pending'?'Pending':'Draft';
   let running=0;
   const html=`<div style="font-family:sans-serif;padding:0;">
@@ -4975,12 +4981,12 @@ function printExpenseReport(){
         <th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Amount</th>
         <th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Running</th>
       </tr></thead>
-      <tbody>${rows.map(e=>{
+      <tbody>${orderedRows.map(e=>{
         const amt=parseFloat(e.amount)||0;
         const neg=amt<0;
         running+=amt;
         const vatTag=(e.tags||[]).includes('VAT')?' <span style="font-size:9px;font-weight:700;color:#b45309;">(VAT)</span>':'';
-        return`<tr><td style="padding:5px 7px;border:1px solid #ccc;">${fmtDateS(e.date)}</td>`
+        return`<tr${neg?' style="background:#fef2f2;"':''}><td style="padding:5px 7px;border:1px solid #ccc;">${fmtDateS(e.date)}</td>`
           +`<td style="padding:5px 7px;border:1px solid #ccc;font-weight:600;">${escapeHtml(e.merchant||'—')}${vatTag}</td>`
           +`<td style="padding:5px 7px;border:1px solid #ccc;">${escapeHtml(e.category||'—')}</td>`
           +`<td style="padding:5px 7px;border:1px solid #ccc;">${escapeHtml(e.notes||'—')}</td>`
@@ -4988,16 +4994,10 @@ function printExpenseReport(){
           +`<td style="padding:5px 7px;border:1px solid #ccc;text-align:right;font-weight:700;color:${neg?'#dc2626':'#0d9488'};">${neg?'−':''}${C}${Math.abs(amt).toFixed(2)}</td>`
           +`<td style="padding:5px 7px;border:1px solid #ccc;text-align:right;color:${running<0?'#dc2626':'#374151'};">${running<0?'−':''}${C}${Math.abs(running).toFixed(2)}</td></tr>`;
       }).join('')}
-      ${vatTotal>0?`<tr style="background:#fffbeb;"><td colspan="6" style="padding:5px 7px;border:1px solid #ccc;">VAT-Tagged Subtotal</td><td style="padding:5px 7px;border:1px solid #ccc;text-align:right;">${C}${vatTotal.toFixed(2)}</td></tr>`:''}
       <tr style="font-weight:bold;font-size:14px;background:#f0fdf4;"><td colspan="6" style="padding:6px 7px;border:2px solid #16a34a;">TOTAL</td><td style="padding:6px 7px;border:2px solid #16a34a;text-align:right;color:#16a34a;">${total<0?'−':''}${C}${Math.abs(total).toFixed(2)}</td></tr>
       </tbody>
     </table>
     <div style="margin-top:26px;font-size:11px;color:#555;">${rows.length} entr${rows.length===1?'y':'ies'} · Generated ${fmtDate(dateKey(new Date()))}</div>
-    <div style="margin-top:24px;display:flex;gap:36px;page-break-inside:avoid;">
-      <div><div style="border-bottom:1px solid #000;width:170px;height:19px;"></div><div style="font-size:11px;color:#555;">Employee Signature</div></div>
-      <div><div style="border-bottom:1px solid #000;width:170px;height:19px;"></div><div style="font-size:11px;color:#555;">Approved By</div></div>
-      <div><div style="border-bottom:1px solid #000;width:90px;height:19px;"></div><div style="font-size:11px;color:#555;">Date</div></div>
-    </div>
   </div>`;
   const c=document.getElementById('ledgerTsSheet');c.innerHTML=html;
   const pageEl=document.getElementById('page-ledger');
