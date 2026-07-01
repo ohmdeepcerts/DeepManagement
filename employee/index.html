@@ -767,7 +767,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="fg"><label>Category</label><select id="edCat"><option value="">— Select —</option></select></div>
-          <div class="fg"><label>Amount (£) *</label><input type="number" id="edAmtInp" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
+          <div class="fg"><label>Amount (£) *</label><input type="text" id="edAmtInp" placeholder="0.00" inputmode="decimal" oninput="sanitizeAmountInput(this)"></div>
         </div>
         <div class="fg"><label>Notes</label><textarea id="edNotesInp" placeholder="Any details..."></textarea></div>
         <div style="display:flex;align-items:center;gap:11px;background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--rs);padding:11px 13px;margin-bottom:14px;">
@@ -826,7 +826,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="fg"><label>Category</label><select id="expCat"><option value="">— Select —</option></select></div>
-          <div class="fg"><label>Amount (£) *</label><input type="number" id="expAmt" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
+          <div class="fg"><label>Amount (£) *</label><input type="text" id="expAmt" placeholder="0.00" inputmode="decimal" oninput="sanitizeAmountInput(this)"></div>
         </div>
         <div class="fg"><label>Notes</label><textarea id="expNotes" placeholder="Any details..."></textarea></div>
         <div style="display:flex;align-items:center;gap:11px;background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--rs);padding:11px 13px;margin-bottom:12px;">
@@ -973,6 +973,15 @@ function isP(s){return s==='P'||s==='HD'||s==='LA'||s==='EL';}
 function dim(y,m){return new Date(y,m+1,0).getDate();}
 function C(){return cfg.currency||'£';}
 function fmt(v){return C()+parseFloat(v||0).toFixed(2);}
+// See office app for rationale — text+decimal mode with manual sanitizing
+// avoids native number-input quirks that can drop typed decimal digits.
+function sanitizeAmountInput(el){
+  let v=el.value.replace(/[^0-9.]/g,'');
+  const firstDot=v.indexOf('.');
+  if(firstDot!==-1)v=v.slice(0,firstDot+1)+v.slice(firstDot+1).replace(/\./g,'');
+  if(el.value!==v)el.value=v;
+  return v;
+}
 function ini(n){return(n||'').split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';}
 function avc(id){const i=allEmps.findIndex(e=>e.id===id);return AVCOLS[Math.abs(i)%AVCOLS.length];}
 function toast(msg,type='i',duration=3200){
@@ -1583,10 +1592,20 @@ function showPg(id){
   const pg=document.getElementById('pg-'+id);if(pg)pg.classList.add('on');
   const nb=document.getElementById('nb-'+id);if(nb)nb.classList.add('on');
   if(id==='home')renderHome();
-  else if(id==='att'){renderAtt();buildTodayMarkSection();}
-  else if(id==='exp')renderExpenses();
-  else if(id==='pay')renderPay();
+  else if(id==='att'){renderAtt();buildTodayMarkSection();scrollMonthTabIntoView('attTabs');}
+  else if(id==='exp'){renderExpenses();scrollMonthTabIntoView('expTabs');}
+  else if(id==='pay'){renderPay();scrollMonthTabIntoView('payTabs');}
   else if(id==='msg')renderMsgs();
+}
+// buildTabs() runs once at login, while these pages are still display:none —
+// scrollIntoView is a no-op on a hidden element, so that scroll never actually
+// happened. Instead, scroll the current-month tab into view right here, at the
+// moment the page (and therefore the tab strip) actually becomes visible.
+function scrollMonthTabIntoView(tabsId){
+  setTimeout(()=>{
+    const on=document.getElementById(tabsId)?.querySelector('.mtab.on');
+    if(on)on.scrollIntoView({inline:'center',block:'nearest'});
+  },50);
 }
 
 // ── HOME ──
@@ -1743,8 +1762,47 @@ function buildTabs(){
         else{payM=m;payY=y;renderPay();}};
       el.appendChild(tab);
     }
+    // Current month is always the last tab built (rightmost) — bring it into
+    // view instead of leaving the strip scrolled to the oldest month, which
+    // pushes "today" off-screen and makes it look like the app is behind.
+    setTimeout(()=>{el.querySelector('.mtab.on')?.scrollIntoView({inline:'center',block:'nearest'});},0);
   });
 }
+
+// ═══════════════════════════════════════════════════
+// DATE / MONTH ROLLOVER WATCHER — same fix as the office app.
+// If this app is left open across a month boundary (e.g. overnight),
+// attM/expM/payM and the month-tab strip were only ever set once, at
+// login — so Attendance, Expenses and Pay could each keep showing last
+// month until the employee manually logged out and back in. This checks
+// periodically, and whenever the tab regains focus, and if the real
+// month has moved on, resets attM/expM/payM together, rebuilds the tab
+// strip, and re-renders whichever page is currently open — so they can
+// never disagree about what "this month" is.
+// ═══════════════════════════════════════════════════
+let _lastKnownDateKeyEmp=dk(new Date());
+function checkDateRolloverEmp(){
+  if(!emp)return; // not logged in yet
+  const nowKey=dk(new Date());
+  if(nowKey===_lastKnownDateKeyEmp)return;
+  const prevMonthKey=_lastKnownDateKeyEmp.slice(0,7);
+  const nowMonthKey=nowKey.slice(0,7);
+  _lastKnownDateKeyEmp=nowKey;
+  if(nowMonthKey===prevMonthKey)return; // day changed but same month — nothing to reset
+  const now=new Date();
+  attM=now.getMonth();attY=now.getFullYear();
+  expM=now.getMonth();expY=now.getFullYear();
+  payM=now.getMonth();payY=now.getFullYear();
+  buildTabs();
+  const curPg=document.querySelector('.pg.on')?.id?.replace('pg-','');
+  if(curPg==='home')renderHome();
+  else if(curPg==='att'){renderAtt();scrollMonthTabIntoView('attTabs');}
+  else if(curPg==='exp'){renderExpenses();scrollMonthTabIntoView('expTabs');}
+  else if(curPg==='pay'){renderPay();scrollMonthTabIntoView('payTabs');}
+  toast('📅 New month — now showing '+MONTHS[now.getMonth()]+' '+now.getFullYear(),'i');
+}
+setInterval(checkDateRolloverEmp,60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDateRolloverEmp();});
 
 function renderAtt(){
   const m=attM,y=attY;
@@ -2370,6 +2428,11 @@ async function submitExp(){
   const r=await sb.from('expenses').insert({employee_id:emp.id,date,merchant,category:document.getElementById('expCat').value||null,amount:amt,notes:document.getElementById('expNotes').value||null,receipt_url:fileUrl,status:'pending',tags:document.getElementById('expVAT')?.checked?['VAT']:[],flagged:false}).select().single();
   if(r.error){_submittingExp=false;toast(r.error.message,'e');return;}
   myExp.unshift(r.data);
+  // Capture the category BEFORE the form is cleared below — the old code read
+  // expCat.value AFTER resetting it to '', so the merchant→category memory was
+  // never actually saved and "remember this merchant's category" never learned
+  // anything new from expenses added on this device.
+  const _submittedCat=document.getElementById('expCat').value;
   document.getElementById('expMerchant').value='';document.getElementById('expAmt').value='';document.getElementById('expNotes').value='';document.getElementById('expCat').value='';const rp=document.getElementById('rcptPreview');if(rp){rp.src='';}
   const rpw=document.getElementById('rcptPreviewWrap');if(rpw)rpw.style.display='none';
   const pdfw=document.getElementById('rcptPdfWrap');if(pdfw)pdfw.style.display='none';
@@ -2389,8 +2452,8 @@ async function submitExp(){
   _submittingExp=false;
   toast('Expense added!','s');renderExpenses();
   // Save merchant→category mapping for future auto-fill (shared across all employees)
-  if(merchant && document.getElementById('expCat').value){
-    const cat=document.getElementById('expCat').value;
+  if(merchant && _submittedCat){
+    const cat=_submittedCat;
     const key=merchant.trim().toLowerCase();
     if(!window._merchantCatMap)window._merchantCatMap={};
     window._merchantCatMap[key]=cat;
@@ -2680,6 +2743,13 @@ async function saveExpDetailEdit(){
   renderExpenses();
   const wasApproved=e.status==='approved';
   toast(wasApproved?'Updated — sent back to office for re-approval':e.status==='rejected'?'Expense updated and resubmitted ✅':'Expense updated ✅','s');
+  // Save merchant→category mapping for future auto-fill (shared across all employees)
+  if(merchant && updData.category){
+    const key=merchant.trim().toLowerCase();
+    if(!window._merchantCatMap)window._merchantCatMap={};
+    window._merchantCatMap[key]=updData.category;
+    sb.from('merchant_categories').upsert({merchant:merchant.trim(),category:updData.category},{onConflict:'merchant'});
+  }
 }
 
 async function toggleFlag(id){
