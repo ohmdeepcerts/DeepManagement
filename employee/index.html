@@ -976,9 +976,11 @@ function fmt(v){return C()+parseFloat(v||0).toFixed(2);}
 // See office app for rationale — text+decimal mode with manual sanitizing
 // avoids native number-input quirks that can drop typed decimal digits.
 function sanitizeAmountInput(el){
+  const neg=el.value.trim().startsWith('-');
   let v=el.value.replace(/[^0-9.]/g,'');
   const firstDot=v.indexOf('.');
   if(firstDot!==-1)v=v.slice(0,firstDot+1)+v.slice(firstDot+1).replace(/\./g,'');
+  if(neg)v='-'+v;
   if(el.value!==v)el.value=v;
   return v;
 }
