@@ -2444,6 +2444,13 @@ function toggleVATvis(e){
   if(knob)knob.style.transform=nowOn?'translateX(22px)':'translateX(0)';
 }
 let _submittingExp=false;
+// Mirrors the office app's payroll lock — without this, an employee could
+// keep adding/editing expenses for a month the office has already finalized
+// and locked for payroll, silently invalidating numbers already signed off.
+function isMonthLocked(month,year){
+  const pr=myPayroll.find(p=>p.month===month&&p.year===year);
+  return !!pr?.locked||pr?.status==='final';
+}
 async function submitExp(){
   if(_submittingExp)return;
   _submittingExp=true;
@@ -2454,6 +2461,8 @@ async function submitExp(){
   if(!merchant||!date||isNaN(parseFloat(document.getElementById('expAmt').value))){_submittingExp=false;toast('Please fill date, merchant and amount','e');return;}
   if(amt===0){_submittingExp=false;toast('Amount cannot be zero','e');return;}
   if(!merchant||!amt||!date){_submittingExp=false;toast('Please fill date, merchant and amount','e');return;}
+  const _expD=new Date(date+'T00:00:00');
+  if(isMonthLocked(_expD.getMonth(),_expD.getFullYear())){_submittingExp=false;toast('⛔ Payroll for this month is already locked by the office — pick a different date or contact them','e');return;}
   let fileUrl=null;
   if(_rcptFile){
     if(_rcptFile.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');_submittingExp=false;return;}
@@ -2692,6 +2701,15 @@ function openExpDetailModal(id){
   // Close the inline action bar on the row
   const bar=document.getElementById('expRowActions-'+id);if(bar)bar.style.display='none';
   document.getElementById('edEditSub').textContent=e.status==='rejected'?'Fix the details below and resubmit':e.status==='approved'?'⚠️ This was already approved — saving will send it back for office re-approval':'Update the details below';
+  const _edD=new Date(e.date+'T00:00:00');
+  const _edLocked=isMonthLocked(_edD.getMonth(),_edD.getFullYear());
+  const edSaveBtn=document.getElementById('edSaveBtn');
+  if(_edLocked){
+    document.getElementById('edEditSub').textContent='⛔ Payroll for this month is already locked by the office — contact them to make changes';
+    if(edSaveBtn)edSaveBtn.disabled=true;
+  } else if(edSaveBtn){
+    edSaveBtn.disabled=false;
+  }
   document.getElementById('edDate').value=e.date||dk(new Date());
   document.getElementById('edMerchantInp').value=e.merchant||'';
   document.getElementById('edAmtInp').value=e.amount||'';
@@ -2757,6 +2775,12 @@ async function saveExpDetailEdit(){
   const merchant=document.getElementById('edMerchantInp').value.trim();
   const amt=parseFloat(document.getElementById('edAmtInp').value);
   if(!merchant||isNaN(amt)||amt===0){toast('Fill in merchant and amount','e');return;}
+  const newDate=document.getElementById('edDate').value;
+  const _origD=new Date(e.date+'T00:00:00');
+  const _newD=new Date(newDate+'T00:00:00');
+  if(isMonthLocked(_origD.getMonth(),_origD.getFullYear())||isMonthLocked(_newD.getMonth(),_newD.getFullYear())){
+    toast('⛔ Payroll for this month is already locked by the office — this expense can\'t be edited','e');return;
+  }
   const btn=document.getElementById('edSaveBtn');
   btn.disabled=true;
   const origLabel=btn.innerHTML;
