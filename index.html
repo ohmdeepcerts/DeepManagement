@@ -561,7 +561,11 @@ tr.rsun td{background:var(--sut)!important;}
 @media(max-width:768px){.led-split{flex-direction:column!important;}.led-right{width:100%!important;border-right:none!important;border-top:1px solid var(--bdr);}}
 @media(max-width:900px){.cr4{grid-template-columns:repeat(2,1fr);}.sidebar{width:58px;min-width:58px;}.sidebar .nav-item span,.sidebar .sb-sec,.sidebar .sb-uname,.sidebar .sb-urole,.sidebar .sb-signout span,.ver{display:none;}}
 .print-only{display:none;}
-@media print{.sidebar,.topbar,.dn,.btn,.bg,.ph .btn,.no-print{display:none!important;}body{display:block;height:auto;overflow:visible;}.main{display:block;height:auto;}.content{padding:0;overflow:visible;}.page{display:block!important;}.page:not(.active){display:none!important;}.card{box-shadow:none;border:1px solid #ddd;}table{font-size:11px;}@page{margin:1.5cm;}.print-only{display:block!important;}}
+@media print{.sidebar,.topbar,.dn,.btn,.bg,.ph .btn,.no-print{display:none!important;}body{display:block;height:auto;overflow:visible;}.main{display:block;height:auto;}.content{padding:0;overflow:visible;}.page{display:block!important;}.page:not(.active){display:none!important;}.card{box-shadow:none;border:1px solid #ddd;}table{font-size:11px;}@page{margin:1.5cm;}.print-only{display:block!important;}
+/* Standalone timesheet printing (Ledger "Timesheet" button, Employee Report "Timesheet" button) — hide the live page content (staff pills, tables, action buttons) so only the generated print sheet shows, not both. */
+#page-ledger.ts-print-mode>*:not(#ledgerTsSheet){display:none!important;}
+#page-emp-report.ts-print-mode>*:not(#tsSheet){display:none!important;}
+}
 
 .skeleton{background:linear-gradient(90deg,var(--card2) 25%,var(--bdr) 50%,var(--card2) 75%);background-size:400px 100%;animation:shimmer 1.5s infinite;border-radius:var(--rs);}
 
@@ -917,6 +921,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
               <button class="btn btn-o btn-sm" onclick="toggleQE()"><i class="fa-solid fa-bolt" style="color:var(--amb);"></i>Quick</button>
               <button class="btn btn-p btn-sm" onclick="addLedRow()"><i class="fa-solid fa-plus"></i>Add Row</button>
               <button class="btn btn-s btn-sm" onclick="approveAllExp()" title="Approve all expenses this month"><i class="fa-solid fa-check-double"></i>Approve All</button>
+              <button class="btn btn-o btn-sm no-print" onclick="openExpReportSignModal()" title="Print/export this person's expenses for the month as a report"><i class="fa-solid fa-file-invoice"></i>Report</button>
               <button class="btn btn-o btn-sm" onclick="submitBatch()"><i class="fa-solid fa-paper-plane"></i>Submit</button>
             </div>
           </div>
@@ -932,6 +937,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div class="led-right" id="ledRight"></div>
       </div>
       <div id="ledTagPicker" style="display:none;" class="tp"></div>
+      <div id="ledgerTsSheet" class="print-only"></div>
     </div>
 
     <!-- APPROVALS -->
@@ -1777,6 +1783,21 @@ function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2
 function dim(y,m){return new Date(y,m+1,0).getDate();}
 function cur(){return cfg.currency||'£';}
 function fmt(v){return cur()+parseFloat(v||0).toFixed(2);}
+// Sanitizes a text-mode amount input as the user types: strips anything that
+// isn't a digit or a dot, and collapses extra dots down to the first one
+// (e.g. typing "157.8.9" keeps "157.89"... a stray 2nd dot, not the digits).
+// Used instead of <input type="number"> for money fields — native number
+// inputs are known to behave inconsistently on some mobile keyboards/locales
+// (decimal comma vs period, IME auto-formatting) and can drop the digits
+// typed after the decimal point. Text + inputmode="decimal" gives us full
+// control over exactly what characters make it into the value.
+function sanitizeAmountInput(el){
+  let v=el.value.replace(/[^0-9.]/g,'');
+  const firstDot=v.indexOf('.');
+  if(firstDot!==-1)v=v.slice(0,firstDot+1)+v.slice(firstDot+1).replace(/\./g,'');
+  if(el.value!==v)el.value=v;
+  return v;
+}
 function avcol(id){const i=employees.findIndex(e=>e.id===id);return AVCOLS[Math.abs(i)%AVCOLS.length];}
 const _deb={};
 function deb(k,fn,ms=900){clearTimeout(_deb[k]);_deb[k]=setTimeout(fn,ms);}
@@ -2480,21 +2501,71 @@ function getDataFromDate(){
   return prev.toISOString().slice(0,10); // YYYY-MM-DD
 }
 let _dataFromDate=getDataFromDate(); // e.g. "2026-05-01"
+// Tracks which "YYYY-MM" months have been fetched from Supabase, so historical
+// views (Payroll, Employee Report, Monthly, Yearly) only fetch each month once
+// and never mistake an empty-but-loaded month for "not loaded yet".
+let _loadedMonths=new Set();
+let _loadedYears=new Set();
 
 // Load data for a specific historical month on demand
 async function loadMonthData(month,year){
   const from=`${year}-${String(month+1).padStart(2,'0')}-01`;
-  const to=`${year}-${String(month+1).padStart(2,'0')}-31`;
+  // IMPORTANT: use the real last day of the month (dim()) — hardcoding "-31" breaks
+  // Feb/Apr/Jun/Sep/Nov because Postgres rejects invalid dates like 2026-02-31,
+  // which silently fails the query and leaves that month's data unloaded.
+  const to=`${year}-${String(month+1).padStart(2,'0')}-${String(dim(year,month)).padStart(2,'0')}`;
+  const monthKey=`${year}-${String(month+1).padStart(2,'0')}`;
   const [attR,expR]=await Promise.all([
     sb.from('attendance').select('*').gte('date',from).lte('date',to),
     sb.from('expenses').select('*').gte('date',from).lte('date',to),
   ]);
+  if(attR.error)console.error('loadMonthData attendance error:',attR.error);
+  if(expR.error)console.error('loadMonthData expenses error:',expR.error);
   if(!attR.error)(attR.data||[]).forEach(r=>{
+    if(!r._monthKey)r._monthKey=(r.date||'').slice(0,7)||monthKey;
     if(!attendance.find(a=>a.id===r.id))attendance.push(r);
   });
   if(!expR.error)(expR.data||[]).forEach(e=>{
+    if(!e._monthKey)e._monthKey=(e.date||'').slice(0,7)||monthKey;
     if(!expenses.find(x=>x.id===e.id))expenses.push(e);
   });
+  _loadedMonths.add(monthKey);
+}
+
+// Ensures one month's attendance/expenses are in memory before a report reads them.
+// Returns true if a network fetch actually happened (caller should re-render after awaiting).
+async function ensureMonthLoaded(month,year){
+  const monthKey=`${year}-${String(month+1).padStart(2,'0')}`;
+  const from=`${monthKey}-01`;
+  if(from>=_dataFromDate)return false; // already covered by the default load window
+  if(_loadedMonths.has(monthKey))return false;
+  await loadMonthData(month,year);
+  return true;
+}
+
+// Ensures a full calendar year is loaded (used by the Yearly report), one query instead of 12.
+async function ensureYearLoaded(year){
+  if(_loadedYears.has(year))return false;
+  const from=`${year}-01-01`;
+  const to=`${year}-12-31`;
+  if(from>=_dataFromDate){_loadedYears.add(year);return false;} // fully within default window
+  const [attR,expR]=await Promise.all([
+    sb.from('attendance').select('*').gte('date',from).lte('date',to),
+    sb.from('expenses').select('*').gte('date',from).lte('date',to),
+  ]);
+  if(attR.error)console.error('ensureYearLoaded attendance error:',attR.error);
+  if(expR.error)console.error('ensureYearLoaded expenses error:',expR.error);
+  if(!attR.error)(attR.data||[]).forEach(r=>{
+    if(!r._monthKey)r._monthKey=(r.date||'').slice(0,7);
+    if(!attendance.find(a=>a.id===r.id))attendance.push(r);
+  });
+  if(!expR.error)(expR.data||[]).forEach(e=>{
+    if(!e._monthKey)e._monthKey=(e.date||'').slice(0,7);
+    if(!expenses.find(x=>x.id===e.id))expenses.push(e);
+  });
+  for(let m=0;m<12;m++)_loadedMonths.add(`${year}-${String(m+1).padStart(2,'0')}`);
+  _loadedYears.add(year);
+  return true;
 }
 
 async function loadAllData(){
@@ -2766,6 +2837,13 @@ function renderDashboard(){
   const mRecs=attendance.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===month&&d.getFullYear()===year;});
   const scopeMRecs=isSingle?mRecs.filter(r=>r.employee_id===staffF):mRecs;
   let pm=month-1,py=year;if(pm<0){pm=11;py--;}
+  // On-demand load: fetch this month + prior month if not already in memory (older than the default window)
+  Promise.all([ensureMonthLoaded(month,year),ensureMonthLoaded(pm,py)]).then(([f1,f2])=>{
+    if((f1||f2)&&currentPage==='dashboard'){
+      const stillSameMonth=parseInt(document.getElementById('dashMonth')?.value)===month&&parseInt(document.getElementById('dashYear')?.value)===year;
+      if(stillSameMonth)renderDashboard();
+    }
+  });
   const prevMRecs=attendance.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===pm&&d.getFullYear()===py;});
   const scopePrevMRecs=isSingle?prevMRecs.filter(r=>r.employee_id===staffF):prevMRecs;
   const days=dim(year,month);
@@ -3352,6 +3430,10 @@ function buildMarkTable(){
   if(emps.length===0){body.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
   const key=dateKey(markDate);
+  // On-demand load: fetch this date's month if not already in memory (older than the default window)
+  ensureMonthLoaded(markDate.getMonth(),markDate.getFullYear()).then(fetched=>{
+    if(fetched&&currentPage==='mark'&&dateKey(markDate)===key)buildMarkTable();
+  });
   const iS=isSun(markDate),isA=isSat(markDate);
   const rowCls=iS?'rsun':isA?'rsat':'';
   body.innerHTML=emps.map(emp=>{
@@ -3750,6 +3832,11 @@ function renderLedger(){
   renderLedger._debounceTimer=setTimeout(_doRenderLedger, 80);
 }
 function _doRenderLedger(){
+  // On-demand load: fetch this month's data if not already in memory (older than the default window)
+  const _ledMonthIdx=parseInt(ledgerMonth)-1,_ledYr=ledgerYear;
+  ensureMonthLoaded(_ledMonthIdx,_ledYr).then(fetched=>{
+    if(fetched&&currentPage==='ledger'&&parseInt(ledgerMonth)-1===_ledMonthIdx&&ledgerYear===_ledYr)renderLedger();
+  });
   // Staff pills
   const sp=document.getElementById('staffPills');
   if(sp){sp.innerHTML='';if(!ledgerStaff&&employees.length>0)ledgerStaff=employees[0].id;employees.forEach(e=>{const isEx=e.status==='ex';const pendCount=expenses.filter(x=>x.employee_id===e.id&&x.status==='pending').length;const pill=document.createElement('div');pill.className=`pill${e.id===ledgerStaff?' on':''}${isEx?' ex':''}`;pill.style.cssText+='display:inline-flex;align-items:center;gap:6px;';pill.innerHTML=escapeHtml(e.name)+(pendCount>0?`<span style="background:#dc2626;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;line-height:1.4;">${pendCount}</span>`:'');pill.onclick=()=>{ledgerStaff=e.id;renderLedger();};sp.appendChild(pill);});}
@@ -3833,7 +3920,7 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
       </div></td>
       <td><input type="text" class="shi cat-inp" list="ledCatList" placeholder="Category" value="" style="" ${isEx?'disabled':''} oninput="updateExp('${row.id}','category',this.value);this.style.cssText=getCatStyle(this.value)" onfocus="this.closest('tr').style.opacity='1'"></td>
       <td><div class="tc" id="tc-${row.id}">${tagsHtml}</div></td>
-      <td><input type="number" class="shi amt-i" placeholder="0.00" step="0.01" min="0" value="" ${isEx?'disabled':''} oninput="updateExp('${row.id}','amount',parseFloat(this.value)||0);this.closest('tr').style.opacity='1'" onblur="renderLedger()" onfocus="this.closest('tr').style.opacity='1'"></td>
+      <td><input type="text" inputmode="decimal" class="shi amt-i" placeholder="0.00" value="" ${isEx?'disabled':''} oninput="sanitizeAmountInput(this);updateExp('${row.id}','amount',parseFloat(this.value)||0);this.closest('tr').style.opacity='1'" onblur="renderLedger()" onfocus="this.closest('tr').style.opacity='1'"></td>
       <td class="run-t" style="color:transparent;">—</td>
       <td style="text-align:center;white-space:nowrap;">
         <button class="ra-btn del" onclick="deleteLedRow('${row.id}')" title="Delete" style="opacity:0.5;"><i class="fa-solid fa-trash-alt"></i></button>
@@ -3852,7 +3939,7 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
     </td>
     <td><input type="text" class="shi cat-inp" list="ledCatList" placeholder="Category" value="${(row.category||'').replace(/"/g,'&quot;')}" style="${catStyle}" ${isEx?'disabled':''} oninput="updateExp('${row.id}','category',this.value);this.style.cssText=getCatStyle(this.value)"></td>
     <td><div class="tc" id="tc-${row.id}">${tagsHtml}</div></td>
-    <td><input type="number" class="shi amt-i" placeholder="0.00" step="0.01" min="0" value="${row.amount===0?'':row.amount}" ${isEx?'disabled':''} oninput="updateExp('${row.id}','amount',parseFloat(this.value)||0)" onblur="renderLedger()"></td>
+    <td><input type="text" inputmode="decimal" class="shi amt-i" placeholder="0.00" value="${row.amount===0?'':row.amount}" ${isEx?'disabled':''} oninput="sanitizeAmountInput(this);updateExp('${row.id}','amount',parseFloat(this.value)||0)" onblur="renderLedger()"></td>
     <td class="run-t">${C}${running.toFixed(2)}</td>
     <td style="text-align:center;white-space:nowrap;">
       ${st==='approved'?`<span style="font-size:11px;font-weight:600;background:var(--grnl);color:var(--grn);padding:3px 10px;border-radius:20px;margin-right:6px;display:inline-block;">Approved</span>`:''}
@@ -3931,7 +4018,13 @@ async function updateExp(id,field,val){
     if(isPayrollLocked(_expLockD.getMonth(),_expLockD.getFullYear())){toast('⛔ This expense is in a locked payroll month — unlock first to edit amount/date','e');return;}
   }
   exp[field]=val;
-  deb('exp-save-'+id,async()=>{
+  // IMPORTANT: key by id+field, not just id. The old key ('exp-save-'+id) meant that
+  // updating two different fields on the same row within 900ms (e.g. picking a merchant
+  // suggestion, which writes merchant then category back-to-back) cancelled the first
+  // field's pending save — only the last field actually reached Supabase. That's why a
+  // picked "Selco" suggestion could revert to the typed "SL" after a refresh: the merchant
+  // save got cancelled by the category save that followed it.
+  deb('exp-save-'+id+'-'+field,async()=>{
     await safeWrite(()=>sb.from('expenses').update({[field]:val}).eq('id',id),null,true);
     // Recalc payroll on any meaningful field change
     if(field==='amount'||field==='date'||field==='category'){
@@ -4271,6 +4364,13 @@ function shiftMonthly(n){
 function renderMonthly(){
   const month=parseInt(document.getElementById('mvMonth').value);
   const year=parseInt(document.getElementById('mvYear').value);
+  // On-demand load: fetch this month's data if not already in memory (older than the default window)
+  ensureMonthLoaded(month,year).then(fetched=>{
+    if(fetched&&currentPage==='monthly'){
+      const stillSameMonth=parseInt(document.getElementById('mvMonth')?.value)===month&&parseInt(document.getElementById('mvYear')?.value)===year;
+      if(stillSameMonth)renderMonthly();
+    }
+  });
   const mvDm=document.getElementById('mvDisp_m'),mvDy=document.getElementById('mvDisp_y');
   if(mvDm)mvDm.textContent=MONTHS[month];if(mvDy)mvDy.textContent=year;
   const days=dim(year,month);const emps=employees.filter(e=>e.status==='Active');
@@ -4329,6 +4429,10 @@ function updateDailyNav(){
 }
 function buildDailyTable(){
   const key=dateKey(dailyDate);const emps=employees.filter(e=>e.status==='Active');
+  // On-demand load: fetch this day's month if not already in memory (older than the default window)
+  ensureMonthLoaded(dailyDate.getMonth(),dailyDate.getFullYear()).then(fetched=>{
+    if(fetched&&currentPage==='daily'&&dateKey(dailyDate)===key)buildDailyTable();
+  });
   const recs=emps.map(emp=>{const r=attendance.find(a=>a.employee_id===emp.id&&a.date===key)||{status:null};return{...r,emp};});
   const pres=recs.filter(r=>isP(r.status)).length,abs=recs.filter(r=>r.status==='A').length,leave=recs.filter(r=>['L','S','H','UL'].includes(r.status)).length,hrs=recs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
   document.getElementById('dvStats').innerHTML=`<div class="sc g"><div class="sc-lbl">Present</div><div class="sc-val">${pres}</div><i class="fa-solid fa-user-check sc-ico"></i></div><div class="sc r"><div class="sc-lbl">Absent</div><div class="sc-val">${abs}</div><i class="fa-solid fa-user-xmark sc-ico"></i></div><div class="sc a"><div class="sc-lbl">On Leave</div><div class="sc-val">${leave}</div><i class="fa-solid fa-umbrella-beach sc-ico"></i></div><div class="sc b"><div class="sc-lbl">Total Hours</div><div class="sc-val">${hrs.toFixed(1)}</div><i class="fa-solid fa-clock sc-ico"></i></div>`;
@@ -4362,6 +4466,8 @@ async function renderEmpReport(){
   const month=parseInt(document.getElementById('erMonth')?.value);
   const year=parseInt(document.getElementById('erYear')?.value);
   if(!empId)return;_lastEmpId=empId;
+  // On-demand load: fetch this month's data if not already in memory (older than the default window)
+  await ensureMonthLoaded(month,year);
   const emp=employeeMap?.get(empId);if(!emp)return;
   const days=dim(year,month);
   const att=attendance.filter(r=>r.employee_id===empId);
@@ -4738,10 +4844,130 @@ function printTimesheet(){
       +'</tfoot></table></div>';
   }
   const c=document.getElementById('tsSheet');c.innerHTML=sheets+expSection;
+  const pageEl=document.getElementById('page-emp-report');
+  if(pageEl)pageEl.classList.add('ts-print-mode');
   const _origTitle=document.title;
   document.title='EMPLOYEE — '+emp.name.toUpperCase();
   window.print();
-  setTimeout(()=>{c.innerHTML='';document.title=_origTitle;},1500);
+  setTimeout(()=>{c.innerHTML='';document.title=_origTitle;if(pageEl)pageEl.classList.remove('ts-print-mode');},1500);
+}
+
+// ═══════════════════════════════════════════════════
+// EXPENSE REPORT — standalone printable expense sheet for one
+// person, one month (independent of the attendance timesheet above).
+// Lives on the Ledger page so it always reflects whichever staff
+// member + month/year is currently selected there.
+// ═══════════════════════════════════════════════════
+// Small prompt so the report can be generated with the sign-off already filled
+// in digitally, instead of always leaving blank lines for a pen signature.
+function openExpReportSignModal(){
+  if(!ledgerStaff){toast('Select a staff member first','e');return;}
+  const emp=employeeMap?.get(ledgerStaff);if(!emp){toast('Employee not found','e');return;}
+  const todayStr=dateKey(new Date());
+  const overlay=document.createElement('div');
+  overlay.className='confirm-overlay';
+  overlay.innerHTML=`<div class="confirm-box" style="max-width:380px;text-align:left;">
+    <div class="confirm-title" style="text-align:center;">Sign Expense Report</div>
+    <div class="confirm-msg" style="text-align:center;margin-bottom:16px;">Fill these in to print them on the signature lines now — or leave blank to sign by hand later.</div>
+    <label style="font-size:12px;font-weight:600;color:var(--txtm);display:block;margin-bottom:4px;">Employee Signature</label>
+    <input id="ersEmpSig" class="confirm-input" placeholder="${escapeHtml(emp.name)}">
+    <label style="font-size:12px;font-weight:600;color:var(--txtm);display:block;margin-bottom:4px;">Approved By</label>
+    <input id="ersApprovedBy" class="confirm-input" placeholder="e.g. office manager name">
+    <label style="font-size:12px;font-weight:600;color:var(--txtm);display:block;margin-bottom:4px;">Date</label>
+    <input id="ersDate" type="date" class="confirm-input" value="${todayStr}">
+    <div class="confirm-btns">
+      <button id="ersSkip" class="btn btn-o" style="flex:1;">Leave Blank</button>
+      <button id="ersGo" class="btn btn-p" style="flex:1;">Generate Report</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.querySelector('#ersSkip').onclick=()=>{overlay.remove();printExpenseReport(null);};
+  overlay.querySelector('#ersGo').onclick=()=>{
+    const signData={
+      employeeSig:overlay.querySelector('#ersEmpSig').value.trim(),
+      approvedBy:overlay.querySelector('#ersApprovedBy').value.trim(),
+      date:overlay.querySelector('#ersDate').value||todayStr
+    };
+    overlay.remove();
+    printExpenseReport(signData);
+  };
+  setTimeout(()=>overlay.querySelector('#ersEmpSig')?.focus(),100);
+}
+function printExpenseReport(signData){
+  if(!ledgerStaff){toast('Select a staff member first','e');return;}
+  const emp=employeeMap?.get(ledgerStaff);if(!emp){toast('Employee not found','e');return;}
+  const month=parseInt(ledgerMonth)-1,year=ledgerYear;
+  const co=cfg.company||'DAM Pro';
+  const C=cur();
+  // Same "real row" filter used by the ledger table/footer — blank draft rows are excluded
+  const isBlank=r=>!r.merchant&&!r.description&&(!r.amount||parseFloat(r.amount)===0)&&!r.category;
+  const rows=expenses.filter(e=>{
+    const d=new Date(e.date+'T00:00:00');
+    return e.employee_id===ledgerStaff&&d.getFullYear()===year&&String(d.getMonth()+1).padStart(2,'0')===ledgerMonth&&!isBlank(e);
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!rows.length){toast('No expenses to print for '+MONTHS[month]+' '+year,'e');return;}
+  const total=rows.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+  const vatRows=rows.filter(e=>(e.tags||[]).includes('VAT'));
+  const vatTotal=vatRows.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+  const statusLabel=st=>st==='approved'?'Approved':st==='rejected'?'Rejected':st==='pending'?'Pending':'Draft';
+  // Renders a signature line — filled in with the typed value (cursive-style for
+  // names, plain for the date) if the sign-off modal was used, otherwise a blank
+  // line for a pen signature later.
+  const sigBox=(label,value,width,isDate)=>{
+    const inner=value
+      ?`<div style="border-bottom:1px solid #000;width:${width}px;height:22px;padding-left:2px;font-size:${isDate?13:16}px;font-family:${isDate?"inherit":"'Brush Script MT','Segoe Script',cursive"};color:#1e3a8a;">${escapeHtml(value)}</div>`
+      :`<div style="border-bottom:1px solid #000;width:${width}px;height:22px;"></div>`;
+    return`<div>${inner}<div style="font-size:11px;color:#555;margin-top:2px;">${label}</div></div>`;
+  };
+  let running=0;
+  const html=`<div style="font-family:sans-serif;padding:0;">
+    <div style="text-align:center;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:8px;">
+      <strong style="font-size:15px;">${escapeHtml(co)}</strong><br>
+      <span style="font-size:13px;">Expense Report — ${escapeHtml(emp.name)}${emp.role?' · '+escapeHtml(emp.role):''}</span><br>
+      <span style="font-size:11px;">${MONTHS[month]} ${year}</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="background:#f1f5f9;">
+        <th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Date</th>
+        <th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Merchant</th>
+        <th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Category</th>
+        <th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Notes</th>
+        <th style="padding:5px 7px;border:1px solid #ccc;text-align:center;">Status</th>
+        <th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Amount</th>
+        <th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Running</th>
+      </tr></thead>
+      <tbody>${rows.map(e=>{
+        const amt=parseFloat(e.amount)||0;
+        const neg=amt<0;
+        running+=amt;
+        const vatTag=(e.tags||[]).includes('VAT')?' <span style="font-size:9px;font-weight:700;color:#b45309;">(VAT)</span>':'';
+        return`<tr><td style="padding:5px 7px;border:1px solid #ccc;">${fmtDateS(e.date)}</td>`
+          +`<td style="padding:5px 7px;border:1px solid #ccc;font-weight:600;">${escapeHtml(e.merchant||'—')}${vatTag}</td>`
+          +`<td style="padding:5px 7px;border:1px solid #ccc;">${escapeHtml(e.category||'—')}</td>`
+          +`<td style="padding:5px 7px;border:1px solid #ccc;">${escapeHtml(e.notes||'—')}</td>`
+          +`<td style="padding:5px 7px;border:1px solid #ccc;text-align:center;">${statusLabel(e.status)}</td>`
+          +`<td style="padding:5px 7px;border:1px solid #ccc;text-align:right;font-weight:700;color:${neg?'#dc2626':'#0d9488'};">${neg?'−':''}${C}${Math.abs(amt).toFixed(2)}</td>`
+          +`<td style="padding:5px 7px;border:1px solid #ccc;text-align:right;color:${running<0?'#dc2626':'#374151'};">${running<0?'−':''}${C}${Math.abs(running).toFixed(2)}</td></tr>`;
+      }).join('')}
+      ${vatTotal>0?`<tr style="background:#fffbeb;"><td colspan="6" style="padding:5px 7px;border:1px solid #ccc;">VAT-Tagged Subtotal</td><td style="padding:5px 7px;border:1px solid #ccc;text-align:right;">${C}${vatTotal.toFixed(2)}</td></tr>`:''}
+      <tr style="font-weight:bold;font-size:14px;background:#f0fdf4;"><td colspan="6" style="padding:6px 7px;border:2px solid #16a34a;">TOTAL</td><td style="padding:6px 7px;border:2px solid #16a34a;text-align:right;color:#16a34a;">${total<0?'−':''}${C}${Math.abs(total).toFixed(2)}</td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:26px;font-size:11px;color:#555;">${rows.length} entr${rows.length===1?'y':'ies'} · Generated ${fmtDate(dateKey(new Date()))}</div>
+    <div style="margin-top:24px;display:flex;gap:36px;page-break-inside:avoid;">
+      ${sigBox('Employee Signature',signData?.employeeSig,170)}
+      ${sigBox('Approved By',signData?.approvedBy,170)}
+      ${sigBox('Date',signData?.date?fmtDateS(signData.date):'',90,true)}
+    </div>
+  </div>`;
+  const c=document.getElementById('ledgerTsSheet');c.innerHTML=html;
+  const pageEl=document.getElementById('page-ledger');
+  if(pageEl)pageEl.classList.add('ts-print-mode');
+  const _origTitle=document.title;
+  document.title=`Expenses — ${emp.name} — ${MONTHS[month]} ${year}`;
+  window.print();
+  setTimeout(()=>{c.innerHTML='';document.title=_origTitle;if(pageEl)pageEl.classList.remove('ts-print-mode');},1500);
 }
 
 // ═══════════════════════════════════════════════════
@@ -4749,6 +4975,13 @@ function printTimesheet(){
 // ═══════════════════════════════════════════════════
 function renderYearly(){
   const year=parseInt(document.getElementById('yrSel').value);
+  // On-demand load: fetch this whole year's data if not already in memory (older than the default window)
+  ensureYearLoaded(year).then(fetched=>{
+    if(fetched&&currentPage==='yearly'){
+      const stillSameYear=parseInt(document.getElementById('yrSel')?.value)===year;
+      if(stillSameYear)renderYearly();
+    }
+  });
   const d=document.getElementById('yrDisp');if(d)d.textContent=year;
   const emps=employees.filter(e=>e.status==='Active');
   const att=attendance.filter(r=>new Date(r.date+'T00:00:00').getFullYear()===year);
@@ -4828,11 +5061,11 @@ function renderPayroll(){
   (async()=>{
     const _m=parseInt(document.getElementById('prMonth')?.value??new Date().getMonth());
     const _y=parseInt(document.getElementById('prYear')?.value??new Date().getFullYear());
-    const _from=`${_y}-${String(_m+1).padStart(2,'0')}-01`;
-    if(_from<_dataFromDate){
-      // Historical month — load on demand if not already fetched
-      const alreadyLoaded=attendance.some(a=>a._monthKey===_from.slice(0,7));
-      if(!alreadyLoaded)await loadMonthData(_m,_y);
+    const fetched=await ensureMonthLoaded(_m,_y);
+    if(fetched&&currentPage==='payroll'){
+      // Data arrived after the initial render below ran on stale/empty data — re-render now
+      const stillSameMonth=parseInt(document.getElementById('prMonth')?.value)===_m&&parseInt(document.getElementById('prYear')?.value)===_y;
+      if(stillSameMonth)renderPayroll();
     }
   })();
   // Load payment statuses for this month
