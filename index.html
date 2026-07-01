@@ -28,6 +28,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">
 </script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{
   --sb:#0f172a;--sbh:#1e293b;--sbb:#1e293b;--sbt:#94a3b8;
@@ -240,6 +241,10 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .led-split{display:flex;flex:1;min-height:0;overflow:hidden;}
 .yr-ctrl{display:flex;align-items:center;justify-content:center;gap:14px;font-weight:800;font-size:1.3rem;margin-bottom:14px;}
 .pill-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:7px;}
+/* Month slider — single scrollable row instead of wrapping to a 2nd line that
+   can end up below the fold. Current month gets auto-scrolled into view. */
+#monthPills{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;padding-bottom:2px;}
+#monthPills .pill{flex-shrink:0;}
 
 /* ── Tag picker ── */
 .tp{position:fixed;background:var(--card);border:1px solid var(--bdr);border-radius:var(--rl);box-shadow:0 20px 40px rgba(0,0,0,0.15);padding:12px;z-index:9999;min-width:190px;}
@@ -921,7 +926,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
               <button class="btn btn-o btn-sm" onclick="toggleQE()"><i class="fa-solid fa-bolt" style="color:var(--amb);"></i>Quick</button>
               <button class="btn btn-p btn-sm" onclick="addLedRow()"><i class="fa-solid fa-plus"></i>Add Row</button>
               <button class="btn btn-s btn-sm" onclick="approveAllExp()" title="Approve all expenses this month"><i class="fa-solid fa-check-double"></i>Approve All</button>
-              <button class="btn btn-o btn-sm no-print" onclick="openExpReportSignModal()" title="Print/export this person's expenses for the month as a report"><i class="fa-solid fa-file-invoice"></i>Report</button>
+              <button class="btn btn-o btn-sm no-print" onclick="printExpenseReport()" title="Print/export this person's expenses for the month as a report"><i class="fa-solid fa-file-invoice"></i>Report</button>
               <button class="btn btn-o btn-sm" onclick="submitBatch()"><i class="fa-solid fa-paper-plane"></i>Submit</button>
             </div>
           </div>
@@ -2792,6 +2797,43 @@ function populateEmpSel(id){
   s.onchange=()=>{_lastEmpId=s.value;renderEmpReport();};
 }
 // ═══════════════════════════════════════════════════
+// DATE / MONTH ROLLOVER WATCHER
+// A long-lived open tab (left running overnight/across a month boundary)
+// never notices the real-world date changed — markDate, dailyDate, the
+// Ledger's selected month, and every "current month" dropdown (Dashboard,
+// Employee Report, Payroll, Monthly View) were only ever computed once,
+// at page load. That's why attendance could look "up to date" (it reads
+// today's date fresh each time) while expenses/other month-scoped views
+// kept showing last month, until something else happened to force a full
+// re-init. This checks periodically — and whenever the tab regains focus —
+// and if the real month has actually moved on, resets every current-month
+// default together and re-renders whatever page is open, so attendance
+// and expenses can never disagree about what "this month" means.
+// ═══════════════════════════════════════════════════
+let _lastKnownDateKey=dateKey(new Date());
+function checkDateRollover(){
+  const nowKey=dateKey(new Date());
+  if(nowKey===_lastKnownDateKey)return;
+  const prevMonthKey=_lastKnownDateKey.slice(0,7);
+  const nowMonthKey=nowKey.slice(0,7);
+  _lastKnownDateKey=nowKey;
+  if(nowMonthKey===prevMonthKey)return; // day changed but still the same month — nothing to reset
+  const now=new Date();
+  markDate=new Date();
+  dailyDate=new Date();
+  ledgerMonth=String(now.getMonth()+1).padStart(2,'0');
+  ledgerYear=now.getFullYear();
+  // Clear the "already applied the auto-default" lock so Payroll recomputes for the new month
+  const prMonthEl=document.getElementById('prMonth');if(prMonthEl)prMonthEl._set=false;
+  // Repopulate every Month/Year dropdown (Dashboard, Employee Report, Payroll, Monthly View) to the new "now"
+  initSelectors();
+  // Re-render whatever page is currently open so it reflects the new month immediately
+  navigate(currentPage||'dashboard');
+  toast(`📅 New month — now showing ${MONTHS[now.getMonth()]} ${now.getFullYear()}`,'i');
+}
+setInterval(checkDateRollover,60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDateRollover();});
+// ═══════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════
 function shiftDash(n){
@@ -3842,7 +3884,11 @@ function _doRenderLedger(){
   if(sp){sp.innerHTML='';if(!ledgerStaff&&employees.length>0)ledgerStaff=employees[0].id;employees.forEach(e=>{const isEx=e.status==='ex';const pendCount=expenses.filter(x=>x.employee_id===e.id&&x.status==='pending').length;const pill=document.createElement('div');pill.className=`pill${e.id===ledgerStaff?' on':''}${isEx?' ex':''}`;pill.style.cssText+='display:inline-flex;align-items:center;gap:6px;';pill.innerHTML=escapeHtml(e.name)+(pendCount>0?`<span style="background:#dc2626;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;line-height:1.4;">${pendCount}</span>`:'');pill.onclick=()=>{ledgerStaff=e.id;renderLedger();};sp.appendChild(pill);});}
   // Month pills
   const mp=document.getElementById('monthPills');
-  if(mp){mp.innerHTML='';MONTHS.forEach((m,i)=>{const ms=String(i+1).padStart(2,'0');const pill=document.createElement('div');pill.className=`pill${ms===ledgerMonth?' on':''}`;pill.textContent=m.slice(0,3);pill.onclick=()=>{ledgerMonth=ms;renderLedger();};mp.appendChild(pill);});}
+  if(mp){mp.innerHTML='';MONTHS.forEach((m,i)=>{const ms=String(i+1).padStart(2,'0');const pill=document.createElement('div');pill.className=`pill${ms===ledgerMonth?' on':''}`;pill.textContent=m.slice(0,3);pill.onclick=()=>{ledgerMonth=ms;renderLedger();};mp.appendChild(pill);});
+    // Bring the selected month into view — centered — instead of leaving the
+    // user to scroll/hunt for it (e.g. July sitting off-screen after June).
+    setTimeout(()=>{mp.querySelector('.pill.on')?.scrollIntoView({inline:'center',block:'nearest'});},0);
+  }
   document.getElementById('ledgerYrDisp').textContent=ledgerYear;
   if(!ledgerStaff)return;
   const emp=employeeMap?.get(ledgerStaff);if(!emp)return;
@@ -4323,13 +4369,20 @@ function renderTags(){
     ${vatExps.length>0?`<div style="background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--r);padding:13px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
         <div style="font-size:13px;font-weight:700;color:var(--amb);">VAT Receipts (${vatExps.length} attached)</div>
-        <button class="btn btn-a btn-sm" onclick="downloadVATReceipts()"><i class="fa-solid fa-download"></i>Download All</button>
+        <button class="btn btn-a btn-sm" onclick="downloadVATReceipts(this)"><i class="fa-solid fa-download"></i>Download All</button>
       </div>
       <div style="font-size:12px;color:var(--txt2);">These expenses have VAT tags and file attachments. Download for your accountant.</div>
     </div>`:'<p style="font-size:12px;color:var(--txtm);">No VAT receipts with attachments found for this period.</p>'}`;
 }
 
-function downloadVATReceipts(){
+// Builds one .zip of every VAT receipt for the selected month/staff and
+// downloads it as a single file. The old version opened a new browser tab
+// per receipt (one every 400ms) — fine for a handful, but at ~300 receipts
+// that's 300 tabs fighting for memory, which is exactly what was hanging
+// the browser. This fetches receipts in small parallel batches, packs them
+// into a zip in memory, and triggers exactly one download at the end. It
+// scales the same way whether there are 20 receipts or 2,000.
+async function downloadVATReceipts(btn){
   const staffF=document.getElementById('tagsStaff')?.value||'All';
   const month=parseInt(document.getElementById('tagsMonth')?.value??new Date().getMonth());
   const year=parseInt(document.getElementById('tagsYear')?.value??new Date().getFullYear());
@@ -4338,15 +4391,45 @@ function downloadVATReceipts(){
     return r.tags?.includes('VAT')&&r.receipt_url&&d.getMonth()===month&&d.getFullYear()===year&&(staffF==='All'||r.employee_id===staffF);
   });
   if(!vatExps.length){toast('No VAT receipts with attachments found','e');return;}
-  toast(`Opening ${vatExps.length} receipt${vatExps.length>1?'s':''}...`,'i');
-  vatExps.forEach((e,i)=>{
-    setTimeout(()=>{
-      const a=document.createElement('a');
-      a.href=e.receipt_url;a.target='_blank';
-      a.download=`VAT_${e.date}_${(e.merchant||'receipt').replace(/[^a-z0-9]/gi,'_')}`;
-      a.click();
-    },i*400);
-  });
+  if(typeof JSZip==='undefined'){toast('Zip library failed to load — check your connection and retry','e');return;}
+  if(vatExps.length>500&&!confirm(`That's ${vatExps.length} receipts — this could take a couple of minutes to fetch and zip. Continue?`))return;
+  const origLabel=btn?btn.innerHTML:null;
+  if(btn){btn.disabled=true;btn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i>0 / ${vatExps.length}`;}
+  const zip=new JSZip();
+  const usedNames=new Set();
+  let done=0,failed=0;
+  const CONCURRENCY=6; // fetch a handful in parallel — fast, without hammering Supabase storage or the browser
+  let idx=0;
+  async function worker(){
+    while(idx<vatExps.length){
+      const e=vatExps[idx++];
+      try{
+        const res=await fetch(e.receipt_url);
+        if(!res.ok)throw new Error('fetch failed');
+        const blob=await res.blob();
+        const ext=(e.receipt_url.split('.').pop()||'jpg').split('?')[0].slice(0,4);
+        let base=`VAT_${e.date}_${(e.merchant||'receipt').replace(/[^a-z0-9]/gi,'_')}`;
+        let name=`${base}.${ext}`,n=2;
+        while(usedNames.has(name)){name=`${base}_${n++}.${ext}`;}
+        usedNames.add(name);
+        zip.file(name,blob);
+      }catch(err){failed++;}
+      done++;
+      if(btn)btn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i>${done} / ${vatExps.length}`;
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(CONCURRENCY,vatExps.length)},worker));
+  if(btn){btn.disabled=false;btn.innerHTML=origLabel;}
+  if(done-failed===0){toast('Could not download any receipts — check your connection and retry','e');return;}
+  toast('Zipping '+(done-failed)+' receipt'+(done-failed>1?'s':'')+'…','i');
+  const content=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+  const url=URL.createObjectURL(content);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`VAT_Receipts_${(staffF==='All'?'AllStaff':(employeeMap?.get(staffF)?.name||'Staff')).replace(/[^a-z0-9]/gi,'_')}_${MONTHS[month]}_${year}.zip`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  toast(failed>0?`Downloaded — ${failed} receipt${failed>1?'s':''} couldn't be fetched`:'Downloaded!','s');
 }
 
 // ═══════════════════════════════════════════════════
@@ -4858,43 +4941,7 @@ function printTimesheet(){
 // Lives on the Ledger page so it always reflects whichever staff
 // member + month/year is currently selected there.
 // ═══════════════════════════════════════════════════
-// Small prompt so the report can be generated with the sign-off already filled
-// in digitally, instead of always leaving blank lines for a pen signature.
-function openExpReportSignModal(){
-  if(!ledgerStaff){toast('Select a staff member first','e');return;}
-  const emp=employeeMap?.get(ledgerStaff);if(!emp){toast('Employee not found','e');return;}
-  const todayStr=dateKey(new Date());
-  const overlay=document.createElement('div');
-  overlay.className='confirm-overlay';
-  overlay.innerHTML=`<div class="confirm-box" style="max-width:380px;text-align:left;">
-    <div class="confirm-title" style="text-align:center;">Sign Expense Report</div>
-    <div class="confirm-msg" style="text-align:center;margin-bottom:16px;">Fill these in to print them on the signature lines now — or leave blank to sign by hand later.</div>
-    <label style="font-size:12px;font-weight:600;color:var(--txtm);display:block;margin-bottom:4px;">Employee Signature</label>
-    <input id="ersEmpSig" class="confirm-input" placeholder="${escapeHtml(emp.name)}">
-    <label style="font-size:12px;font-weight:600;color:var(--txtm);display:block;margin-bottom:4px;">Approved By</label>
-    <input id="ersApprovedBy" class="confirm-input" placeholder="e.g. office manager name">
-    <label style="font-size:12px;font-weight:600;color:var(--txtm);display:block;margin-bottom:4px;">Date</label>
-    <input id="ersDate" type="date" class="confirm-input" value="${todayStr}">
-    <div class="confirm-btns">
-      <button id="ersSkip" class="btn btn-o" style="flex:1;">Leave Blank</button>
-      <button id="ersGo" class="btn btn-p" style="flex:1;">Generate Report</button>
-    </div>
-  </div>`;
-  document.body.appendChild(overlay);
-  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
-  overlay.querySelector('#ersSkip').onclick=()=>{overlay.remove();printExpenseReport(null);};
-  overlay.querySelector('#ersGo').onclick=()=>{
-    const signData={
-      employeeSig:overlay.querySelector('#ersEmpSig').value.trim(),
-      approvedBy:overlay.querySelector('#ersApprovedBy').value.trim(),
-      date:overlay.querySelector('#ersDate').value||todayStr
-    };
-    overlay.remove();
-    printExpenseReport(signData);
-  };
-  setTimeout(()=>overlay.querySelector('#ersEmpSig')?.focus(),100);
-}
-function printExpenseReport(signData){
+function printExpenseReport(){
   if(!ledgerStaff){toast('Select a staff member first','e');return;}
   const emp=employeeMap?.get(ledgerStaff);if(!emp){toast('Employee not found','e');return;}
   const month=parseInt(ledgerMonth)-1,year=ledgerYear;
@@ -4911,15 +4958,6 @@ function printExpenseReport(signData){
   const vatRows=rows.filter(e=>(e.tags||[]).includes('VAT'));
   const vatTotal=vatRows.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
   const statusLabel=st=>st==='approved'?'Approved':st==='rejected'?'Rejected':st==='pending'?'Pending':'Draft';
-  // Renders a signature line — filled in with the typed value (cursive-style for
-  // names, plain for the date) if the sign-off modal was used, otherwise a blank
-  // line for a pen signature later.
-  const sigBox=(label,value,width,isDate)=>{
-    const inner=value
-      ?`<div style="border-bottom:1px solid #000;width:${width}px;height:22px;padding-left:2px;font-size:${isDate?13:16}px;font-family:${isDate?"inherit":"'Brush Script MT','Segoe Script',cursive"};color:#1e3a8a;">${escapeHtml(value)}</div>`
-      :`<div style="border-bottom:1px solid #000;width:${width}px;height:22px;"></div>`;
-    return`<div>${inner}<div style="font-size:11px;color:#555;margin-top:2px;">${label}</div></div>`;
-  };
   let running=0;
   const html=`<div style="font-family:sans-serif;padding:0;">
     <div style="text-align:center;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:8px;">
@@ -4956,9 +4994,9 @@ function printExpenseReport(signData){
     </table>
     <div style="margin-top:26px;font-size:11px;color:#555;">${rows.length} entr${rows.length===1?'y':'ies'} · Generated ${fmtDate(dateKey(new Date()))}</div>
     <div style="margin-top:24px;display:flex;gap:36px;page-break-inside:avoid;">
-      ${sigBox('Employee Signature',signData?.employeeSig,170)}
-      ${sigBox('Approved By',signData?.approvedBy,170)}
-      ${sigBox('Date',signData?.date?fmtDateS(signData.date):'',90,true)}
+      <div><div style="border-bottom:1px solid #000;width:170px;height:19px;"></div><div style="font-size:11px;color:#555;">Employee Signature</div></div>
+      <div><div style="border-bottom:1px solid #000;width:170px;height:19px;"></div><div style="font-size:11px;color:#555;">Approved By</div></div>
+      <div><div style="border-bottom:1px solid #000;width:90px;height:19px;"></div><div style="font-size:11px;color:#555;">Date</div></div>
     </div>
   </div>`;
   const c=document.getElementById('ledgerTsSheet');c.innerHTML=html;
