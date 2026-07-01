@@ -2049,7 +2049,7 @@ async function scanReceiptWithAI(target){
       return;
     }
     const yr=new Date().getFullYear();
-    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"bbox\":{\"x\":0,\"y\":0,\"w\":100,\"h\":100},\"is_bent\":false}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. bbox=bounding box of the receipt as percentages of image (x=left%, y=top%, w=width%, h=height%), set null if receipt fills whole image with no background. is_bent=true if receipt is curved/bent/folded, false if flat.`;
+    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"bbox\":{\"x\":0,\"y\":0,\"w\":100,\"h\":100},\"is_bent\":false,\"rotation\":0}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. bbox=bounding box of the receipt as percentages of image (x=left%, y=top%, w=width%, h=height%), set null if receipt fills whole image with no background. is_bent=true if receipt is curved/bent/folded, false if flat. rotation=degrees you'd need to rotate the whole image CLOCKWISE so the receipt text reads upright, left-to-right — must be exactly 0, 90, 180, or 270 (0 if already upright).`;
     const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${_geminiKey}`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -2060,14 +2060,16 @@ async function scanReceiptWithAI(target){
     const raw=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
     // Parse JSON — strip any accidental markdown
     const clean=raw.replace(/```json|```/g,'').trim();
-    const result=JSON.parse(clean);
-    // ── SMART CROP ─────────────────────────────────────────────
-    // Gemini returned bbox — crop the receipt out of the background
-    // Flat receipt: 3% padding. Bent/curved receipt: 12% padding.
-    if(result.bbox){
-      if(st){st.textContent='Cropping receipt...';st.style.color='var(--acc)';}
+    let result=JSON.parse(clean);
+    // ── SMART CROP + AUTO-STRAIGHTEN ──────────────────────────────
+    // Gemini returned bbox and/or rotation — crop the receipt out of the
+    // background and rotate it upright in one pass. Flat receipt: 3%
+    // padding. Bent/curved receipt: 12% padding.
+    let workingB64=b64, workingMime=mimeType;
+    if(result.bbox||result.rotation){
+      if(st){st.textContent=result.rotation?'Straightening receipt...':'Cropping receipt...';st.style.color='var(--acc)';}
       try{
-        const croppedFile=await _cropReceiptFromBbox(b64,mimeType,result.bbox,!!result.is_bent);
+        const croppedFile=await _cropReceiptFromBbox(b64,mimeType,result.bbox,!!result.is_bent,result.rotation);
         if(croppedFile){
           if(isEd){
             _edRcptFile=croppedFile;
@@ -2082,8 +2084,30 @@ async function scanReceiptWithAI(target){
             if(imgEl){imgEl.src=URL.createObjectURL(croppedFile);}
             if(wrapEl)wrapEl.style.display='block';
           }
+          // Keep the corrected image handy in case we need a 2nd read attempt below
+          workingB64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(croppedFile);});
+          workingMime=croppedFile.type;
         }
-      }catch(cropErr){console.warn('Crop failed (using original):',cropErr);}
+      }catch(cropErr){console.warn('Crop/rotate failed (using original):',cropErr);}
+    }
+    // If the first read came back with nothing useful AND the photo needed
+    // straightening, the sideways/upside-down orientation was likely why —
+    // try once more on the now-corrected image before giving up.
+    if(!result.merchant&&!(result.amount>0)&&result.rotation&&workingB64!==b64){
+      if(st){st.textContent='First read was unclear — trying again now it\'s straightened...';st.style.color='var(--acc)';}
+      try{
+        const retryPrompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear.`;
+        const retryResp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${_geminiKey}`,{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:workingMime,data:workingB64}},{text:retryPrompt}]}]})
+        });
+        if(retryResp.ok){
+          const retryData=await retryResp.json();
+          const retryRaw=retryData?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+          const retryResult=JSON.parse(retryRaw.replace(/```json|```/g,'').trim());
+          if(retryResult.merchant||retryResult.amount>0)result=retryResult;
+        }
+      }catch(retryErr){console.warn('Retry read failed, keeping first result:',retryErr);}
     }
     // ────────────────────────────────────────────────────────────
     // Auto-fill form fields
@@ -2147,27 +2171,38 @@ async function scanReceiptWithAI(target){
     if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt';}
   }
 }
-// Smart receipt crop — called after Gemini returns bbox
+// Smart receipt crop + straighten — called after Gemini returns bbox/rotation
 // Flat (is_bent=false): 3% padding. Bent/curved (is_bent=true): 12% padding.
-// If crop area < 20% of image, skip (bbox probably unreliable).
-async function _cropReceiptFromBbox(b64,mimeType,bbox,isBent){
+// If crop area < 20% of image, skip the crop (bbox probably unreliable) but
+// still apply rotation if one was detected.
+async function _cropReceiptFromBbox(b64,mimeType,bbox,isBent,rotation){
   return new Promise((resolve,reject)=>{
     const img=new Image();
     img.onload=()=>{
       try{
         const W=img.naturalWidth, H=img.naturalHeight;
-        const pad=isBent?0.12:0.03;
-        let sx=Math.round((bbox.x/100)*W - W*pad);
-        let sy=Math.round((bbox.y/100)*H - H*pad);
-        let sw=Math.round((bbox.w/100)*W + W*pad*2);
-        let sh=Math.round((bbox.h/100)*H + H*pad*2);
-        sx=Math.max(0,sx); sy=Math.max(0,sy);
-        if(sx+sw>W)sw=W-sx; if(sy+sh>H)sh=H-sy;
-        // Skip if crop < 20% of image (Gemini bbox was probably wrong)
-        if(sw*sh<W*H*0.20){resolve(null);return;}
+        let sx=0,sy=0,sw=W,sh=H;
+        if(bbox){
+          const pad=isBent?0.12:0.03;
+          sx=Math.round((bbox.x/100)*W - W*pad);
+          sy=Math.round((bbox.y/100)*H - H*pad);
+          sw=Math.round((bbox.w/100)*W + W*pad*2);
+          sh=Math.round((bbox.h/100)*H + H*pad*2);
+          sx=Math.max(0,sx); sy=Math.max(0,sy);
+          if(sx+sw>W)sw=W-sx; if(sy+sh>H)sh=H-sy;
+          // Skip the crop (bbox probably wrong) but rotation below still applies
+          if(sw*sh<W*H*0.20){sx=0;sy=0;sw=W;sh=H;}
+        }
+        // Normalize rotation to a clean 0/90/180/270 step
+        const rot=((Math.round((rotation||0)/90)*90)%360+360)%360;
+        if(!bbox&&rot===0){resolve(null);return;} // nothing to do
+        const swap=rot===90||rot===270;
         const canvas=document.createElement('canvas');
-        canvas.width=sw; canvas.height=sh;
-        canvas.getContext('2d').drawImage(img,sx,sy,sw,sh,0,0,sw,sh);
+        canvas.width=swap?sh:sw; canvas.height=swap?sw:sh;
+        const ctx=canvas.getContext('2d');
+        ctx.translate(canvas.width/2,canvas.height/2);
+        if(rot)ctx.rotate(rot*Math.PI/180);
+        ctx.drawImage(img,sx,sy,sw,sh,-sw/2,-sh/2,sw,sh);
         const outMime=mimeType==='image/png'?'image/png':'image/jpeg';
         canvas.toBlob(blob=>{
           if(!blob){resolve(null);return;}
