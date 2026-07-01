@@ -5111,7 +5111,6 @@ function shiftPayroll(n){
   renderPayroll();
 }
 function renderPayroll(){
-  populateMY('prMonth','prYear');
   // On-demand load: fetch this month's data if not already in memory
   (async()=>{
     const _m=parseInt(document.getElementById('prMonth')?.value??new Date().getMonth());
