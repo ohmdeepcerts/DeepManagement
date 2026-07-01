@@ -1168,6 +1168,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
               </div>
             </div>
             <button class="btn btn-p" onclick="saveGeminiKey()"><i class="fa-solid fa-floppy-disk"></i>Save Key</button>
+            <button class="btn btn-o btn-sm" onclick="openGeminiColumnMissingModal()" style="margin-left:8px;" title="Run once if saving fails"><i class="fa-solid fa-database"></i>First-time setup SQL</button>
             <p style="font-size:12px;color:var(--txtm);margin-top:11px;line-height:1.6;">Employees will see <strong>"Not configured — admin must add Gemini key in Settings → AI"</strong> on the scan button until a key is saved here.<br>Don't have a key? Get a free one at <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--acc);">aistudio.google.com/apikey</a> — sign in with a Google account, click "Create API key", and paste it above.</p>
           </div>
         </div>
@@ -6301,8 +6302,42 @@ function loadSettings(){
 }
 async function saveGeminiKey(){
   const key=document.getElementById('sGeminiKey').value.trim();
-  await sbUpsertSettings({gemini_key:key});
+  setSyncStatus('saving');
+  const r=await sb.from('settings').upsert({id:1,gemini_key:key});
+  if(r.error){
+    setSyncStatus('err');
+    // PGRST204 / "Could not find the 'gemini_key' column" = the settings table
+    // doesn't have this column yet. This is a brand-new field — it won't exist
+    // in the database until the SQL below is run once in Supabase.
+    if(/column|schema cache/i.test(r.error.message)){
+      openGeminiColumnMissingModal();
+    } else {
+      toast(r.error.message,'e');
+    }
+    return;
+  }
+  cfg={...cfg,gemini_key:key};setSyncStatus('saved');
   toast(key?'Gemini key saved — employees can now use receipt scanning':'Gemini key cleared — receipt scanning disabled','s');
+}
+function openGeminiColumnMissingModal(){
+  const overlay=document.createElement('div');
+  overlay.className='confirm-overlay';
+  overlay.innerHTML=`<div class="confirm-box" style="max-width:440px;text-align:left;">
+    <div class="confirm-title" style="text-align:center;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--amb);margin-right:6px;"></i>One-time database setup needed</div>
+    <div class="confirm-msg" style="margin-bottom:12px;">The <code>settings</code> table doesn't have a <code>gemini_key</code> column yet — this is a brand-new field, so the save can't go through until it's added. This is a one-time fix.</div>
+    <div style="font-size:12px;color:var(--txtm);margin-bottom:8px;">1. Copy the SQL below<br>2. Open your Supabase project → SQL Editor<br>3. Paste and click Run<br>4. Come back here and hit Save Key again</div>
+    <pre style="background:var(--card2);border:1px solid var(--bdr);border-radius:var(--rs);padding:10px 12px;font-size:12px;overflow-x:auto;margin-bottom:12px;">ALTER TABLE settings ADD COLUMN IF NOT EXISTS gemini_key text;</pre>
+    <div class="confirm-btns">
+      <button id="gcmClose" class="btn btn-o" style="flex:1;">Close</button>
+      <button id="gcmCopy" class="btn btn-p" style="flex:1;">Copy SQL</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.querySelector('#gcmClose').onclick=()=>overlay.remove();
+  overlay.querySelector('#gcmCopy').onclick=()=>{
+    navigator.clipboard.writeText("ALTER TABLE settings ADD COLUMN IF NOT EXISTS gemini_key text;").then(()=>toast('SQL copied! Paste in Supabase SQL Editor and run.','s'));
+  };
 }
 async function saveSettings(){
   await sbUpsertSettings({
