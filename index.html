@@ -1149,13 +1149,29 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <!-- SETTINGS -->
     <div class="page" id="page-settings">
       <div class="ph"><div><h1>Settings &amp; Tools</h1></div><button class="btn btn-p" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div>
-      <div class="tabs"><div class="tab active" onclick="setSettTab('general',this)">General</div><div class="tab" onclick="setSettTab('att',this)">Attendance</div><div class="tab" onclick="setSettTab('pay',this)">Pay</div><div class="tab" onclick="setSettTab('exp',this)">Expenses</div><div class="tab" onclick="setSettTab('admin',this)">Password</div><div class="tab" onclick="setSettTab('data',this)"><i class="fa-solid fa-database" style="margin-right:4px;"></i>Data</div></div>
+      <div class="tabs"><div class="tab active" onclick="setSettTab('general',this)">General</div><div class="tab" onclick="setSettTab('att',this)">Attendance</div><div class="tab" onclick="setSettTab('pay',this)">Pay</div><div class="tab" onclick="setSettTab('exp',this)">Expenses</div><div class="tab" onclick="setSettTab('ai',this)"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:4px;"></i>AI</div><div class="tab" onclick="setSettTab('admin',this)">Password</div><div class="tab" onclick="setSettTab('data',this)"><i class="fa-solid fa-database" style="margin-right:4px;"></i>Data</div></div>
       <div class="sett-sec active" id="settTab-general"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl" style="grid-column:1/-1"><label>Company Name</label><input type="text" id="sCompany" placeholder="OHM Electrical"></div><div class="fgl"><label>Currency</label><select id="sCurrency"><option value="£">£ GBP</option><option value="$">$ USD</option><option value="€">€ EUR</option></select></div><div class="fgl"><label>Attendance Warning %</label><input type="number" id="sThreshold" min="0" max="100" placeholder="80"></div></div></div></div></div>
       <div class="sett-sec" id="settTab-att"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl"><label>Default Work Start</label><input type="time" id="sWStart" value="08:00"></div><div class="fgl"><label>Default Work End</label><input type="time" id="sWEnd" value="17:00"></div><div class="fgl"><label>OT After (hours/day)</label><input type="number" id="sOT" min="1" max="24" step="0.5" placeholder="8"></div></div></div></div>
         <div class="card" style="margin-top:13px;"><div class="ch"><div class="ct">Bank Account Names</div></div><div class="cb"><div id="bankList" style="display:flex;flex-direction:column;gap:7px;margin-bottom:11px;"></div><div style="display:flex;gap:7px;"><input type="text" id="newBank" placeholder="e.g. GB Electrical" style="flex:1;padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;"><button class="btn btn-p btn-sm" onclick="addBank()"><i class="fa-solid fa-plus"></i>Add</button></div></div></div>
       </div>
       <div class="sett-sec" id="settTab-pay"><div class="card"><div class="cb"><div class="fg fg3"><div class="fgl"><label>Default OT Multiplier</label><input type="number" id="sOTMult" min="1" max="5" step="0.1" placeholder="1.5"></div><div class="fgl"><label>Saturday ×</label><input type="number" id="sSat" min="1" max="5" step="0.1" placeholder="1.0"></div><div class="fgl"><label>Sunday ×</label><input type="number" id="sSun" min="1" max="5" step="0.1" placeholder="1.0"></div></div><p style="font-size:12px;color:var(--txtm);margin-top:9px;">Each employee can override in their profile.</p></div></div></div>
       <div class="sett-sec" id="settTab-exp"><div class="card"><div class="ch"><div class="ct">Default Categories</div></div><div class="cb"><div id="catList" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:11px;"></div><div style="display:flex;gap:7px;"><input type="text" id="newCat" placeholder="e.g. Fuel" style="flex:1;padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;"><button class="btn btn-p btn-sm" onclick="addCat()"><i class="fa-solid fa-plus"></i>Add</button></div></div></div></div>
+      <div class="sett-sec" id="settTab-ai">
+        <div class="card">
+          <div class="ch"><div><div class="ct"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--acc);margin-right:6px;"></i>AI Receipt Scanning</div><div class="cs">Powers the "Auto-fill from Receipt" button employees see when adding an expense</div></div></div>
+          <div class="cb">
+            <div class="fgl" style="margin-bottom:11px;">
+              <label>Gemini API Key</label>
+              <div style="display:flex;gap:7px;">
+                <input type="password" id="sGeminiKey" placeholder="Paste your Gemini API key here" style="flex:1;padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;">
+                <button type="button" class="btn btn-o btn-sm" onclick="const i=document.getElementById('sGeminiKey');i.type=i.type==='password'?'text':'password';this.querySelector('i').className=i.type==='password'?'fa-solid fa-eye':'fa-solid fa-eye-slash';" title="Show/hide key"><i class="fa-solid fa-eye"></i></button>
+              </div>
+            </div>
+            <button class="btn btn-p" onclick="saveGeminiKey()"><i class="fa-solid fa-floppy-disk"></i>Save Key</button>
+            <p style="font-size:12px;color:var(--txtm);margin-top:11px;line-height:1.6;">Employees will see <strong>"Not configured — admin must add Gemini key in Settings → AI"</strong> on the scan button until a key is saved here.<br>Don't have a key? Get a free one at <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--acc);">aistudio.google.com/apikey</a> — sign in with a Google account, click "Create API key", and paste it above.</p>
+          </div>
+        </div>
+      </div>
       <div class="sett-sec" id="settTab-admin"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl"><label>New Password (min 6 characters)</label><input type="password" id="newPin" placeholder="New password"></div><div class="fgl"><label>Confirm Password</label><input type="password" id="confirmPin" placeholder="New password"></div></div><button class="btn btn-p" style="margin-top:11px;" onclick="changePin()"><i class="fa-solid fa-key"></i>Update PIN</button><p style="font-size:12px;color:var(--txtm);margin-top:8px;">Default PIN: 1234 — change this immediately.</p></div></div>
       </div>
 
@@ -6280,7 +6296,13 @@ function loadSettings(){
   document.getElementById('sOTMult').value=cfg.rate_ot||1.5;
   document.getElementById('sSat').value=cfg.rate_sat||1.0;
   document.getElementById('sSun').value=cfg.rate_sun||1.0;
+  document.getElementById('sGeminiKey').value=cfg.gemini_key||'';
   renderBankList();renderCatList();
+}
+async function saveGeminiKey(){
+  const key=document.getElementById('sGeminiKey').value.trim();
+  await sbUpsertSettings({gemini_key:key});
+  toast(key?'Gemini key saved — employees can now use receipt scanning':'Gemini key cleared — receipt scanning disabled','s');
 }
 async function saveSettings(){
   await sbUpsertSettings({
