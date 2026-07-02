@@ -2053,12 +2053,41 @@ async function scanReceiptWithAI(target){
     }
     const yr=new Date().getFullYear();
     const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"items\":\"item list\",\"bbox\":{\"x\":0,\"y\":0,\"w\":100,\"h\":100},\"is_bent\":false,\"rotation\":0}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=a short comma-separated list of the individual line items on the receipt with quantities where shown, e.g. \"2x cable ties, 1x 10mm drill bit, 1x junction box\" — null if the receipt doesn't show itemized lines (e.g. fuel, parking). bbox=bounding box of the receipt as percentages of image (x=left%, y=top%, w=width%, h=height%), set null if receipt fills whole image with no background. is_bent=true if receipt is curved/bent/folded, false if flat. rotation=degrees you'd need to rotate the whole image CLOCKWISE so the receipt text reads upright, left-to-right — must be exactly 0, 90, 180, or 270 (0 if already upright).`;
-    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${_geminiKey}`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mimeType,data:b64}},{text:prompt}]}]})
-    });
-        if(!resp.ok) throw new Error(`Gemini error ${resp.status}`);
+    // Try the high-quota free model first; each attempt retries on transient
+    // failures but bails immediately on 429 (daily quota — retrying won't help).
+    // If it's still down after that, fall back to gemini-2.5-flash once — a
+    // different model with its own separate quota AND separate server
+    // capacity, so a 503 "this model is overloaded" on one doesn't mean the
+    // other is too.
+    async function tryGeminiModel(model,maxAttempts){
+      let resp,lastErrBody='';
+      for(let attempt=1;attempt<=maxAttempts;attempt++){
+        resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${_geminiKey}`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mimeType,data:b64}},{text:prompt}]}]})
+        }).catch(networkErr=>{lastErrBody=String(networkErr);return null;});
+        if(resp&&resp.ok)return{resp,lastErrBody:null};
+        if(resp){lastErrBody=await resp.text().catch(()=>'');console.warn(`Gemini (${model}) attempt ${attempt}/${maxAttempts} failed (${resp.status}):`,lastErrBody);}
+        else console.warn(`Gemini (${model}) attempt ${attempt}/${maxAttempts} — network error:`,lastErrBody);
+        if(resp&&resp.status===429)break; // daily quota — no point retrying
+        if(attempt<maxAttempts&&(!resp||resp.status!==429)){
+          if(st){st.textContent=`Connection hiccup — retrying (${attempt}/${maxAttempts-1})...`;st.style.color='var(--amb)';}
+          await new Promise(r=>setTimeout(r,700*attempt));
+        }
+      }
+      return{resp,lastErrBody};
+    }
+    let{resp,lastErrBody}=await tryGeminiModel('gemini-2.5-flash-lite',3);
+    if(!resp||!resp.ok){
+      if(st){st.textContent='Trying a backup model...';st.style.color='var(--amb)';}
+      const fallback=await tryGeminiModel('gemini-2.5-flash',1);
+      resp=fallback.resp;lastErrBody=fallback.lastErrBody;
+    }
+    if(!resp||!resp.ok){
+      console.error('Gemini scan failed on both models:',resp?resp.status:'network error',lastErrBody);
+      throw new Error(`Gemini error ${resp?resp.status:'network'}`);
+    }
     const data=await resp.json();
     const raw=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
     // Parse JSON — strip any accidental markdown
@@ -2100,7 +2129,7 @@ async function scanReceiptWithAI(target){
       if(st){st.textContent='First read was unclear — trying again now it\'s straightened...';st.style.color='var(--acc)';}
       try{
         const retryPrompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"items\":\"item list\"}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=a short comma-separated list of the individual line items on the receipt with quantities where shown — null if not itemized.`;
-        const retryResp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${_geminiKey}`,{
+        const retryResp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${_geminiKey}`,{
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:workingMime,data:workingB64}},{text:retryPrompt}]}]})
         });
@@ -2170,12 +2199,26 @@ async function scanReceiptWithAI(target){
   }catch(err){
     console.error('Gemini scan error:',err);
     const msg=err.message||'';
-    if(msg.includes('400')||msg.includes('403')||msg.includes('Worker')){
-      if(st){st.textContent='Scanner not set up yet — contact admin';st.style.color='var(--red)';}
-      toast('Receipt scanner not ready — contact admin','e');
+    if(msg.includes('429')){
+      if(st){st.textContent='Daily AI scan limit reached — fill in manually, try again later';st.style.color='var(--red)';}
+      toast('Daily AI scan limit reached for today — please fill in manually','e');
+    } else if(msg.includes('503')){
+      // This is Google's AI servers being overloaded on their end — nothing
+      // wrong with the employee's connection or the app's setup. Already
+      // tried the backup model too by the time we get here.
+      if(st){st.textContent='AI scanner is overloaded right now — not your connection. Try again shortly, or fill in manually';st.style.color='var(--amb)';}
+      toast('AI scanner is busy right now — try again in a minute, or fill in manually','e');
+    } else if(msg.includes('network')){
+      if(st){st.textContent='Connection problem — check signal and try again';st.style.color='var(--amb)';}
+      toast('Couldn\'t reach the scanner — check your connection and try again','e');
     } else {
-      if(st){st.textContent='Scan failed — fill in manually';st.style.color='var(--amb)';}
-      toast('Could not scan receipt — fill in manually','e');
+      // Note: a 400 here doesn't reliably mean "not configured" — the key is
+      // already checked before this point, and Gemini can return a transient
+      // 400 under load even with a valid key (this already retried 3 times).
+      // Blaming "contact admin" for what's usually just a flaky connection
+      // was actively misleading, so this now points at the real likely cause.
+      if(st){st.textContent='Scan failed after a few tries — check signal, or fill in manually';st.style.color='var(--amb)';}
+      toast('Scan failed — check your connection and try again, or fill in manually','e');
     }
   } finally {
     if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt';}
@@ -3363,6 +3406,24 @@ document.addEventListener('keydown',e=>{
 });
 
 // ── INIT ──
+// Settings fetch, with a couple of retries. On a flaky mobile connection (very
+// plausible out on a job site) this single request can fail even though
+// everything's configured correctly — without a retry, that silently leaves
+// _geminiKey empty for the WHOLE session with no clue why, and the only way
+// to get another shot at it was a manual hard refresh. This gives it a couple
+// of automatic extra tries first.
+async function fetchSettingsWithRetry(retries){
+  retries=retries==null?2:retries;
+  let last={data:null,error:null};
+  for(let i=0;i<=retries;i++){
+    const r=await sb.from('settings').select('*').eq('id',1).single();
+    if(r.data)return r;
+    last=r;
+    if(i<retries)await new Promise(res=>setTimeout(res,500*(i+1)));
+  }
+  console.warn('Settings fetch failed after retries:',last.error);
+  return last;
+}
 async function tryAutoLogin(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session){
@@ -3379,7 +3440,7 @@ async function tryAutoLogin(){
   const sevenDays=7*24*60*60*1000;
   if(savedId&&Date.now()-savedTs<sevenDays){
     const r=await sb.from('employees').select('*').eq('id',savedId).single();
-    const cfgR=await sb.from('settings').select('*').eq('id',1).single();
+    const cfgR=await fetchSettingsWithRetry();
     if(cfgR.data){cfg=cfgR.data;_geminiKey=cfgR.data.gemini_key||'';}
     if(!r.error&&r.data&&r.data.status==='Active'&&r.data.pin){
       allEmps=[r.data];
@@ -3391,7 +3452,7 @@ async function tryAutoLogin(){
     localStorage.removeItem('dam_emp_ts');
   }
   // Load settings only — employee list NOT shown until phone is entered
-  const cfgR=await sb.from('settings').select('*').eq('id',1).single();
+  const cfgR=await fetchSettingsWithRetry();
   if(cfgR.data){cfg=cfgR.data;_geminiKey=cfgR.data.gemini_key||'';}
   document.getElementById('step1').style.display='block';
 }
