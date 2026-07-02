@@ -769,6 +769,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
           <div class="fg"><label>Category</label><select id="edCat"><option value="">— Select —</option></select></div>
           <div class="fg"><label>Amount (£) *</label><input type="text" id="edAmtInp" placeholder="0.00" inputmode="decimal" oninput="sanitizeAmountInput(this)"></div>
         </div>
+        <div class="fg"><label>Items <span style="font-weight:400;color:var(--txtm);">(auto-filled from receipt scan, or type your own)</span></label><textarea id="edItemsInp" placeholder="e.g. 2x cable ties, 1x 10mm drill bit, 1x junction box"></textarea></div>
         <div class="fg"><label>Notes</label><textarea id="edNotesInp" placeholder="Any details..."></textarea></div>
         <div style="display:flex;align-items:center;gap:11px;background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--rs);padding:11px 13px;margin-bottom:14px;">
           <i class="fa-solid fa-tag" style="color:var(--amb);font-size:16px;flex-shrink:0;"></i>
@@ -805,8 +806,9 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
           <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt
         </button>
         <div id="edGeminiScanStatus" style="display:none;font-size:12px;color:var(--acc);text-align:center;margin-top:6px;font-weight:600;"></div>
-        <div style="display:flex;gap:10px;margin-top:6px;">
+        <div style="display:flex;gap:8px;margin-top:6px;">
           <button class="btn btn-o" onclick="closeExpDetailModal()" style="flex:1;">Cancel</button>
+          <button class="btn btn-o" id="edDeleteBtn" onclick="deleteExpFromEdit()" style="flex:1;border-color:var(--red);color:var(--red);"><i class="fa-solid fa-trash"></i> Delete</button>
           <button class="btn btn-p" id="edSaveBtn" onclick="saveExpDetailEdit()" style="flex:1.5;"><i class="fa-solid fa-check"></i> Save Changes</button>
         </div>
       </div>
@@ -828,6 +830,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
           <div class="fg"><label>Category</label><select id="expCat"><option value="">— Select —</option></select></div>
           <div class="fg"><label>Amount (£) *</label><input type="text" id="expAmt" placeholder="0.00" inputmode="decimal" oninput="sanitizeAmountInput(this)"></div>
         </div>
+        <div class="fg"><label>Items <span style="font-weight:400;color:var(--txtm);">(auto-filled from receipt scan, or type your own)</span></label><textarea id="expItems" placeholder="e.g. 2x cable ties, 1x 10mm drill bit, 1x junction box"></textarea></div>
         <div class="fg"><label>Notes</label><textarea id="expNotes" placeholder="Any details..."></textarea></div>
         <div style="display:flex;align-items:center;gap:11px;background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--rs);padding:11px 13px;margin-bottom:12px;">
           <i class="fa-solid fa-tag" style="color:var(--amb);font-size:16px;flex-shrink:0;"></i>
@@ -874,7 +877,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
         </div>
         <input type="file" id="rcptCamera" accept="image/*" capture="environment" style="display:none;" onchange="rcptChosen(this)">
         <input type="file" id="rcptFile" accept="image/*,.pdf,.doc,.docx,.xlsx,.xls,.heic,.heif" style="display:none;" onchange="rcptChosen(this)">
-        <button class="btn btn-p" onclick="submitExp()"><i class="fa-solid fa-paper-plane"></i>Submit Expense</button>
+        <button class="btn btn-p" id="expSubmitBtn" onclick="submitExp()"><i class="fa-solid fa-paper-plane"></i>Submit Expense</button>
       </div></div>
 
       <!-- My expenses -->
@@ -1362,7 +1365,7 @@ function doLogout(){
   // Clear ALL in-memory data — no stale data for next employee
   emp=null;
   myAtt=[];myExp=[];myMsgs=[];myBatches=[];mySalHist=[];myPaySt=[];myAttReqs=[];myPayroll=[];
-  allEmps=[];cfg={};
+  allEmps=[];cfg={};_geminiKey='';
   // Reset UI state
   attM=new Date().getMonth();attY=new Date().getFullYear();
   expM=new Date().getMonth();expY=new Date().getFullYear();
@@ -2049,7 +2052,7 @@ async function scanReceiptWithAI(target){
       return;
     }
     const yr=new Date().getFullYear();
-    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"bbox\":{\"x\":0,\"y\":0,\"w\":100,\"h\":100},\"is_bent\":false,\"rotation\":0}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. bbox=bounding box of the receipt as percentages of image (x=left%, y=top%, w=width%, h=height%), set null if receipt fills whole image with no background. is_bent=true if receipt is curved/bent/folded, false if flat. rotation=degrees you'd need to rotate the whole image CLOCKWISE so the receipt text reads upright, left-to-right — must be exactly 0, 90, 180, or 270 (0 if already upright).`;
+    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"items\":\"item list\",\"bbox\":{\"x\":0,\"y\":0,\"w\":100,\"h\":100},\"is_bent\":false,\"rotation\":0}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=a short comma-separated list of the individual line items on the receipt with quantities where shown, e.g. \"2x cable ties, 1x 10mm drill bit, 1x junction box\" — null if the receipt doesn't show itemized lines (e.g. fuel, parking). bbox=bounding box of the receipt as percentages of image (x=left%, y=top%, w=width%, h=height%), set null if receipt fills whole image with no background. is_bent=true if receipt is curved/bent/folded, false if flat. rotation=degrees you'd need to rotate the whole image CLOCKWISE so the receipt text reads upright, left-to-right — must be exactly 0, 90, 180, or 270 (0 if already upright).`;
     const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${_geminiKey}`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -2096,7 +2099,7 @@ async function scanReceiptWithAI(target){
     if(!result.merchant&&!(result.amount>0)&&result.rotation&&workingB64!==b64){
       if(st){st.textContent='First read was unclear — trying again now it\'s straightened...';st.style.color='var(--acc)';}
       try{
-        const retryPrompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear.`;
+        const retryPrompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"items\":\"item list\"}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=a short comma-separated list of the individual line items on the receipt with quantities where shown — null if not itemized.`;
         const retryResp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${_geminiKey}`,{
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:workingMime,data:workingB64}},{text:retryPrompt}]}]})
@@ -2116,6 +2119,7 @@ async function scanReceiptWithAI(target){
     const fDate=document.getElementById(isEd?'edDate':'expDate');
     const fCat=document.getElementById(isEd?'edCat':'expCat');
     const fVAT=document.getElementById(isEd?'edVAT':'expVAT');
+    const fItems=document.getElementById(isEd?'edItemsInp':'expItems');
     let filled=[];
     if(result.merchant){
       fMerchant.value=result.merchant;
@@ -2128,6 +2132,12 @@ async function scanReceiptWithAI(target){
     if(result.date){
       fDate.value=result.date;
       filled.push('date');
+    }
+    // Items: only auto-fill if the employee hasn't already typed their own —
+    // don't clobber something they wrote by hand before scanning.
+    if(result.items&&fItems&&!fItems.value.trim()){
+      fItems.value=result.items;
+      filled.push('items');
     }
     // Check shared merchant memory first — overrides Gemini's guess
     const _mKey=(result.merchant||'').trim().toLowerCase();
@@ -2453,57 +2463,72 @@ function isMonthLocked(month,year){
 }
 async function submitExp(){
   if(_submittingExp)return;
-  _submittingExp=true;
-  setTimeout(function(){_submittingExp=false;},3000);
   const merchant=document.getElementById('expMerchant').value.trim();
   const amt=parseFloat(document.getElementById('expAmt').value);
   const date=document.getElementById('expDate').value;
-  if(!merchant||!date||isNaN(parseFloat(document.getElementById('expAmt').value))){_submittingExp=false;toast('Please fill date, merchant and amount','e');return;}
-  if(amt===0){_submittingExp=false;toast('Amount cannot be zero','e');return;}
-  if(!merchant||!amt||!date){_submittingExp=false;toast('Please fill date, merchant and amount','e');return;}
+  if(!merchant||!date||isNaN(parseFloat(document.getElementById('expAmt').value))){toast('Please fill date, merchant and amount','e');return;}
+  if(amt===0){toast('Amount cannot be zero','e');return;}
+  if(!merchant||!amt||!date){toast('Please fill date, merchant and amount','e');return;}
   const _expD=new Date(date+'T00:00:00');
-  if(isMonthLocked(_expD.getMonth(),_expD.getFullYear())){_submittingExp=false;toast('⛔ Payroll for this month is already locked by the office — pick a different date or contact them','e');return;}
-  let fileUrl=null;
-  if(_rcptFile){
-    if(_rcptFile.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');_submittingExp=false;return;}
-    const ext=_rcptFile.name.split('.').pop()||'jpg';
-    const path=`receipts/${emp.id}/${Date.now()}.${ext}`;
-    const {error}=await sb.storage.from('employee-docs').upload(path,_rcptFile,{upsert:true});
-    if(!error){const {data:ud}=sb.storage.from('employee-docs').getPublicUrl(path);fileUrl=ud?.publicUrl||null;}
-  }
-  const r=await sb.from('expenses').insert({employee_id:emp.id,date,merchant,category:document.getElementById('expCat').value||null,amount:amt,notes:document.getElementById('expNotes').value||null,receipt_url:fileUrl,status:'pending',tags:document.getElementById('expVAT')?.checked?['VAT']:[],flagged:false}).select().single();
-  if(r.error){_submittingExp=false;toast(r.error.message,'e');return;}
-  myExp.unshift(r.data);
-  // Capture the category BEFORE the form is cleared below — the old code read
-  // expCat.value AFTER resetting it to '', so the merchant→category memory was
-  // never actually saved and "remember this merchant's category" never learned
-  // anything new from expenses added on this device.
-  const _submittedCat=document.getElementById('expCat').value;
-  document.getElementById('expMerchant').value='';document.getElementById('expAmt').value='';document.getElementById('expNotes').value='';document.getElementById('expCat').value='';const rp=document.getElementById('rcptPreview');if(rp){rp.src='';}
-  const rpw=document.getElementById('rcptPreviewWrap');if(rpw)rpw.style.display='none';
-  const pdfw=document.getElementById('rcptPdfWrap');if(pdfw)pdfw.style.display='none';
-  const fnEl=document.getElementById('rcptFileName');if(fnEl)fnEl.textContent='';
-  _rcptFile=null;
-  // Hide AI scan button after submit
-  const scanBtnClr=document.getElementById('geminiScanBtn');
-  const scanStClr=document.getElementById('geminiScanStatus');
-  if(scanBtnClr)scanBtnClr.style.display='none';
-  if(scanStClr){scanStClr.style.display='none';scanStClr.textContent='';}
-  const rc=document.getElementById('rcptCamera');if(rc)rc.value='';
-  const rf=document.getElementById('rcptFile');if(rf)rf.value='';
-  const fn=document.getElementById('rcptFileName');if(fn){fn.textContent='';fn.style.display='none';}
-  const vcb=document.getElementById('expVAT');if(vcb)vcb.checked=false;
-  const vvis=document.getElementById('vatToggleVis');if(vvis)vvis.style.background='var(--bdr)';
-  const vknob=document.getElementById('vatToggleKnob');if(vknob)vknob.style.transform='translateX(0)';
-  _submittingExp=false;
-  toast('Expense added!','s');renderExpenses();
-  // Save merchant→category mapping for future auto-fill (shared across all employees)
-  if(merchant && _submittedCat){
-    const cat=_submittedCat;
-    const key=merchant.trim().toLowerCase();
-    if(!window._merchantCatMap)window._merchantCatMap={};
-    window._merchantCatMap[key]=cat;
-    sb.from('merchant_categories').upsert({merchant:merchant.trim(),category:cat},{onConflict:'merchant'});
+  if(isMonthLocked(_expD.getMonth(),_expD.getFullYear())){toast('⛔ Payroll for this month is already locked by the office — pick a different date or contact them','e');return;}
+  if(_rcptFile&&_rcptFile.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');return;}
+  // Only now — after every validation has passed — do we lock submission.
+  // IMPORTANT: no fixed setTimeout to auto-release this. The old version reset
+  // it after a flat 3 seconds regardless of whether the upload+insert had
+  // actually finished — on a slow connection that's easily beaten, so a
+  // frustrated re-click would slip through mid-upload and create a genuine
+  // duplicate expense. The try/finally below is the only thing that clears
+  // the guard now, exactly when the request truly completes (success or not).
+  _submittingExp=true;
+  const subBtn=document.getElementById('expSubmitBtn');
+  const subBtnOrigLabel=subBtn?subBtn.innerHTML:null;
+  if(subBtn){subBtn.disabled=true;subBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';}
+  try{
+    let fileUrl=null;
+    if(_rcptFile){
+      const ext=_rcptFile.name.split('.').pop()||'jpg';
+      const path=`receipts/${emp.id}/${Date.now()}.${ext}`;
+      const {error}=await sb.storage.from('employee-docs').upload(path,_rcptFile,{upsert:true});
+      if(!error){const {data:ud}=sb.storage.from('employee-docs').getPublicUrl(path);fileUrl=ud?.publicUrl||null;}
+    }
+    const r=await sb.from('expenses').insert({employee_id:emp.id,date,merchant,category:document.getElementById('expCat').value||null,amount:amt,notes:document.getElementById('expNotes').value||null,items:document.getElementById('expItems').value||null,receipt_url:fileUrl,status:'pending',tags:document.getElementById('expVAT')?.checked?['VAT']:[],flagged:false}).select().single();
+    if(r.error){toast(r.error.message,'e');return;}
+    myExp.unshift(r.data);
+    // Capture the category BEFORE the form is cleared below — the old code read
+    // expCat.value AFTER resetting it to '', so the merchant→category memory was
+    // never actually saved and "remember this merchant's category" never learned
+    // anything new from expenses added on this device.
+    const _submittedCat=document.getElementById('expCat').value;
+    document.getElementById('expMerchant').value='';document.getElementById('expAmt').value='';document.getElementById('expNotes').value='';document.getElementById('expItems').value='';document.getElementById('expCat').value='';const rp=document.getElementById('rcptPreview');if(rp){rp.src='';}
+    const rpw=document.getElementById('rcptPreviewWrap');if(rpw)rpw.style.display='none';
+    const pdfw=document.getElementById('rcptPdfWrap');if(pdfw)pdfw.style.display='none';
+    const fnEl=document.getElementById('rcptFileName');if(fnEl)fnEl.textContent='';
+    _rcptFile=null;
+    // Hide AI scan button after submit
+    const scanBtnClr=document.getElementById('geminiScanBtn');
+    const scanStClr=document.getElementById('geminiScanStatus');
+    if(scanBtnClr)scanBtnClr.style.display='none';
+    if(scanStClr){scanStClr.style.display='none';scanStClr.textContent='';}
+    const rc=document.getElementById('rcptCamera');if(rc)rc.value='';
+    const rf=document.getElementById('rcptFile');if(rf)rf.value='';
+    const fn=document.getElementById('rcptFileName');if(fn){fn.textContent='';fn.style.display='none';}
+    const vcb=document.getElementById('expVAT');if(vcb)vcb.checked=false;
+    const vvis=document.getElementById('vatToggleVis');if(vvis)vvis.style.background='var(--bdr)';
+    const vknob=document.getElementById('vatToggleKnob');if(vknob)vknob.style.transform='translateX(0)';
+    toast('Expense added!','s');renderExpenses();
+    // Save merchant→category mapping for future auto-fill (shared across all employees)
+    if(merchant && _submittedCat){
+      const cat=_submittedCat;
+      const key=merchant.trim().toLowerCase();
+      if(!window._merchantCatMap)window._merchantCatMap={};
+      window._merchantCatMap[key]=cat;
+      sb.from('merchant_categories').upsert({merchant:merchant.trim(),category:cat},{onConflict:'merchant'});
+    }
+  }catch(err){
+    toast('Something went wrong submitting — please try again','e');
+  }finally{
+    _submittingExp=false;
+    if(subBtn){subBtn.disabled=false;subBtn.innerHTML=subBtnOrigLabel;}
   }
 }
 function renderExpenses(){
@@ -2539,9 +2564,10 @@ function renderExpenses(){
         <div class="exp-amt" style="color:${isApproved?'var(--grn)':isRejected?'var(--red)':'var(--grn)'};">${fmt(e.amount)}</div>
         ${!isFlagged&&!isApproved?`<button onclick="event.stopPropagation();toggleFlag('${e.id}')" style="font-size:10px;color:var(--txtm);background:none;border:1px solid var(--bdr);border-radius:5px;padding:2px 6px;cursor:pointer;margin-top:4px;"><i class="fa-solid fa-flag" style="font-size:11px;"></i> Flag</button>`:''}
       </div>
-      ${canEdit?`<div id="expRowActions-${e.id}" style="display:none;position:absolute;inset:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background:rgba(255,255,255,0.45);border-radius:10px;align-items:center;justify-content:center;gap:10px;z-index:5;">
-        <button onclick="event.stopPropagation();toggleExpRowActions('${e.id}')" style="font-size:12px;font-weight:700;padding:8px 16px;border-radius:8px;border:1px solid var(--bdr);background:var(--card);color:var(--txt);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);">Close</button>
-        <button onclick="event.stopPropagation();openExpDetailModal('${e.id}')" style="font-size:12px;font-weight:700;padding:8px 16px;border-radius:8px;border:none;background:var(--acc);color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.18);"><i class="fa-solid fa-pen"></i>Edit</button>
+      ${canEdit?`<div id="expRowActions-${e.id}" style="display:none;position:absolute;inset:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background:rgba(255,255,255,0.45);border-radius:10px;align-items:center;justify-content:center;gap:8px;z-index:5;flex-wrap:wrap;">
+        <button onclick="event.stopPropagation();toggleExpRowActions('${e.id}')" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:1px solid var(--bdr);background:var(--card);color:var(--txt);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);">Close</button>
+        <button onclick="event.stopPropagation();deleteExp('${e.id}',this)" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:none;background:var(--red);color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.18);"><i class="fa-solid fa-trash"></i>Delete</button>
+        <button onclick="event.stopPropagation();openExpDetailModal('${e.id}')" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:none;background:var(--acc);color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.18);"><i class="fa-solid fa-pen"></i>Edit</button>
       </div>`:''}
     </div>`;
   }).join('')+`<div style="border-top:1px solid var(--bdr);padding-top:9px;margin-top:9px;display:flex;justify-content:space-between;"><span style="font-size:13px;font-weight:700;">Total</span><span style="font-family:JetBrains Mono;font-size:14px;font-weight:800;color:var(--grn);">${fmt(total)}</span></div>`:
@@ -2569,6 +2595,7 @@ async function editAndResendExp(id){
   document.getElementById('expMerchant').value=e.merchant||'';
   document.getElementById('expAmt').value=e.amount||'';
   document.getElementById('expNotes').value=e.notes||'';
+  document.getElementById('expItems').value=e.items||'';
   document.getElementById('expDate').value=e.date||dk(new Date());
   document.getElementById('expCat').value=e.category||'';
 
@@ -2633,7 +2660,7 @@ async function editAndResendExp(id){
         if(!upErr){const {data:ud}=sb.storage.from('employee-docs').getPublicUrl(path);fileUrl=ud?.publicUrl||fileUrl;}
         else{toast('Receipt upload failed — saving without new receipt','e');}
       }
-      const updData={merchant,amount:amt,category:document.getElementById('expCat').value||null,notes:document.getElementById('expNotes').value||null,date:document.getElementById('expDate').value,status:'pending',flagged:false,flag_note:null,tags:document.getElementById('expVAT')?.checked?['VAT']:[],receipt_url:fileUrl};
+      const updData={merchant,amount:amt,category:document.getElementById('expCat').value||null,notes:document.getElementById('expNotes').value||null,items:document.getElementById('expItems').value||null,date:document.getElementById('expDate').value,status:'pending',flagged:false,flag_note:null,tags:document.getElementById('expVAT')?.checked?['VAT']:[],receipt_url:fileUrl};
       const r=await sb.from('expenses').update(updData).eq('id',id);
       if(r.error){toast(r.error.message,'e');btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-rotate"></i> Update & Resubmit';return;}
       const eIdx=myExp.findIndex(x=>x.id===id);
@@ -2650,7 +2677,7 @@ async function editAndResendExp(id){
 }
 
 function _resetExpForm(){
-  ['expMerchant','expAmt','expNotes'].forEach(x=>{const el=document.getElementById(x);if(el)el.value='';});
+  ['expMerchant','expAmt','expNotes','expItems'].forEach(x=>{const el=document.getElementById(x);if(el)el.value='';});
   const catEl=document.getElementById('expCat');if(catEl)catEl.value='';
   const vcb=document.getElementById('expVAT');if(vcb)vcb.checked=false;
   const vvis=document.getElementById('vatToggleVis');if(vvis)vvis.style.background='var(--bdr)';
@@ -2704,16 +2731,20 @@ function openExpDetailModal(id){
   const _edD=new Date(e.date+'T00:00:00');
   const _edLocked=isMonthLocked(_edD.getMonth(),_edD.getFullYear());
   const edSaveBtn=document.getElementById('edSaveBtn');
+  const edDeleteBtn=document.getElementById('edDeleteBtn');
   if(_edLocked){
     document.getElementById('edEditSub').textContent='⛔ Payroll for this month is already locked by the office — contact them to make changes';
     if(edSaveBtn)edSaveBtn.disabled=true;
-  } else if(edSaveBtn){
-    edSaveBtn.disabled=false;
+    if(edDeleteBtn)edDeleteBtn.disabled=true;
+  } else {
+    if(edSaveBtn)edSaveBtn.disabled=false;
+    if(edDeleteBtn)edDeleteBtn.disabled=false;
   }
   document.getElementById('edDate').value=e.date||dk(new Date());
   document.getElementById('edMerchantInp').value=e.merchant||'';
   document.getElementById('edAmtInp').value=e.amount||'';
   document.getElementById('edNotesInp').value=e.notes||'';
+  document.getElementById('edItemsInp').value=e.items||'';
   // Populate category select (mirrors populateCats)
   const catSel=document.getElementById('edCat');
   catSel.innerHTML='<option value="">— Select —</option>';
@@ -2794,7 +2825,7 @@ async function saveExpDetailEdit(){
     if(!upErr){const {data:ud}=sb.storage.from('employee-docs').getPublicUrl(path);fileUrl=ud?.publicUrl||fileUrl;}
     else{toast('Receipt upload failed — saving without new receipt','e');}
   }
-  const updData={merchant,amount:amt,category:document.getElementById('edCat').value||null,notes:document.getElementById('edNotesInp').value||null,date:document.getElementById('edDate').value,status:'pending',flagged:false,flag_note:null,tags:document.getElementById('edVAT')?.checked?['VAT']:[],receipt_url:fileUrl};
+  const updData={merchant,amount:amt,category:document.getElementById('edCat').value||null,notes:document.getElementById('edNotesInp').value||null,items:document.getElementById('edItemsInp').value||null,date:document.getElementById('edDate').value,status:'pending',flagged:false,flag_note:null,tags:document.getElementById('edVAT')?.checked?['VAT']:[],receipt_url:fileUrl};
   const r=await sb.from('expenses').update(updData).eq('id',id);
   if(r.error){toast(r.error.message,'e');btn.disabled=false;btn.innerHTML=origLabel;return;}
   const eIdx=myExp.findIndex(x=>x.id===id);
@@ -2811,6 +2842,36 @@ async function saveExpDetailEdit(){
     window._merchantCatMap[key]=updData.category;
     sb.from('merchant_categories').upsert({merchant:merchant.trim(),category:updData.category},{onConflict:'merchant'});
   }
+}
+
+// Lets an employee remove an expense they added by mistake — usable both
+// from the row's quick-actions bar (Close/Delete/Edit) and from inside the
+// edit modal. Blocked the same way editing is — once the office has locked
+// that month's payroll, the numbers are final and shouldn't move.
+async function deleteExp(id,btnEl){
+  const e=myExp.find(x=>x.id===id);if(!e)return;
+  const _delD=new Date(e.date+'T00:00:00');
+  if(isMonthLocked(_delD.getMonth(),_delD.getFullYear())){
+    toast('⛔ Payroll for this month is already locked by the office — this expense can\'t be deleted','e');return;
+  }
+  const warnApproved=e.status==='approved'?' This expense was already approved by the office.':'';
+  if(!confirm(`Delete this expense — ${e.merchant||'Untitled'} (${fmt(e.amount)})? This can't be undone.${warnApproved}`))return;
+  const origLabel=btnEl?btnEl.innerHTML:null;
+  if(btnEl){btnEl.disabled=true;btnEl.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i>';}
+  const r=await sb.from('expenses').delete().eq('id',id);
+  if(r.error){
+    toast(r.error.message,'e');
+    if(btnEl){btnEl.disabled=false;btnEl.innerHTML=origLabel;}
+    return;
+  }
+  myExp=myExp.filter(x=>x.id!==id);
+  closeExpDetailModal();
+  renderExpenses();
+  toast('Expense deleted','s');
+}
+function deleteExpFromEdit(){
+  if(!_edCurrentExpId)return;
+  deleteExp(_edCurrentExpId,document.getElementById('edDeleteBtn'));
 }
 
 async function toggleFlag(id){
@@ -3331,7 +3392,7 @@ async function tryAutoLogin(){
   }
   // Load settings only — employee list NOT shown until phone is entered
   const cfgR=await sb.from('settings').select('*').eq('id',1).single();
-  if(cfgR.data)cfg=cfgR.data;
+  if(cfgR.data){cfg=cfgR.data;_geminiKey=cfgR.data.gemini_key||'';}
   document.getElementById('step1').style.display='block';
 }
 function normPhone(p){
