@@ -4652,6 +4652,7 @@ async function renderEmpReport(){
   // Gross pay = what they'd earn if all days were full contracted hours (no deductions)
   var grossPay=totalPay;
   var totalHoursDeduction=0;
+  var baseCalcLabel='';
   if(emp.pay_type==='daily'&&emp.contracted_hours&&emp.daily_rate){
     var ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     var dr=parseFloat(emp.daily_rate)||0;
@@ -4659,6 +4660,7 @@ async function renderEmpReport(){
     grossPay=fullDayRecs.length*parseFloat(dr.toFixed(2))+recOT+totalBonus;
     var actualBase=_erSav?(parseFloat(_erSav.base_pay)||0):fullDayRecs.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
     totalHoursDeduction=_erSav?(parseFloat(_erSav.deduction_total)||0):Math.max(0,parseFloat((fullDayRecs.length*parseFloat(dr.toFixed(2))-actualBase).toFixed(2)));
+    baseCalcLabel=fullDayRecs.length+' day'+(fullDayRecs.length!==1?'s':'')+' × '+C+dr.toFixed(2)+'/day';
   } else if(emp.pay_type==='fixed'&&emp.salary&&emp.contracted_hours){
     // Fixed salary: gross = what they'd earn if they worked all contracted hours for days present
     var ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
@@ -4671,12 +4673,14 @@ async function renderEmpReport(){
     grossPay=fullDayRecs2.length*roundedDailyEq+recOT+totalBonus;
     var actualBase2=_erSav?(parseFloat(_erSav.base_pay)||0):fullDayRecs2.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
     totalHoursDeduction=_erSav?(parseFloat(_erSav.deduction_total)||0):Math.max(0,parseFloat((grossPay-actualBase2-recOT-totalBonus).toFixed(2)));
+    baseCalcLabel=fullDayRecs2.length+' day'+(fullDayRecs2.length!==1?'s':'')+' × '+C+roundedDailyEq.toFixed(2)+'/day';
   } else if(emp.pay_type==='hourly'&&emp.hourly_rate&&emp.contracted_hours){
     var ch2=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     var hr=parseFloat(emp.hourly_rate)||0;
     var presentDaysCount=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';}).length;
     grossPay=presentDaysCount*ch2*hr+recOT+totalBonus;
     totalHoursDeduction=Math.max(0,parseFloat((grossPay-totalPay).toFixed(2)));
+    baseCalcLabel=(presentDaysCount*ch2).toFixed(1)+'h × '+C+hr.toFixed(2)+'/h';
   }
   // Expense summary for this employee this month
   const mExpenses=expenses.filter(function(e){
@@ -4693,6 +4697,13 @@ async function renderEmpReport(){
   var s='';
   var C2=C;
   var shortH=contractedH>0?Math.max(0,contractedH-totalH):0;
+  // grossPay (from the branches above) is actually base+OT+bonus combined —
+  // but it was being displayed as "Base Pay" while OT was ALSO shown as its
+  // own separate "+OT Pay" card, making it look (and, in the Total Payable
+  // figure, actually BE) double-counted. pureBase backs OT/bonus back out so
+  // "Base Pay" means what it says, and Total Payable can be built as a clean
+  // base → +OT → +bonus → −deduction chain that always adds up.
+  var pureBase=grossPay-recOT-totalBonus;
   var hasShort=shortH>0.05;
   var hasOT=totalOT>0;
 
@@ -4735,20 +4746,19 @@ async function renderEmpReport(){
    +'</div>';
 
   // Card 3: Hours Worked
+  // OT used to be repeated here (badge + sub-line) as well as in its own
+  // dedicated OT Pay card below — right after fixing Base Pay to no longer
+  // double-count OT, showing OT a second time here just recreated the same
+  // "is this counted twice?" confusion in a different spot. This card now
+  // sticks purely to attendance hours; OT lives only in the OT Pay card.
   var hoursColor=hasShort?'var(--red)':hasOT?'var(--grn)':'var(--tel)';
   var hoursIcon=hasShort?'fa-clock-rotate-left':hasOT?'fa-bolt':'fa-clock';
   var hoursSub='';
   if(contractedH>0){
     hoursSub='<div class="sc-sub">Expected: '+contractedH.toFixed(0)+'h</div>';
-    if(hasShort&&hasOT) hoursSub+='<div style="font-size:11px;margin-top:1px;"><span style="color:var(--red);">−'+shortH.toFixed(1)+'h</span> · <span style="color:var(--acc);">OT +'+totalOT.toFixed(1)+'h</span></div>';
-    else if(hasShort) hoursSub+='<div style="font-size:11px;color:var(--red);margin-top:1px;">−'+shortH.toFixed(1)+'h short</div>';
-    else if(hasOT) hoursSub+='<div style="font-size:11px;color:var(--acc);margin-top:1px;">OT: +'+totalOT.toFixed(1)+'h</div>';
+    if(hasShort) hoursSub+='<div style="font-size:11px;color:var(--red);margin-top:1px;">−'+shortH.toFixed(1)+'h short</div>';
     else hoursSub+='<div style="font-size:11px;color:var(--grn);margin-top:1px;">✓ full hours</div>';
-  } else if(hasOT){
-    hoursSub='<div class="sc-sub">OT: +'+totalOT.toFixed(1)+'h</div>';
   }
-  var otLabel=hasOT?'+'+totalOT.toFixed(1)+'h':'0.0h';
-  var otLabelCol=hasOT?'var(--acc)':'var(--txtm)';
   s+='<div class="sc sc-sm" style="border-color:'+hoursColor+'40;display:flex;align-items:stretch;">'
    +'<div class="sc-accent" style="background:'+hoursColor+';"></div>'
    +'<div style="flex:1;">'
@@ -4758,8 +4768,6 @@ async function renderEmpReport(){
    +'</div>'
    +'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-left:10px;border-left:1px solid var(--bdr);margin-left:10px;min-width:46px;">'
    +'<i class="fa-solid '+hoursIcon+'" style="font-size:20px;color:'+hoursColor+';opacity:0.8;"></i>'
-   +'<div style="font-size:11px;font-weight:700;color:'+otLabelCol+';margin-top:4px;">'+otLabel+'</div>'
-   +'<div style="font-size:10px;color:var(--txtm);">OT</div>'
    +'</div>'
    +'</div>';
 
@@ -4769,8 +4777,8 @@ async function renderEmpReport(){
      +'<div class="sc-accent" style="background:var(--grn);"></div>'
      +'<div style="flex:1;">'
      +'<div class="sc-lbl">Base Pay</div>'
-     +'<div class="sc-val">'+C+grossPay.toFixed(2)+'</div>'
-     +'<div class="sc-sub">'+(totalHoursDeduction>0?'before deductions':'inc. all')+'</div>'
+     +'<div class="sc-val">'+C+pureBase.toFixed(2)+'</div>'
+     +'<div class="sc-sub">'+(baseCalcLabel||(totalHoursDeduction>0?'before OT & deductions':'before OT'))+'</div>'
      +'</div>'
      +'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-left:10px;border-left:1px solid var(--bdr);margin-left:10px;min-width:46px;">'
      +'<i class="fa-solid fa-sterling-sign" style="font-size:20px;color:var(--grn);opacity:0.8;"></i>'
@@ -4801,12 +4809,11 @@ async function renderEmpReport(){
         +'<div style="flex:1;">'
         +'<div class="sc-lbl">OT Pay</div>'
         +'<div class="sc-val" style="color:var(--acc);">+'+C2+recOT.toFixed(2)+'</div>'
-        +'<div class="sc-sub">'+totalOT.toFixed(1)+'h worked</div>'
+        +'<div class="sc-sub">'+totalOT.toFixed(1)+'h × '+C2+otHrRate.toFixed(2)+'/h</div>'
         +'</div>'
         +'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-left:10px;border-left:1px solid var(--bdr);margin-left:10px;min-width:52px;">'
-        +'<i class="fa-solid fa-bolt" style="font-size:16px;color:var(--acc);opacity:0.8;margin-bottom:3px;"></i>'
-        +'<div style="font-size:10px;color:var(--txtm);">rate</div>'
-        +'<div style="font-size:11px;font-weight:700;color:var(--acc);">'+C2+otHrRate.toFixed(2)+'/h</div>'
+        +'<div style="font-size:10px;color:var(--txtm);">base + OT</div>'
+        +'<div style="font-size:12px;font-weight:800;color:var(--acc);margin-top:2px;">'+C2+(pureBase+recOT).toFixed(2)+'</div>'
         +'</div>'
         +'</div>';
     }
@@ -4821,20 +4828,21 @@ async function renderEmpReport(){
         +'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-left:10px;border-left:1px solid var(--bdr);margin-left:10px;min-width:52px;">'
         +'<i class="fa-solid fa-star" style="font-size:16px;color:var(--grn);opacity:0.8;margin-bottom:3px;"></i>'
         +'<div style="font-size:10px;color:var(--txtm);">base + bonus</div>'
-        +'<div style="font-size:11px;font-weight:700;color:var(--grn);">'+C2+(grossPay+totalBonus).toFixed(2)+'</div>'
+        +'<div style="font-size:11px;font-weight:700;color:var(--grn);">'+C2+(pureBase+totalBonus).toFixed(2)+'</div>'
         +'</div>'
         +'</div>';
     }
     if(showDeduct){
       var ch2=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
       var dedRate=emp.pay_type==='daily'?(parseFloat(emp.daily_rate)||0)/ch2:parseFloat(emp.hourly_rate)||0;
-      var netAfterDed=grossPay-deductAmt+(showOT?recOT:0)+(showBonus?totalBonus:0);
+      var netAfterDed=pureBase-deductAmt+recOT+totalBonus;
+      var dedHoursShown=dedRate>0?(deductAmt/dedRate):0;
       payCards+='<div class="sc sc-sm" style="border-color:rgba(220,38,38,0.35);display:flex;align-items:stretch;">'
         +'<div class="sc-accent" style="background:var(--red);"></div>'
         +'<div style="flex:1;">'
         +'<div class="sc-lbl">Deducted</div>'
         +'<div class="sc-val" style="color:var(--red);">−'+C2+deductAmt.toFixed(2)+'</div>'
-        +'<div class="sc-sub">'+shortH.toFixed(1)+'h × '+C2+dedRate.toFixed(2)+'/h</div>'
+        +'<div class="sc-sub">'+dedHoursShown.toFixed(1)+'h × '+C2+dedRate.toFixed(2)+'/h</div>'
         +'</div>'
         +'<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding-left:10px;border-left:1px solid var(--bdr);margin-left:10px;min-width:52px;">'
         +'<div style="font-size:10px;color:var(--txtm);">net pay</div>'
@@ -4844,7 +4852,7 @@ async function renderEmpReport(){
         +'</div>';
     }
     if(showExp){
-      var expNetTotal=totalPay+mExpTotal;
+      var expNetTotal=pureBase+recOT+totalBonus-deductAmt+mExpTotal;
       payCards+='<div class="sc sc-sm" style="border-color:rgba(20,184,166,0.35);display:flex;align-items:stretch;">'
         +'<div class="sc-accent" style="background:var(--tel);"></div>'
         +'<div style="flex:1;">'
@@ -4859,13 +4867,13 @@ async function renderEmpReport(){
         +'</div>'
         +'</div>';
     }
-    var finalTotal=totalPay+(showExp?mExpTotal:0);
+    var finalTotal=pureBase+recOT+totalBonus-deductAmt+(showExp?mExpTotal:0);
     var totalParts=[];
     if(showDeduct)totalParts.push('net');if(showOT)totalParts.push('OT');if(showBonus)totalParts.push('bonus');if(showExp)totalParts.push('exp');
     if(!totalParts.length)totalParts.push('inc. all');
     // Total payable — breakdown on right
     var breakdownLines=[];
-    if(grossPay>0)breakdownLines.push('base '+C2+grossPay.toFixed(2));
+    if(pureBase>0)breakdownLines.push('base '+C2+pureBase.toFixed(2));
     if(showOT)breakdownLines.push('OT +'+C2+recOT.toFixed(2));
     if(showBonus)breakdownLines.push('bonus +'+C2+totalBonus.toFixed(2));
     if(showDeduct)breakdownLines.push('ded −'+C2+deductAmt.toFixed(2));
