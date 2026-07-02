@@ -882,6 +882,11 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
 
       <!-- My expenses -->
       <div class="sec">My Expenses</div>
+      <div style="position:relative;margin-bottom:10px;">
+        <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--txtm);"></i>
+        <input type="text" id="expSearchInput" placeholder="Search all my expenses (merchant, items, notes)..." oninput="renderExpenses()" style="width:100%;box-sizing:border-box;padding:9px 34px 9px 32px;border:1px solid var(--bdr);border-radius:10px;font-size:13px;font-family:inherit;color:var(--txt);background:var(--card);outline:none;">
+        <button onclick="document.getElementById('expSearchInput').value='';renderExpenses();" id="expSearchClear" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--txtm);cursor:pointer;font-size:13px;display:none;"><i class="fa-solid fa-circle-xmark"></i></button>
+      </div>
       <div class="month-tabs" id="expTabs"></div>
       <div class="card"><div class="card-b" id="myExp"></div></div>
 
@@ -976,6 +981,12 @@ function isP(s){return s==='P'||s==='HD'||s==='LA'||s==='EL';}
 function dim(y,m){return new Date(y,m+1,0).getDate();}
 function C(){return cfg.currency||'£';}
 function fmt(v){return C()+parseFloat(v||0).toFixed(2);}
+// Escapes user-entered text before inserting into HTML. The office app has
+// always had this; the employee app never did — meaning anything typed (or
+// AI-scanned) into merchant/notes/items was rendered as raw HTML everywhere
+// it appeared. eH() is the short alias used inside template literals.
+function escapeHtml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+const eH=escapeHtml;
 // See office app for rationale — text+decimal mode with manual sanitizing
 // avoids native number-input quirks that can drop typed decimal digits.
 function sanitizeAmountInput(el){
@@ -1517,11 +1528,32 @@ async function loadAll(){
 }
 
 // ── REALTIME ──
+// ── SYSTEM NOTIFICATIONS (free browser Notification API, no install needed) ──
+// Fires a real phone/desktop notification when the app tab is in the
+// background — in-app popup toasts still handle the foreground case.
+function sysNotify(title,body){
+  try{
+    if(!('Notification' in window))return;
+    if(Notification.permission!=='granted')return;
+    if(!document.hidden)return; // app visible — the in-app popup covers it
+    new Notification(title,{body:body||'',icon:'icon-192.png',badge:'icon-192.png',tag:'ohm-'+title});
+  }catch(e){/* some webviews lack Notification — fine, popups still work */}
+}
+function requestNotifPermission(){
+  try{
+    if(!('Notification' in window))return;
+    if(Notification.permission!=='default')return; // already granted or denied
+    // Ask gently, a few seconds after login rather than the instant they land
+    setTimeout(()=>{Notification.requestPermission();},4000);
+  }catch(e){}
+}
 function startRealtime(){
+  requestNotifPermission();
   realtimeChannel=sb.channel('emp-'+emp.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`employee_id=eq.${emp.id}`},payload=>{
       if(!myMsgs.find(m=>m.id===payload.new.id))myMsgs.push(payload.new);
       updateBadges();
+      sysNotify('New message from Office',(payload.new.body||'').slice(0,80));
       if(document.getElementById('pg-msg').classList.contains('on'))renderMsgs();
       else showPopupNotif('<i class="fa-solid fa-bell" style="margin-right:5px;"></i>New message from Office');
     })
@@ -1530,7 +1562,8 @@ function startRealtime(){
       if(idx>=0)myBatches[idx]=payload.new;else myBatches.push(payload.new);
       updateBadges();
       const st=payload.new.status;
-      
+      if(st==='approved')sysNotify('Expenses approved ✅','Your expense submission has been approved');
+      else if(st==='rejected')sysNotify('Expenses rejected','Contact the office for details');
       showPopupNotif(st==='approved'?'<i class="fa-solid fa-check-circle" style="color:#16a34a;margin-right:5px;"></i>Expenses Approved!':st==='rejected'?'<i class="fa-solid fa-times-circle" style="color:#dc2626;margin-right:5px;"></i>Expenses Rejected':'<i class="fa-solid fa-receipt" style="margin-right:5px;"></i>Expense batch updated');
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'attendance',filter:`employee_id=eq.${emp.id}`},payload=>{
@@ -1551,6 +1584,7 @@ function startRealtime(){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'payment_status',filter:`employee_id=eq.${emp.id}`},payload=>{
       myPaySt.push(payload.new);
       updateBadges();
+      sysNotify('Payment update 💷',payload.new.bank_paid?'Payment sent to your bank':payload.new.cash_paid?'Cash payment recorded':'Payment status updated');
       showPopupNotif(`<i class="fa-solid fa-sterling-sign" style="margin-right:5px;"></i>Payment ${payload.new.bank_paid?'sent to bank':payload.new.cash_paid?'given as cash':'updated'}!`,'payment');
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'payment_status',filter:`employee_id=eq.${emp.id}`},payload=>{
@@ -1572,6 +1606,7 @@ function startRealtime(){
       const msg=st==='approved'?`<i class="fa-solid fa-check-circle" style="color:#16a34a;margin-right:5px;"></i>Attendance request approved for ${payload.new.date}`
                :st==='rejected'?`<i class="fa-solid fa-times-circle" style="color:#dc2626;margin-right:5px;"></i>Attendance request rejected — ${payload.new.office_note||'see office'}`
                :'<i class="fa-solid fa-calendar-check" style="margin-right:5px;"></i>Attendance request updated';
+      sysNotify(st==='approved'?'Attendance approved ✅':st==='rejected'?'Attendance request rejected':'Attendance request updated',payload.new.date||'');
       showPopupNotif(msg,'att-req');
       updateBadges();
       if(document.getElementById('pg-att').classList.contains('on'))renderAtt();
@@ -1745,7 +1780,7 @@ function renderHome(silent=false){
   expEl.innerHTML=recent.length?recent.map(e=>{const col=getCatColor(e.category);return`
     <div class="exp-row">
       <div class="exp-icon" style="background:${col}18;color:${col};"><i class="fa-solid fa-receipt"></i></div>
-      <div style="flex:1;"><div class="exp-name">${e.merchant||'—'}</div><div class="exp-meta">${e.category||'—'} · ${fmtDS(e.date)}</div></div>
+      <div style="flex:1;"><div class="exp-name">${eH(e.merchant)||'—'}</div><div class="exp-meta">${eH(e.category)||'—'} · ${fmtDS(e.date)}</div></div>
       <div class="exp-amt">${fmt(e.amount)}</div>
     </div>`;}).join(''):'<div class="empty-s" style="padding:14px;"><i class="fa-solid fa-receipt"></i><p>No expenses yet</p></div>';
 }
@@ -2514,6 +2549,11 @@ async function submitExp(){
   if(!merchant||!amt||!date){toast('Please fill date, merchant and amount','e');return;}
   const _expD=new Date(date+'T00:00:00');
   if(isMonthLocked(_expD.getMonth(),_expD.getFullYear())){toast('⛔ Payroll for this month is already locked by the office — pick a different date or contact them','e');return;}
+  // Duplicate check: same merchant + same amount within 2 days = probably a
+  // double entry (or two people splitting one receipt). Warn, don't block —
+  // genuinely buying the same thing twice at the same shop does happen.
+  const _dupes=myExp.filter(x=>x.merchant&&x.merchant.trim().toLowerCase()===merchant.toLowerCase()&&Math.abs(parseFloat(x.amount)-amt)<0.01&&Math.abs(new Date(x.date)-_expD)<604800000);
+  if(_dupes.length&&!confirm(`Possible duplicate: you already have "${merchant}" for ${fmt(amt)} on ${fmtDS(_dupes[0].date)}. Submit anyway?`))return;
   if(_rcptFile&&_rcptFile.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');return;}
   // Only now — after every validation has passed — do we lock submission.
   // IMPORTANT: no fixed setTimeout to auto-release this. The old version reset
@@ -2576,13 +2616,24 @@ async function submitExp(){
 }
 function renderExpenses(){
   const m=expM,y=expY;
+  const _q=(document.getElementById('expSearchInput')?.value||'').trim().toLowerCase();
+  const _clearBtn=document.getElementById('expSearchClear');
+  if(_clearBtn)_clearBtn.style.display=_q?'block':'none';
+  // Grey out the month tabs while searching, since search covers ALL months
+  const _tabsEl=document.getElementById('expTabs');
+  if(_tabsEl){_tabsEl.style.opacity=_q?'0.35':'1';_tabsEl.style.pointerEvents=_q?'none':'auto';}
   const mExp=myExp.filter(e=>{
-    const d=new Date(e.date+'T00:00:00');
-    if(d.getMonth()!==m||d.getFullYear()!==y)return false;
     // Skip blank rows (no merchant AND no amount AND no description)
     if(!e.merchant&&!e.description&&(!e.amount||parseFloat(e.amount)===0))return false;
+    if(_q){
+      // Searching: match across ALL months on merchant, items, notes, category, or amount
+      const hay=[(e.merchant||''),(e.items||''),(e.notes||''),(e.category||''),String(e.amount||'')].join(' ').toLowerCase();
+      return hay.includes(_q);
+    }
+    const d=new Date(e.date+'T00:00:00');
+    if(d.getMonth()!==m||d.getFullYear()!==y)return false;
     return true;
-  });
+  }).sort((a,b)=>_q?b.date.localeCompare(a.date):0);
   const total=mExp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
   // My expenses list
   document.getElementById('myExp').innerHTML=mExp.length?mExp.map(e=>{
@@ -2595,13 +2646,13 @@ function renderExpenses(){
     return`<div class="exp-row" id="expRow-${e.id}" onclick="${canEdit?`if(!event.target.closest('a,button'))toggleExpRowActions('${e.id}')`:''}" style="cursor:${canEdit?'pointer':'default'};position:relative;${isFlagged?'background:rgba(220,38,38,0.04);border-radius:10px;padding:8px;':isRejected?'background:rgba(220,38,38,0.03);border-radius:10px;padding:8px;':''}">
       <div class="exp-icon" style="background:${col}18;color:${col};"><i class="fa-solid fa-receipt"></i></div>
       <div style="flex:1;">
-        <div class="exp-name">${e.merchant||'—'}</div>
-        <div class="exp-meta">${e.category||'—'} · ${fmtDS(e.date)}</div>
+        <div class="exp-name">${eH(e.merchant)||'—'}</div>
+        <div class="exp-meta">${eH(e.category)||'—'} · ${fmtDS(e.date)}</div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap;">
           <span class="exp-status ${e.status||'draft'}">${isApproved?'Approved':isRejected?'Rejected':isPending?'Pending review':'Draft'}</span>
           ${e.receipt_url?`<a href="${e.receipt_url}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:var(--txtm);display:inline-flex;align-items:center;gap:2px;text-decoration:none;"><i class="fa-solid fa-paperclip" style="font-size:9px;"></i>receipt</a>`:''}
         </div>
-        ${isFlagged?`<div style="font-size:11px;color:var(--red);margin-top:4px;font-weight:600;"><i class="fa-solid fa-flag" style="margin-right:3px;"></i>Flagged by office${e.flag_note?': "'+e.flag_note+'"':''}</div>`:''}
+        ${isFlagged?`<div style="font-size:11px;color:var(--red);margin-top:4px;font-weight:600;"><i class="fa-solid fa-flag" style="margin-right:3px;"></i>Flagged by office${e.flag_note?': "'+eH(e.flag_note)+'"':''}</div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0;">
         <div class="exp-amt" style="color:${isApproved?'var(--grn)':isRejected?'var(--red)':'var(--grn)'};">${fmt(e.amount)}</div>
@@ -2614,7 +2665,7 @@ function renderExpenses(){
       </div>`:''}
     </div>`;
   }).join('')+`<div style="border-top:1px solid var(--bdr);padding-top:9px;margin-top:9px;display:flex;justify-content:space-between;"><span style="font-size:13px;font-weight:700;">Total</span><span style="font-family:JetBrains Mono;font-size:14px;font-weight:800;color:var(--grn);">${fmt(total)}</span></div>`:
-  '<div class="empty-s"><i class="fa-solid fa-receipt"></i><p>No expenses for this month</p></div>';
+  '<div class="empty-s"><i class="fa-solid fa-receipt"></i><p>'+(_q?'No expenses match your search':'No expenses for this month')+'</p></div>';
 
   // Approval batches
   const batchHtml=myBatches.length?myBatches.map(b=>{
@@ -3122,7 +3173,7 @@ async function renderMsgs(){
   area.innerHTML=myMsgs.map(m=>{
     const isMe=m.sender!=='office';
     return`<div class="bubble-wrap ${isMe?'me':'them'}">
-      <div class="bubble ${isMe?'me':'them'}">${m.body}</div>
+      <div class="bubble ${isMe?'me':'them'}">${eH(m.body)}</div>
       <div class="bubble-time">${isMe?'You':'Office'} · ${new Date(m.created_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
     </div>`;
   }).join('');
