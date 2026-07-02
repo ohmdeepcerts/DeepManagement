@@ -769,7 +769,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
           <div class="fg"><label>Category</label><select id="edCat"><option value="">— Select —</option></select></div>
           <div class="fg"><label>Amount (£) *</label><input type="text" id="edAmtInp" placeholder="0.00" inputmode="decimal" oninput="sanitizeAmountInput(this)"></div>
         </div>
-        <div class="fg"><label>Items <span style="font-weight:400;color:var(--txtm);">(auto-filled from receipt scan, or type your own)</span></label><textarea id="edItemsInp" placeholder="e.g. 2x cable ties, 1x 10mm drill bit, 1x junction box"></textarea></div>
+        <div class="fg"><label>Items <span style="font-weight:400;color:var(--txtm);">(auto-filled from receipt scan, or type your own)</span></label><textarea id="edItemsInp" placeholder="e.g. 2x cable ties&#10;1x 10mm drill bit&#10;1x junction box"></textarea></div>
         <div class="fg"><label>Notes</label><textarea id="edNotesInp" placeholder="Any details..."></textarea></div>
         <div style="display:flex;align-items:center;gap:11px;background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--rs);padding:11px 13px;margin-bottom:14px;">
           <i class="fa-solid fa-tag" style="color:var(--amb);font-size:16px;flex-shrink:0;"></i>
@@ -830,7 +830,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
           <div class="fg"><label>Category</label><select id="expCat"><option value="">— Select —</option></select></div>
           <div class="fg"><label>Amount (£) *</label><input type="text" id="expAmt" placeholder="0.00" inputmode="decimal" oninput="sanitizeAmountInput(this)"></div>
         </div>
-        <div class="fg"><label>Items <span style="font-weight:400;color:var(--txtm);">(auto-filled from receipt scan, or type your own)</span></label><textarea id="expItems" placeholder="e.g. 2x cable ties, 1x 10mm drill bit, 1x junction box"></textarea></div>
+        <div class="fg"><label>Items <span style="font-weight:400;color:var(--txtm);">(auto-filled from receipt scan, or type your own)</span></label><textarea id="expItems" placeholder="e.g. 2x cable ties&#10;1x 10mm drill bit&#10;1x junction box"></textarea></div>
         <div class="fg"><label>Notes</label><textarea id="expNotes" placeholder="Any details..."></textarea></div>
         <div style="display:flex;align-items:center;gap:11px;background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--rs);padding:11px 13px;margin-bottom:12px;">
           <i class="fa-solid fa-tag" style="color:var(--amb);font-size:16px;flex-shrink:0;"></i>
@@ -2052,7 +2052,7 @@ async function scanReceiptWithAI(target){
       return;
     }
     const yr=new Date().getFullYear();
-    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"items\":\"item list\",\"bbox\":{\"x\":0,\"y\":0,\"w\":100,\"h\":100},\"is_bent\":false,\"rotation\":0}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=a short comma-separated list of the individual line items on the receipt with quantities where shown, e.g. \"2x cable ties, 1x 10mm drill bit, 1x junction box\" — null if the receipt doesn't show itemized lines (e.g. fuel, parking). bbox=bounding box of the receipt as percentages of image (x=left%, y=top%, w=width%, h=height%), set null if receipt fills whole image with no background. is_bent=true if receipt is curved/bent/folded, false if flat. rotation=degrees you'd need to rotate the whole image CLOCKWISE so the receipt text reads upright, left-to-right — must be exactly 0, 90, 180, or 270 (0 if already upright).`;
+    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"items\":\"item list\",\"bbox\":{\"x\":0,\"y\":0,\"w\":100,\"h\":100},\"is_bent\":false,\"rotation\":0}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=the individual line items on the receipt, ONE PER LINE separated by \\n (like a real itemized receipt), each formatted as \"QTYx Item name\" with quantities where shown, e.g. \"2x cable ties\\n1x 10mm drill bit\\n1x junction box\" — null if the receipt doesn't show itemized lines (e.g. fuel, parking). bbox=bounding box of the receipt as percentages of image (x=left%, y=top%, w=width%, h=height%), set null if receipt fills whole image with no background. is_bent=true if receipt is curved/bent/folded, false if flat. rotation=degrees you'd need to rotate the whole image CLOCKWISE so the receipt text reads upright, left-to-right — must be exactly 0, 90, 180, or 270 (0 if already upright).`;
     // Try the high-quota free model first; each attempt retries on transient
     // failures but bails immediately on 429 (daily quota — retrying won't help).
     // If it's still down after that, fall back to gemini-2.5-flash once — a
@@ -2128,7 +2128,7 @@ async function scanReceiptWithAI(target){
     if(!result.merchant&&!(result.amount>0)&&result.rotation&&workingB64!==b64){
       if(st){st.textContent='First read was unclear — trying again now it\'s straightened...';st.style.color='var(--acc)';}
       try{
-        const retryPrompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"items\":\"item list\"}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=a short comma-separated list of the individual line items on the receipt with quantities where shown — null if not itemized.`;
+        const retryPrompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"items\":\"item list\"}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=the individual line items on the receipt, ONE PER LINE separated by \\n (like a real itemized receipt), formatted as "QTYx Item name" — null if not itemized.`;
         const retryResp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${_geminiKey}`,{
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:workingMime,data:workingB64}},{text:retryPrompt}]}]})
