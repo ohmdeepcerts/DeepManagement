@@ -1149,7 +1149,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <!-- SETTINGS -->
     <div class="page" id="page-settings">
       <div class="ph"><div><h1>Settings &amp; Tools</h1></div><button class="btn btn-p" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div>
-      <div class="tabs"><div class="tab active" onclick="setSettTab('general',this)">General</div><div class="tab" onclick="setSettTab('att',this)">Attendance</div><div class="tab" onclick="setSettTab('pay',this)">Pay</div><div class="tab" onclick="setSettTab('exp',this)">Expenses</div><div class="tab" onclick="setSettTab('ai',this)"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:4px;"></i>AI</div><div class="tab" onclick="setSettTab('admin',this)">Password</div><div class="tab" onclick="setSettTab('data',this)"><i class="fa-solid fa-database" style="margin-right:4px;"></i>Data</div></div>
+      <div class="tabs"><div class="tab active" onclick="setSettTab('general',this)">General</div><div class="tab" onclick="setSettTab('att',this)">Attendance</div><div class="tab" onclick="setSettTab('pay',this)">Pay</div><div class="tab" onclick="setSettTab('exp',this)">Expenses</div><div class="tab" onclick="setSettTab('ai',this)"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:4px;"></i>AI</div><div class="tab" onclick="setSettTab('email',this)"><i class="fa-solid fa-envelope" style="margin-right:4px;"></i>Email</div><div class="tab" onclick="setSettTab('admin',this)">Password</div><div class="tab" onclick="setSettTab('data',this)"><i class="fa-solid fa-database" style="margin-right:4px;"></i>Data</div></div>
       <div class="sett-sec active" id="settTab-general"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl" style="grid-column:1/-1"><label>Company Name</label><input type="text" id="sCompany" placeholder="OHM Electrical"></div><div class="fgl"><label>Currency</label><select id="sCurrency"><option value="£">£ GBP</option><option value="$">$ USD</option><option value="€">€ EUR</option></select></div><div class="fgl"><label>Attendance Warning %</label><input type="number" id="sThreshold" min="0" max="100" placeholder="80"></div></div></div></div></div>
       <div class="sett-sec" id="settTab-att"><div class="card"><div class="cb"><div class="fg fg2"><div class="fgl"><label>Default Work Start</label><input type="time" id="sWStart" value="08:00"></div><div class="fgl"><label>Default Work End</label><input type="time" id="sWEnd" value="17:00"></div><div class="fgl"><label>OT After (hours/day)</label><input type="number" id="sOT" min="1" max="24" step="0.5" placeholder="8"></div></div></div></div>
         <div class="card" style="margin-top:13px;"><div class="ch"><div class="ct">Bank Account Names</div></div><div class="cb"><div id="bankList" style="display:flex;flex-direction:column;gap:7px;margin-bottom:11px;"></div><div style="display:flex;gap:7px;"><input type="text" id="newBank" placeholder="e.g. GB Electrical" style="flex:1;padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;"><button class="btn btn-p btn-sm" onclick="addBank()"><i class="fa-solid fa-plus"></i>Add</button></div></div></div>
@@ -1170,6 +1170,27 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
             <button class="btn btn-p" onclick="saveGeminiKey()"><i class="fa-solid fa-floppy-disk"></i>Save Key</button>
             <button class="btn btn-o btn-sm" onclick="openGeminiColumnMissingModal()" style="margin-left:8px;" title="Run once if saving fails"><i class="fa-solid fa-database"></i>First-time setup SQL</button>
             <p style="font-size:12px;color:var(--txtm);margin-top:11px;line-height:1.6;">Employees will see <strong>"Not configured — admin must add Gemini key in Settings → AI"</strong> on the scan button until a key is saved here.<br>Don't have a key? Get a free one at <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--acc);">aistudio.google.com/apikey</a> — sign in with a Google account, click "Create API key", and paste it above.</p>
+          </div>
+        </div>
+      </div>
+      <div class="sett-sec" id="settTab-email">
+        <div class="card">
+          <div class="ch"><div><div class="ct"><i class="fa-solid fa-envelope" style="color:var(--acc);margin-right:6px;"></i>Payslip Email (Resend)</div><div class="cs">Powers the "Email Payslip" button on the Payroll page</div></div></div>
+          <div class="cb">
+            <div class="fgl" style="margin-bottom:11px;">
+              <label>Resend API Key</label>
+              <div style="display:flex;gap:7px;">
+                <input type="password" id="sResendKey" placeholder="Paste your Resend API key here" style="flex:1;padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;">
+                <button type="button" class="btn btn-o btn-sm" onclick="const i=document.getElementById('sResendKey');i.type=i.type==='password'?'text':'password';this.querySelector('i').className=i.type==='password'?'fa-solid fa-eye':'fa-solid fa-eye-slash';" title="Show/hide key"><i class="fa-solid fa-eye"></i></button>
+              </div>
+            </div>
+            <div class="fgl" style="margin-bottom:11px;">
+              <label>Send From Address</label>
+              <input type="text" id="sFromEmail" placeholder="payroll@yourdomain.com" style="width:100%;padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;">
+            </div>
+            <button class="btn btn-p" onclick="saveResendSettings()"><i class="fa-solid fa-floppy-disk"></i>Save</button>
+            <p style="font-size:12px;color:var(--txtm);margin-top:11px;line-height:1.6;">Get a free key at <a href="https://resend.com" target="_blank" style="color:var(--acc);">resend.com</a> (3,000 emails/month free) — the "from" address must be on a domain you've verified there.</p>
+            <p style="font-size:12px;color:var(--amb);margin-top:8px;line-height:1.6;"><i class="fa-solid fa-triangle-exclamation"></i> Heads up: Resend's API is built to be called from a server, not directly from a browser like this app — most browsers will block the request even with a valid key. If sending fails, the app will offer to open your own email app instead with the payslip pre-filled, which always works. For fully automatic sending, a small server-side relay (e.g. a Supabase Edge Function) would be needed — ask if you'd like help setting that up.</p>
           </div>
         </div>
       </div>
@@ -1803,6 +1824,29 @@ function isP(s){return s==='P'||s==='HD'||s==='LA'||s==='EL';}
 function inits(n){return(n||'').split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function dim(y,m){return new Date(y,m+1,0).getDate();}
+// Was this employee actually on the books during the given month/year?
+// Active employees always qualify. Ex-employees still qualify for any month
+// up to and including the month they left (using their stored left_date) —
+// otherwise marking someone as Ex-Employee retroactively erases them from
+// Payroll/Attendance for months they genuinely worked, forcing an awkward
+// "reinstate, fix the numbers, mark ex again" workaround.
+function empActiveInMonth(e,month,year){
+  if(e.status==='Active')return true;
+  if(e.status==='ex'&&e.left_date){
+    const leftD=new Date(e.left_date+'T00:00:00');
+    const monthStart=new Date(year,month,1);
+    return leftD>=monthStart;
+  }
+  return false;
+}
+// Same idea, for a single specific day (Mark Attendance, Daily View).
+function empActiveOnDate(e,dateObj){
+  if(e.status==='Active')return true;
+  if(e.status==='ex'&&e.left_date){
+    return e.left_date>=dateKey(dateObj);
+  }
+  return false;
+}
 function cur(){return cfg.currency||'£';}
 function fmt(v){return cur()+parseFloat(v||0).toFixed(2);}
 // Sanitizes a text-mode amount input as the user types: strips anything that
@@ -2306,7 +2350,7 @@ async function recalcMonthsFrom(employeeId,fromDateStr){
 }
 // Recalculate every active employee for a given month — manual "Recalculate Whole Month" button
 async function recalcWholeMonth(month,year){
-  const emps=employees.filter(e=>e.status==='Active');
+  const emps=employees.filter(e=>empActiveInMonth(e,month,year));
   setSyncStatus('saving');
   for(const emp of emps){
     await savePayrollSummary(emp.id,month,year);
@@ -2316,7 +2360,7 @@ async function recalcWholeMonth(month,year){
 
 // Lock a month: marks all employees' payroll_summary rows for that month as final+locked
 async function lockPayrollMonth(month,year){
-  const emps=employees.filter(e=>e.status==='Active');
+  const emps=employees.filter(e=>empActiveInMonth(e,month,year));
   setSyncStatus('saving');
   for(const emp of emps){
     await savePayrollSummary(emp.id,month,year,{status:'final',locked:true,force:true});
@@ -2330,7 +2374,7 @@ async function lockPayrollMonth(month,year){
 
 // Unlock a month: marks payroll_summary rows back to draft so they can be recalculated
 async function unlockPayrollMonth(month,year){
-  const emps=employees.filter(e=>e.status==='Active');
+  const emps=employees.filter(e=>empActiveInMonth(e,month,year));
   setSyncStatus('saving');
   for(const emp of emps){
     const existing=payrollSummaries.find(p=>p.employee_id===emp.id&&p.month===month&&p.year===year);
@@ -2811,6 +2855,12 @@ function populateEmpSel(id){
   const s=document.getElementById(id);if(!s)return;
   const cur=s.value||_lastEmpId;s.innerHTML='';
   employees.filter(e=>e.status==='Active').forEach(e=>{s.appendChild(new Option(e.name,e.id));});
+  const exEmps=employees.filter(e=>e.status==='ex');
+  if(exEmps.length){
+    const grp=document.createElement('optgroup');grp.label='Ex-Employees';
+    exEmps.forEach(e=>{grp.appendChild(new Option(e.name+' (Ex)',e.id));});
+    s.appendChild(grp);
+  }
   if(cur&&[...s.options].some(o=>o.value===cur))s.value=cur;
   else if(s.options.length>0)_lastEmpId=s.value;
   s.onchange=()=>{_lastEmpId=s.value;renderEmpReport();};
@@ -3486,7 +3536,7 @@ function updateMarkNav(){
   }
 }
 function buildMarkTable(){
-  const emps=employees.filter(e=>e.status==='Active');
+  const emps=employees.filter(e=>empActiveOnDate(e,markDate));
   const body=document.getElementById('markBody'),empty=document.getElementById('markEmpty');
   if(emps.length===0){body.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
@@ -4001,6 +4051,7 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
     <td>
       <input type="text" class="shi" placeholder="Merchant / Supplier..." value="${(row.merchant||'').replace(/"/g,'&quot;')}" ${isEx?'disabled':''} autocomplete="off" oninput="updateExp('${row.id}','merchant',this.value);checkAutoNextRow('${row.id}',${i},${totalRows||1});ledMerchantAC(this,'${row.id}')" onblur="setTimeout(hideLedAC,200)">
       <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">${row.receipt_url?`<div onclick="openLightbox('${row.receipt_url}')" style="width:30px;height:30px;border-radius:5px;border:1px solid var(--bdr);overflow:hidden;cursor:pointer;flex-shrink:0;background:var(--card2);display:flex;align-items:center;justify-content:center;position:relative;"><img src="${row.receipt_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;" onerror="this.style.display='none'"><i class="fa-solid fa-file-image" style="font-size:14px;color:var(--acc);"></i></div><a href="${row.receipt_url}" target="_blank" title="Open receipt" style="font-size:10px;color:var(--acc);"><i class="fa-solid fa-eye"></i></a>`:''}<label title="${row.receipt_url?'Replace receipt':'Attach receipt'}" style="width:22px;height:22px;border-radius:5px;border:1px dashed ${row.receipt_url?'var(--acc)':'var(--bdr)'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:${row.receipt_url?'var(--acc)':'var(--txtm)'};font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label></div>
+      ${row.items?`<div onclick="editLedItems('${row.id}','${(row.items||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" title="Click to edit items" style="font-size:10px;color:var(--acc);margin-top:1px;cursor:pointer;"><i class="fa-solid fa-list" style="font-size:9px;margin-right:2px;"></i>${row.items}</div>`:!isEx?`<div onclick="editLedItems('${row.id}','')" style="font-size:10px;color:var(--txtm);margin-top:1px;cursor:pointer;opacity:0.6;"><i class="fa-solid fa-plus" style="font-size:8px;"></i> Add items</div>`:''}
       ${row.notes?`<div style="font-size:10px;color:var(--txtm);margin-top:1px;font-style:italic;">"${row.notes}"</div>`:''}
     </td>
     <td><input type="text" class="shi cat-inp" list="ledCatList" placeholder="Category" value="${(row.category||'').replace(/"/g,'&quot;')}" style="${catStyle}" ${isEx?'disabled':''} oninput="updateExp('${row.id}','category',this.value);this.style.cssText=getCatStyle(this.value)"></td>
@@ -4074,6 +4125,14 @@ async function toggleTag(expId,tagName){
   const cell=document.getElementById(`tc-${expId}`);
   if(cell)cell.innerHTML=buildTagsCell(exp.tags,expId);
   renderLedRight(expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return e.employee_id===ledgerStaff&&d.getFullYear()===ledgerYear&&String(d.getMonth()+1).padStart(2,'0')===ledgerMonth;}).sort((a,b)=>a.date.localeCompare(b.date)),cur());
+}
+// Click-to-edit for the Items list (auto-filled by Gemini on the employee
+// side, or added/corrected by the office here). No dedicated table column —
+// the ledger's already tight on width — so this edits it via a quick prompt.
+function editLedItems(id,current){
+  const val=prompt('Items on this receipt (comma-separated):',current||'');
+  if(val===null)return; // cancelled
+  updateExp(id,'items',val.trim());
 }
 async function updateExp(id,field,val){
   const exp=expenses.find(e=>e.id===id);if(!exp)return;
@@ -4476,7 +4535,7 @@ function renderMonthly(){
   });
   const mvDm=document.getElementById('mvDisp_m'),mvDy=document.getElementById('mvDisp_y');
   if(mvDm)mvDm.textContent=MONTHS[month];if(mvDy)mvDy.textContent=year;
-  const days=dim(year,month);const emps=employees.filter(e=>e.status==='Active');
+  const days=dim(year,month);const emps=employees.filter(e=>empActiveInMonth(e,month,year));
   let hRow='<thead><tr><th style="text-align:left;padding-left:9px;">Employee</th>';
   for(let d=1;d<=days;d++){const dt=new Date(year,month,d),dow=dt.getDay();const cc=(dow===0?'sc2':dow===6?'wc':'')+(dow===1?' wsc':'');hRow+=`<th class="${cc}" style="width:22px;">${d}<br><span style="font-size:7px;">${['Su','Mo','Tu','We','Th','Fr','Sa'][dow]}</span></th>`;}
   hRow+='<th>P</th><th>A</th><th>HD</th><th>☀</th><th>%</th></tr></thead>';
@@ -4531,7 +4590,7 @@ function updateDailyNav(){
   const btn=document.getElementById('dvEditBtn');if(btn){btn.disabled=locked;btn.innerHTML=locked?'<i class="fa-solid fa-lock"></i> Locked':'<i class="fa-solid fa-pen-to-square"></i>Edit';}
 }
 function buildDailyTable(){
-  const key=dateKey(dailyDate);const emps=employees.filter(e=>e.status==='Active');
+  const key=dateKey(dailyDate);const emps=employees.filter(e=>empActiveOnDate(e,dailyDate));
   // On-demand load: fetch this day's month if not already in memory (older than the default window)
   ensureMonthLoaded(dailyDate.getMonth(),dailyDate.getFullYear()).then(fetched=>{
     if(fetched&&currentPage==='daily'&&dateKey(dailyDate)===key)buildDailyTable();
@@ -4993,6 +5052,7 @@ function printExpenseReport(){
         <th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Date</th>
         <th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Merchant</th>
         <th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Category</th>
+        <th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Items</th>
         <th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Notes</th>
         <th style="padding:5px 7px;border:1px solid #ccc;text-align:center;">Status</th>
         <th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Amount</th>
@@ -5006,12 +5066,13 @@ function printExpenseReport(){
         return`<tr${neg?' style="background:#fef2f2;"':''}><td style="padding:5px 7px;border:1px solid #ccc;">${fmtDateS(e.date)}</td>`
           +`<td style="padding:5px 7px;border:1px solid #ccc;font-weight:600;">${escapeHtml(e.merchant||'—')}${vatTag}</td>`
           +`<td style="padding:5px 7px;border:1px solid #ccc;">${escapeHtml(e.category||'—')}</td>`
+          +`<td style="padding:5px 7px;border:1px solid #ccc;font-size:11px;">${escapeHtml(e.items||'—')}</td>`
           +`<td style="padding:5px 7px;border:1px solid #ccc;">${escapeHtml(e.notes||'—')}</td>`
           +`<td style="padding:5px 7px;border:1px solid #ccc;text-align:center;">${statusLabel(e.status)}</td>`
           +`<td style="padding:5px 7px;border:1px solid #ccc;text-align:right;font-weight:700;color:${neg?'#dc2626':'#0d9488'};">${neg?'−':''}${C}${Math.abs(amt).toFixed(2)}</td>`
           +`<td style="padding:5px 7px;border:1px solid #ccc;text-align:right;color:${running<0?'#dc2626':'#374151'};">${running<0?'−':''}${C}${Math.abs(running).toFixed(2)}</td></tr>`;
       }).join('')}
-      <tr style="font-weight:bold;font-size:14px;background:#f0fdf4;"><td colspan="6" style="padding:6px 7px;border:2px solid #16a34a;">TOTAL</td><td style="padding:6px 7px;border:2px solid #16a34a;text-align:right;color:#16a34a;">${total<0?'−':''}${C}${Math.abs(total).toFixed(2)}</td></tr>
+      <tr style="font-weight:bold;font-size:14px;background:#f0fdf4;"><td colspan="7" style="padding:6px 7px;border:2px solid #16a34a;">TOTAL</td><td style="padding:6px 7px;border:2px solid #16a34a;text-align:right;color:#16a34a;">${total<0?'−':''}${C}${Math.abs(total).toFixed(2)}</td></tr>
       </tbody>
     </table>
     <div style="margin-top:26px;font-size:11px;color:#555;">${rows.length} entr${rows.length===1?'y':'ies'} · Generated ${fmtDate(dateKey(new Date()))}</div>
@@ -5038,7 +5099,7 @@ function renderYearly(){
     }
   });
   const d=document.getElementById('yrDisp');if(d)d.textContent=year;
-  const emps=employees.filter(e=>e.status==='Active');
+  const emps=employees.filter(e=>e.status==='Active'||(e.status==='ex'&&e.left_date&&e.left_date>=`${year}-01-01`));
   const att=attendance.filter(r=>new Date(r.date+'T00:00:00').getFullYear()===year);
   const yWD=Array.from({length:12},(_,m)=>Array.from({length:dim(year,m)},(_,d)=>isWD(new Date(year,m,d+1))).filter(Boolean).length).reduce((s,v)=>s+v,0);
   const C=cur();
@@ -5138,7 +5199,7 @@ function renderPayroll(){
   }
   const m=parseInt(document.getElementById('prMonth').value);
   const y=parseInt(document.getElementById('prYear').value);
-  const emps=employees.filter(e=>e.status==='Active');
+  const emps=employees.filter(e=>empActiveInMonth(e,m,y));
   const mRecs=attendance.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;});
   const mStr=String(m+1).padStart(2,'0');
   const locked=(cfg.locked_months||[]).includes(`${y}_${m}`);
@@ -5369,6 +5430,15 @@ async function sendPayslipEmail(empId,month,year){
     </div>
     <div class="footer">OHM Electrical · This is an automatically generated payslip · ${new Date().toLocaleDateString('en-GB')}</div>
   </div></body></html>`;
+  const RESEND_KEY=cfg.resend_key||'';
+  const FROM_EMAIL=cfg.from_email||'';
+  if(!RESEND_KEY||!FROM_EMAIL){
+    toast('Email sending isn\'t set up yet — go to Settings → Email','e');
+    if(confirm('Resend isn\'t configured. Open your own email app instead, with the payslip pre-filled, so you can send it manually?')){
+      openPayslipMailto(emp,monthName,year,basePay,otPay,bonusPay,expTotal,deductions,netPay,bankAmt,cashAmt,C);
+    }
+    return;
+  }
   try{
     const r=await fetch('https://api.resend.com/emails',{
       method:'POST',
@@ -5385,20 +5455,46 @@ async function sendPayslipEmail(empId,month,year){
       toast(`Payslip sent to ${emp.email} ✅`,'s');
     } else {
       console.error('Resend error:',data);
-      if(RESEND_KEY==='YOUR_RESEND_API_KEY'){
-        toast('Resend key not set — get a free key at resend.com','e');
-      } else {
-        toast(`Email failed: ${data.message||'check Resend account'}`,'e');
-      }
+      toast(`Email failed: ${data.message||'check Resend account'}`,'e');
     }
   }catch(err){
+    // Resend's API is designed to be called from a server, not a browser — most
+    // browsers will block this as a CORS/network error even with a valid key,
+    // which is exactly the crash reported. Rather than leave the admin stuck,
+    // offer the one thing that's guaranteed to work everywhere: their own email app.
     console.error('sendPayslipEmail:',err);
-    toast('Email failed — check internet connection','e');
+    if(confirm('Couldn\'t send automatically (this usually means Resend needs a small server-side relay, not a direct browser call). Open your own email app instead, with the payslip pre-filled?')){
+      openPayslipMailto(emp,monthName,year,basePay,otPay,bonusPay,expTotal,deductions,netPay,bankAmt,cashAmt,C);
+    }
   }
+}
+// Fallback that always works, no API key or server needed: opens the admin's
+// own email client with the payslip pre-filled as plain text.
+function openPayslipMailto(emp,monthName,year,basePay,otPay,bonusPay,expTotal,deductions,netPay,bankAmt,cashAmt,C){
+  const lines=[
+    `Payslip — ${monthName} ${year}`,
+    `Employee: ${emp.name}`,
+    `Role: ${emp.role||'—'}`,
+    ``,
+    `Basic Pay: ${C}${basePay.toFixed(2)}`,
+  ];
+  if(otPay>0)lines.push(`Overtime: +${C}${otPay.toFixed(2)}`);
+  if(bonusPay>0)lines.push(`Bonus: +${C}${bonusPay.toFixed(2)}`);
+  if(expTotal>0)lines.push(`Expenses: +${C}${expTotal.toFixed(2)}`);
+  if(deductions>0)lines.push(`Deductions: -${C}${deductions.toFixed(2)}`);
+  lines.push(`Net Pay: ${C}${netPay.toFixed(2)}`);
+  if(bankAmt>0||cashAmt>0){
+    lines.push('');
+    if(bankAmt>0)lines.push(`Bank Transfer: ${C}${bankAmt.toFixed(2)}`);
+    if(cashAmt>0)lines.push(`Cash: ${C}${cashAmt.toFixed(2)}`);
+  }
+  const subject=encodeURIComponent(`OHM Electrical — Payslip ${monthName} ${year}`);
+  const body=encodeURIComponent(lines.join('\n'));
+  window.location.href=`mailto:${emp.email}?subject=${subject}&body=${body}`;
 }
 function exportPayrollCSV(){
   const m=parseInt(document.getElementById('prMonth').value),y=parseInt(document.getElementById('prYear').value);
-  const emps=employees.filter(e=>e.status==='Active');
+  const emps=employees.filter(e=>empActiveInMonth(e,m,y));
   const mRecs=attendance.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;});
   const C=cur();
   const rows=[['Employee','Role','Contract','Pay Type','Days','Absent','Hrs','OT Hrs','Base Pay','OT Pay','Bonus','Expenses','Total','Bank Name','To Bank','Cash']];
@@ -5540,8 +5636,11 @@ function initDangerTab(){
         <i class="fa-solid fa-user-slash" style="color:var(--red);font-size:16px;"></i>
         <span style="font-size:14px;font-weight:700;color:var(--red);">Mark as Ex-Employee</span>
       </div>
-      <p style="font-size:12px;color:var(--txtm);margin-bottom:6px;line-height:1.6;">This will archive <strong>${emp.name}</strong>'s record and remove them from active payroll, attendance, and reports. Their historical data is kept. You can reinstate them at any time.</p>
+      <p style="font-size:12px;color:var(--txtm);margin-bottom:6px;line-height:1.6;">This will archive <strong>${emp.name}</strong>'s record and remove them from <strong>new</strong> attendance marking and future payroll. Their Payroll, Attendance, and Reports for any month up to and including their last working day stay exactly as they were — no need to reinstate them just to review or fix a past month.</p>
       <p style="font-size:12px;color:var(--txtm);margin-bottom:14px;line-height:1.6;">This does <strong>not</strong> delete any records — it only changes their status to ex-employee.</p>
+      <label style="display:block;font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:6px;">Last working day</label>
+      <input type="date" id="exLeftDateInput" value="${dateKey(new Date())}"
+        style="width:100%;padding:9px 11px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--txt);background:var(--card);outline:none;margin-bottom:10px;">
       <label style="display:block;font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:6px;">Type <strong style="color:var(--red);">${emp.name.toUpperCase()}</strong> to confirm</label>
       <input type="text" id="exConfirmInput" placeholder="Type employee name to confirm..." oninput="checkExConfirm('${emp.name}')"
         style="width:100%;padding:9px 11px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--txt);background:var(--card);outline:none;margin-bottom:10px;"
@@ -5567,7 +5666,7 @@ async function confirmMarkEx(id){
   if(btn)btn.disabled=true;
   const idx=employees.findIndex(e=>e.id===id);if(idx<0)return;
   const empName=employees[idx].name;
-  const leftDate=dateKey(new Date());
+  const leftDate=document.getElementById('exLeftDateInput')?.value||dateKey(new Date());
   const r=await sb.from('employees').update({status:'ex',left_date:leftDate}).eq('id',id);
   if(r.error){toast(r.error.message,'e');if(btn)btn.disabled=false;return;}
   employees[idx].status='ex';
@@ -6297,7 +6396,47 @@ function loadSettings(){
   document.getElementById('sSat').value=cfg.rate_sat||1.0;
   document.getElementById('sSun').value=cfg.rate_sun||1.0;
   document.getElementById('sGeminiKey').value=cfg.gemini_key||'';
+  document.getElementById('sResendKey').value=cfg.resend_key||'';
+  document.getElementById('sFromEmail').value=cfg.from_email||'';
   renderBankList();renderCatList();
+}
+async function saveResendSettings(){
+  const key=document.getElementById('sResendKey').value.trim();
+  const from=document.getElementById('sFromEmail').value.trim();
+  setSyncStatus('saving');
+  const r=await sb.from('settings').upsert({id:1,resend_key:key,from_email:from});
+  if(r.error){
+    setSyncStatus('err');
+    if(/column|schema cache/i.test(r.error.message)){
+      openResendColumnMissingModal();
+    } else {
+      toast(r.error.message,'e');
+    }
+    return;
+  }
+  cfg={...cfg,resend_key:key,from_email:from};setSyncStatus('saved');
+  toast(key&&from?'Email settings saved':'Email settings updated','s');
+}
+function openResendColumnMissingModal(){
+  const overlay=document.createElement('div');
+  overlay.className='confirm-overlay';
+  overlay.innerHTML=`<div class="confirm-box" style="max-width:440px;text-align:left;">
+    <div class="confirm-title" style="text-align:center;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--amb);margin-right:6px;"></i>One-time database setup needed</div>
+    <div class="confirm-msg" style="margin-bottom:12px;">The <code>settings</code> table doesn't have the email columns yet — these are brand-new fields, so the save can't go through until they're added. This is a one-time fix.</div>
+    <div style="font-size:12px;color:var(--txtm);margin-bottom:8px;">1. Copy the SQL below<br>2. Open your Supabase project → SQL Editor<br>3. Paste and click Run<br>4. Come back here and hit Save again</div>
+    <pre style="background:var(--card2);border:1px solid var(--bdr);border-radius:var(--rs);padding:10px 12px;font-size:12px;overflow-x:auto;margin-bottom:12px;">ALTER TABLE settings ADD COLUMN IF NOT EXISTS resend_key text;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS from_email text;</pre>
+    <div class="confirm-btns">
+      <button id="rcmClose" class="btn btn-o" style="flex:1;">Close</button>
+      <button id="rcmCopy" class="btn btn-p" style="flex:1;">Copy SQL</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.querySelector('#rcmClose').onclick=()=>overlay.remove();
+  overlay.querySelector('#rcmCopy').onclick=()=>{
+    navigator.clipboard.writeText("ALTER TABLE settings ADD COLUMN IF NOT EXISTS resend_key text;\nALTER TABLE settings ADD COLUMN IF NOT EXISTS from_email text;").then(()=>toast('SQL copied! Paste in Supabase SQL Editor and run.','s'));
+  };
 }
 async function saveGeminiKey(){
   const key=document.getElementById('sGeminiKey').value.trim();
