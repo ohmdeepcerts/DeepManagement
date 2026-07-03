@@ -1128,6 +1128,10 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <!-- MESSAGES -->
     <div class="page" id="page-messages">
       <div class="ph"><div><h1>Messages</h1><p>Communicate with employees</p><button class="btn btn-o btn-sm" onclick="openBroadcastModal()"><i class="fa-solid fa-bullhorn"></i>Broadcast</button></div></div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="ch"><div><div class="ct"><i class="fa-solid fa-bullhorn" style="color:var(--amb);margin-right:6px;"></i>Announcements</div><div class="cs">Shown on every employee's Home screen — "Important" ones pop up once when they open the app</div></div><button class="btn btn-p btn-sm" onclick="openAnnModal()"><i class="fa-solid fa-plus"></i>New</button></div>
+        <div class="cb" id="annAdminList"><div style="font-size:12px;color:var(--txtm);">Loading…</div></div>
+      </div>
       <div class="cr cr2">
         <div class="card"><div class="ch"><div class="ct">Select Employee</div></div><div class="cb"><select id="msgEmpSel" onchange="loadMessages(this.value)" style="width:100%;padding:8px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;"><option value="">— Choose employee —</option></select></div>
           <div class="cb" id="msgEmpList" style="max-height:300px;overflow-y:auto;"></div>
@@ -1136,7 +1140,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
           <div style="display:flex;gap:6px;">
             <button class="btn btn-d btn-sm" id="clearChatBtn" style="display:none;" onclick="clearChat()"><i class="fa-solid fa-trash"></i>Clear Chat</button>
           </div>
-        </div><div class="cb"><div class="message-area"><div class="msg-list" id="msgList"><div class="es" style="padding:20px;"><i class="fa-solid fa-comments"></i><h3>Select an employee</h3></div></div><div class="msg-input-row"><input class="msg-input" id="msgInput" placeholder="Type message..." onkeydown="if(event.key==='Enter')sendMsg()"><button class="btn btn-p btn-sm" onclick="sendMsg()"><i class="fa-solid fa-paper-plane"></i></button></div></div></div></div>
+        </div><div class="cb"><div class="message-area"><div class="msg-list" id="msgList"><div class="es" style="padding:20px;"><i class="fa-solid fa-comments"></i><h3>Select an employee</h3></div></div><div id="msgImgChip" style="display:none;align-items:center;gap:8px;padding:6px 10px;background:var(--card2);border:1px solid var(--bdr);border-radius:8px;margin-bottom:6px;font-size:12px;"><img id="msgImgChipThumb" style="width:32px;height:32px;object-fit:cover;border-radius:5px;"><span style="flex:1;color:var(--txtm);">Image attached</span><button onclick="clearMsgImg()" style="border:none;background:none;color:var(--red);cursor:pointer;"><i class="fa-solid fa-xmark"></i></button></div><div class="msg-input-row"><input type="file" id="msgImgFile" accept="image/*" style="display:none;" onchange="pickMsgImg(this)"><button class="btn btn-o btn-sm" onclick="document.getElementById('msgImgFile').click()" title="Attach image"><i class="fa-solid fa-image"></i></button><input class="msg-input" id="msgInput" placeholder="Type message..." onkeydown="if(event.key==='Enter')sendMsg()"><button class="btn btn-p btn-sm" onclick="sendMsg()"><i class="fa-solid fa-paper-plane"></i></button></div></div></div></div>
       </div>
     </div>
 
@@ -2490,6 +2494,62 @@ async function hardRefresh(){
     if(btn){btn.disabled=false;btn.querySelector('i').classList.remove('fa-spin');}
   }
 }
+// ═══════════════════════════════════════════════════
+// OFFICE REALTIME — push updates instead of waiting for the poll
+// ═══════════════════════════════════════════════════
+let _officeRTChannel=null;
+let _rtRefreshTimer=null;
+function _rtRefresh(noticeMsg){
+  if(noticeMsg){
+    toast(noticeMsg,'i');
+    // Also fire a real OS notification if the office tab is backgrounded
+    try{
+      if('Notification' in window&&Notification.permission==='granted'&&document.hidden){
+        new Notification('OHM Attendance',{body:noticeMsg.replace(/^[^\w£]*/,''),tag:'ohm-office'});
+      }
+    }catch(e){}
+  }
+  // Debounce: several changes can land at once (batch submit); refresh once.
+  clearTimeout(_rtRefreshTimer);
+  _rtRefreshTimer=setTimeout(async()=>{
+    try{
+      await loadAllDataSilent();
+      updateBadges();
+      const page=currentPage||'dashboard';
+      const fn=window['render'+page.charAt(0).toUpperCase()+page.slice(1).replace(/-([a-z])/g,(_,c)=>c.toUpperCase())];
+      if(typeof fn==='function')fn();
+    }catch(e){/* silent — poll will pick it up */}
+  },800);
+}
+function setupOfficeRealtime(){
+  try{
+    if('Notification' in window&&Notification.permission==='default')setTimeout(()=>{try{Notification.requestPermission();}catch(e){}},4000);
+    if(_officeRTChannel){sb.removeChannel(_officeRTChannel);_officeRTChannel=null;}
+    _officeRTChannel=sb.channel('office-live')
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'expenses'},payload=>{
+        const emp=employeeMap?.get(payload.new?.employee_id);
+        _rtRefresh(emp?`💷 New expense from ${emp.name}`:null);
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'expenses'},()=>_rtRefresh(null))
+      .on('postgres_changes',{event:'DELETE',schema:'public',table:'expenses'},()=>_rtRefresh(null))
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'expense_batches'},payload=>{
+        const emp=employeeMap?.get(payload.new?.employee_id);
+        _rtRefresh(emp?`📨 ${emp.name} submitted expenses for approval`:null);
+      })
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'attendance_requests'},payload=>{
+        const emp=employeeMap?.get(payload.new?.employee_id);
+        _rtRefresh(emp?`🕐 Attendance request from ${emp.name}`:null);
+      })
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},payload=>{
+        // Only notify for messages sent BY employees (not our own)
+        if(payload.new?.sender==='employee'){
+          const emp=employeeMap?.get(payload.new?.employee_id);
+          _rtRefresh(emp?`💬 Message from ${emp.name}`:null);
+        } else _rtRefresh(null);
+      })
+      .subscribe();
+  }catch(e){console.warn('Realtime setup failed (poll still active):',e);}
+}
 async function loadAllDataSilent(){
   // Same as loadAllData but does NOT call navigate('dashboard') — used by hardRefresh to preserve current page
   const [empR,cfgR,attR,expR,batR,msgR]=await Promise.all([
@@ -2699,6 +2759,11 @@ async function loadAllData(){
         updateBadges();
       }catch(e){/* silent */}
     },11000);
+    // Realtime: the employee app has had live push updates all along; the
+    // office side only ever polled. This makes new expenses, submissions,
+    // attendance requests, and messages appear the moment they happen.
+    // The 11s poll above stays as a safety net in case realtime drops.
+    setupOfficeRealtime();
     // employeeDocuments already loaded above - no separate call needed
   }catch(e){
     // Ignore CORS/manifest errors from file:// protocol — these are not real data errors
@@ -2792,7 +2857,7 @@ function navigate(page){
   else if(page==='search'){setTimeout(()=>document.getElementById('srchInput')?.focus(),80);}
   else if(page==='payroll')renderPayroll();
   else if(page==='employees')renderEmployees();
-  else if(page==='messages'){populateMsgSel();populateMsgEmpList();}
+  else if(page==='messages'){populateMsgSel();populateMsgEmpList();loadAnnouncementsAdmin();}
   else if(page==='flags')renderFlags();
   else if(page==='settings')loadSettings();
   else if(page==='att-requests')renderAttRequests();
@@ -4137,6 +4202,17 @@ function editLedItems(id,current){
 async function updateExp(id,field,val){
   const exp=expenses.find(e=>e.id===id);if(!exp)return;
   if(field==='amount'&&parseFloat(val)===0){toast('Amount cannot be zero','e');return;}
+  // Duplicate warning (non-blocking): fires once per row, when both merchant
+  // and amount are in place. findSimilarExpense() existed for ages but was
+  // never actually called from anywhere.
+  if((field==='merchant'||field==='amount')&&!exp._dupWarned){
+    const _m=field==='merchant'?val:exp.merchant;
+    const _a=field==='amount'?parseFloat(val):parseFloat(exp.amount);
+    if(_m&&_a){
+      const _dupes=findSimilarExpense(_m,_a,exp.date).filter(x=>x.id!==id&&x.employee_id===exp.employee_id);
+      if(_dupes.length){exp._dupWarned=true;toast(`⚠️ Possible duplicate — "${_m}" for ${fmt(_a)} already exists on ${fmtDateS(_dupes[0].date)}`,'e');}
+    }
+  }
   // Hard block amount/date changes on locked months
   if(field==='amount'||field==='date'){
     const _expLockD=new Date((field==='date'?val:exp.date)+'T00:00:00');
@@ -4246,7 +4322,7 @@ function updateLedgerFooterOnly(){
 }
 async function deleteLedRow(id){
   const exp=expenses.find(e=>e.id===id);if(exp){const _dd=new Date(exp.date+'T00:00:00');if(isPayrollLocked(_dd.getMonth(),_dd.getFullYear())){toast('⛔ Locked payroll month','e');return;}}
-  if(!confirm('Delete this expense row?'))return;
+  if(!await confirmAsync('Delete this expense row?'))return;
   const r=await sb.from('expenses').delete().eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   expenses=expenses.filter(e=>e.id!==id);renderLedger();toast('Row deleted','i');
@@ -4356,7 +4432,7 @@ async function submitBatch(){
   const total=data.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   if(total===0){toast('No expenses to submit','e');return;}
   const emp=employeeMap?.get(ledgerStaff);
-  if(!confirm(`Submit ${emp?.name} — ${MONTHS[parseInt(ledgerMonth)-1]} ${ledgerYear} (${fmt(total)}) for approval?`))return;
+  if(!await confirmAsync(`Submit ${emp?.name} — ${MONTHS[parseInt(ledgerMonth)-1]} ${ledgerYear} (${fmt(total)}) for approval?`))return;
   // Remove existing pending batch for same period
   const existing=batches.find(b=>b.employee_id===ledgerStaff&&b.month===ledgerMonth&&b.year===ledgerYear&&b.status==='pending');
   if(existing){safeWrite(()=>sb.from('expense_batches').delete().eq('id',existing.id),null,true);batches=batches.filter(b=>b.id!==existing.id);}
@@ -4372,7 +4448,7 @@ function setAprTab(f,el){aprTab=f;document.querySelectorAll('#page-approvals .ta
 async function clearOldApprovals(){
   const reviewed=batches.filter(b=>b.status==='approved'||b.status==='rejected');
   if(!reviewed.length){toast('No old approval records to clear','i');return;}
-  if(!confirm(`Clear ${reviewed.length} reviewed approval records?\n\nThis only removes these submission records from the Approvals page — the actual expenses stay untouched and remain in the Expense Ledger exactly as they are.`))return;
+  if(!await confirmAsync(`Clear ${reviewed.length} reviewed approval records?\n\nThis only removes these submission records from the Approvals page — the actual expenses stay untouched and remain in the Expense Ledger exactly as they are.`))return;
   const ids=reviewed.map(b=>b.id);
   await safeWrite(()=>sb.from('expense_batches').delete().in('id',ids),'Old approval records cleared');
   batches=batches.filter(b=>!ids.includes(b.id));
@@ -4471,7 +4547,7 @@ async function downloadVATReceipts(btn){
   });
   if(!vatExps.length){toast('No VAT receipts with attachments found','e');return;}
   if(typeof JSZip==='undefined'){toast('Zip library failed to load — check your connection and retry','e');return;}
-  if(vatExps.length>500&&!confirm(`That's ${vatExps.length} receipts — this could take a couple of minutes to fetch and zip. Continue?`))return;
+  if(vatExps.length>500&&!await confirmAsync(`That's ${vatExps.length} receipts — this could take a couple of minutes to fetch and zip. Continue?`))return;
   const origLabel=btn?btn.innerHTML:null;
   if(btn){btn.disabled=true;btn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i>0 / ${vatExps.length}`;}
   const zip=new JSZip();
@@ -4803,7 +4879,22 @@ async function renderEmpReport(){
 
     if(showOT){
       var ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
-      var otHrRate=emp.pay_type==='daily'?(parseFloat(emp.daily_rate)||0)/ch:parseFloat(emp.hourly_rate)||0;
+      // Mirror calcPay()'s actual OT rate logic exactly, so the label always
+      // matches the real amount — a custom flat OT rate (or custom multiplier)
+      // was being ignored here, showing the base hourly-equivalent rate
+      // instead of the rate that was actually used to calculate the pay.
+      var otHrRate;
+      if(emp.ot_type==='flat'){
+        otHrRate=emp.ot_flat!=null&&emp.ot_flat!==''?parseFloat(emp.ot_flat):0;
+      } else {
+        var hasOwnMult=emp.ot_mult!=null&&emp.ot_mult!=='';
+        var otM;
+        if(hasOwnMult){otM=parseFloat(emp.ot_mult);}
+        else if(emp.pay_type==='daily'){otM=0;}
+        else{otM=parseFloat(cfg.rate_ot)||1.5;}
+        var baseHourlyEquiv=emp.pay_type==='daily'?(parseFloat(emp.daily_rate)||0)/ch:parseFloat(emp.hourly_rate)||0;
+        otHrRate=baseHourlyEquiv*otM;
+      }
       payCards+='<div class="sc sc-sm" style="border-color:rgba(99,102,241,0.35);display:flex;align-items:stretch;">'
         +'<div class="sc-accent" style="background:var(--acc);"></div>'
         +'<div style="flex:1;">'
@@ -5340,13 +5431,13 @@ async function togglePayrollLock(){
   const key=`${y}_${m}`;
   const locked=(cfg.locked_months||[]).includes(key)||payrollSummaries.some(p=>p.month===m&&p.year===y&&p.locked);
   if(locked){
-    if(!confirm(`Unlock ${MONTHS[m]} ${y}? You'll be able to recalculate and edit payroll again.`))return;
+    if(!await confirmAsync(`Unlock ${MONTHS[m]} ${y}? You'll be able to recalculate and edit payroll again.`))return;
     setSyncStatus('saving');
     await unlockPayrollMonth(m,y);
     setSyncStatus('saved');
     toast(`${MONTHS[m]} ${y} unlocked`,'i');
   } else {
-    if(!confirm(`Lock ${MONTHS[m]} ${y} for payroll? This will finalize all employees' pay for this month — employees will see "Final Pay".`))return;
+    if(!await confirmAsync(`Lock ${MONTHS[m]} ${y} for payroll? This will finalize all employees' pay for this month — employees will see "Final Pay".`))return;
     setSyncStatus('saving');
     // Ensure everything is calculated before locking
     await recalcWholeMonth(m,y);
@@ -5382,7 +5473,7 @@ async function sendPayslipEmail(empId,month,year){
   const emp=employeeMap?.get(empId);
   if(!emp){toast('Employee not found','e');return;}
   if(!emp.email){toast('No email set for this employee — edit their profile first','e');return;}
-  if(!confirm(`Send payslip to ${emp.email}?`))return;
+  if(!await confirmAsync(`Send payslip to ${emp.email}?`))return;
   toast('Sending payslip...','i');
   // Build payslip data from payrollSummaries
   const prRow=payrollSummaries.find(p=>p.employee_id===empId&&p.month===month&&p.year===year);
@@ -5442,7 +5533,7 @@ async function sendPayslipEmail(empId,month,year){
   const FROM_EMAIL=cfg.from_email||'';
   if(!RESEND_KEY||!FROM_EMAIL){
     toast('Email sending isn\'t set up yet — go to Settings → Email','e');
-    if(confirm('Resend isn\'t configured. Open your own email app instead, with the payslip pre-filled, so you can send it manually?')){
+    if(await confirmAsync('Resend isn\'t configured. Open your own email app instead, with the payslip pre-filled, so you can send it manually?')){
       openPayslipMailto(emp,monthName,year,basePay,otPay,bonusPay,expTotal,deductions,netPay,bankAmt,cashAmt,C);
     }
     return;
@@ -5471,7 +5562,7 @@ async function sendPayslipEmail(empId,month,year){
     // which is exactly the crash reported. Rather than leave the admin stuck,
     // offer the one thing that's guaranteed to work everywhere: their own email app.
     console.error('sendPayslipEmail:',err);
-    if(confirm('Couldn\'t send automatically (this usually means Resend needs a small server-side relay, not a direct browser call). Open your own email app instead, with the payslip pre-filled?')){
+    if(await confirmAsync('Couldn\'t send automatically (this usually means Resend needs a small server-side relay, not a direct browser call). Open your own email app instead, with the payslip pre-filled?')){
       openPayslipMailto(emp,monthName,year,basePay,otPay,bonusPay,expTotal,deductions,netPay,bankAmt,cashAmt,C);
     }
   }
@@ -6327,7 +6418,7 @@ async function clearChat(){
   const empId=document.getElementById('msgEmpSel').value;
   if(!empId)return;
   const emp=employeeMap?.get(empId);
-  if(!confirm(`Delete ALL messages with ${emp?.name||'this employee'}? This cannot be undone.`))return;
+  if(!await confirmAsync(`Delete ALL messages with ${emp?.name||'this employee'}? This cannot be undone.`))return;
   const r=await sb.from('messages').delete().eq('employee_id',empId);
   if(r.error){toast(r.error.message,'e');return;}
   messages=messages.filter(m=>m.employee_id!==empId);
@@ -6348,16 +6439,49 @@ async function loadMessages(empId){
   if(unread.length>0){await safeWrite(()=>sb.from('messages').update({read:true}).eq('employee_id',empId).neq('sender','office'),null,true);unread.forEach(m=>{const idx=messages.findIndex(x=>x.id===m.id);if(idx>=0)messages[idx].read=true;});}
   updateBadges();
   const list=document.getElementById('msgList');
-  list.innerHTML=msgs.length?msgs.map(m=>{const isOffice=m.sender==='office';return`<div style="display:flex;flex-direction:column;align-items:${isOffice?'flex-end':'flex-start'};"><div class="msg-bubble ${isOffice?'msg-office':'msg-emp'}">${m.body}</div><div style="font-size:10px;color:var(--txtm);margin:1px 4px;">${new Date(m.created_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} · ${isOffice?'Office':emp?.name||'Employee'}</div></div>`}).join(''):'<div class="es" style="padding:20px;"><i class="fa-solid fa-message"></i><h3>No messages yet</h3></div>';
+  list.innerHTML=msgs.length?msgs.map(m=>{const isOffice=m.sender==='office';return`<div style="display:flex;flex-direction:column;align-items:${isOffice?'flex-end':'flex-start'};"><div class="msg-bubble ${isOffice?'msg-office':'msg-emp'}">${m.image_url?`<img src="${m.image_url}" onclick="openLightbox('${m.image_url}')" style="max-width:200px;max-height:200px;border-radius:8px;display:block;margin-bottom:${m.body?'6px':'0'};cursor:zoom-in;">`:''}${escapeHtml(m.body||'')}</div><div style="font-size:10px;color:var(--txtm);margin:1px 4px;">${new Date(m.created_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} · ${isOffice?'Office':emp?.name||'Employee'}</div></div>`}).join(''):'<div class="es" style="padding:20px;"><i class="fa-solid fa-message"></i><h3>No messages yet</h3></div>';
   list.scrollTop=list.scrollHeight;
+}
+let _msgImgFile=null;
+function pickMsgImg(inp){
+  const f=inp.files&&inp.files[0];if(!f)return;
+  if(f.size>5*1024*1024){toast('Image must be under 5MB','e');inp.value='';return;}
+  _msgImgFile=f;
+  const chip=document.getElementById('msgImgChip');
+  const thumb=document.getElementById('msgImgChipThumb');
+  if(thumb)thumb.src=URL.createObjectURL(f);
+  if(chip)chip.style.display='flex';
+}
+function clearMsgImg(){
+  _msgImgFile=null;
+  const chip=document.getElementById('msgImgChip');if(chip)chip.style.display='none';
+  const fi=document.getElementById('msgImgFile');if(fi)fi.value='';
+}
+async function uploadMsgImage(file){
+  const ext=(file.name.split('.').pop()||'jpg').slice(0,4);
+  const path=`msg-images/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const{error}=await sb.storage.from('employee-docs').upload(path,file,{upsert:true});
+  if(error)throw error;
+  const{data}=sb.storage.from('employee-docs').getPublicUrl(path);
+  return data?.publicUrl||null;
 }
 async function sendMsg(){
   const empId=document.getElementById('msgEmpSel').value;
   const body=document.getElementById('msgInput').value.trim();
-  if(!empId||!body)return;
-  const r=await sb.from('messages').insert({employee_id:empId,sender:'office',body,read:false}).select().single();
-  if(r.error){toast(r.error.message,'e');return;}
-  messages.push(r.data);document.getElementById('msgInput').value='';loadMessages(empId);
+  if(!empId||(!body&&!_msgImgFile))return;
+  let imageUrl=null;
+  if(_msgImgFile){
+    try{imageUrl=await uploadMsgImage(_msgImgFile);}
+    catch(e){toast('Image upload failed: '+(e.message||''),'e');return;}
+  }
+  const r=await sb.from('messages').insert({employee_id:empId,sender:'office',body,read:false,image_url:imageUrl}).select().single();
+  if(r.error){
+    // Likely the image_url column doesn't exist yet — tell the admin the one-time fix
+    if(/image_url|column|schema cache/i.test(r.error.message)){toast('Run once in Supabase SQL Editor: ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url text;','e');}
+    else toast(r.error.message,'e');
+    return;
+  }
+  messages.push(r.data);document.getElementById('msgInput').value='';clearMsgImg();loadMessages(empId);
 }
 
 // ═══════════════════════════════════════════════════
@@ -6509,7 +6633,7 @@ function renderBankList(){
   refreshBankSel();
 }
 async function addBank(){const inp=document.getElementById('newBank');const name=inp.value.trim();if(!name){toast('Enter a name','e');return;}const accounts=[...(cfg.bank_accounts||[])];if(accounts.includes(name)){toast('Already exists','e');return;}accounts.push(name);await sbUpsertSettings({bank_accounts:accounts});inp.value='';renderBankList();toast(`${name} added`,'s');}
-async function removeBank(idx){if(!confirm('Remove this bank account?'))return;const accounts=[...(cfg.bank_accounts||[])];accounts.splice(idx,1);await sbUpsertSettings({bank_accounts:accounts});renderBankList();}
+async function removeBank(idx){if(!await confirmAsync('Remove this bank account?'))return;const accounts=[...(cfg.bank_accounts||[])];accounts.splice(idx,1);await sbUpsertSettings({bank_accounts:accounts});renderBankList();}
 function renderCatList(){
   const cats=cfg.categories||[];const el=document.getElementById('catList');if(!el)return;
   el.innerHTML=cats.map((c,i)=>`<div style="display:flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--bdr);border-radius:20px;padding:4px 11px;"><span style="font-size:12px;">${c}</span><button onclick="removeCat(${i})" style="background:none;border:none;color:var(--txtm);cursor:pointer;font-size:11px;"><i class="fa-solid fa-xmark"></i></button></div>`).join('');
@@ -6686,7 +6810,7 @@ async function loadEmpDocs(empId){
 }
 
 async function deleteDoc(id){
-  if(!confirm('Delete this document?'))return;
+  if(!await confirmAsync('Delete this document?'))return;
   const r=await sb.from('employee_documents').delete().eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
   employeeDocuments=employeeDocuments.filter(d=>d.id!==id);
@@ -6781,7 +6905,7 @@ async function savePayRise(){
   const notesExtra=document.getElementById('prNotes').value.trim();
   if(newRate<0){toast('Rate cannot be negative','e');return;}
   if(newRate===0){
-    if(!confirm('You are setting the salary to £0.00 — this will make all pay calculations return £0 for this employee. Are you sure?'))return;
+    if(!await confirmAsync('You are setting the salary to £0.00 — this will make all pay calculations return £0 for this employee. Are you sure?'))return;
   }
   if(!effectiveFrom){toast('Select an effective date','e');return;}
   const pt=emp.pay_type||'fixed';
@@ -7015,7 +7139,7 @@ function openDocViewer(docId){
 }
 
 async function deleteDocFromViewer(docId,empId){
-  if(!confirm('Delete this document?'))return;
+  if(!await confirmAsync('Delete this document?'))return;
   document.getElementById('docViewModal').classList.remove('open');
   await deleteDoc(docId);
 }
@@ -7051,7 +7175,7 @@ function setAttReqTab(f,el){attReqTab=f;document.querySelectorAll('#page-att-req
 async function clearAllAttReqs(){
   const approved=attRequests.filter(r=>r.status==='approved'||r.status==='rejected');
   if(!approved.length){toast('No old requests to clear','i');return;}
-  if(!confirm(`Clear ${approved.length} approved/rejected requests? Pending requests are kept.`))return;
+  if(!await confirmAsync(`Clear ${approved.length} approved/rejected requests? Pending requests are kept.`))return;
   const ids=approved.map(r=>r.id);
   await safeWrite(()=>sb.from('attendance_requests').delete().in('id',ids),'Old requests cleared');
   attRequests=attRequests.filter(r=>!ids.includes(r.id));
@@ -7768,7 +7892,7 @@ function importFileChosen(input){
 
 async function importAllData(){
   if(!_importData){toast('No file loaded','e');return;}
-  if(!confirm('This will INSERT all records into the current Supabase project.\n\nOnly do this on a FRESH empty project. Continue?'))return;
+  if(!await confirmAsync('This will INSERT all records into the current Supabase project.\n\nOnly do this on a FRESH empty project. Continue?'))return;
 
   const statusEl=document.getElementById('importStatus');
   const btn=document.getElementById('importBtn');
@@ -7851,8 +7975,9 @@ function getStreakBadge(empId){
 // ═══ COMMAND PALETTE ═══
 // ═══ DUPLICATE EXPENSE DETECTION ═══
 function findSimilarExpense(merchant,amount,date){
+  const m=(merchant||'').trim().toLowerCase();
   return(expenses||[]).filter(function(e){
-    return e.merchant===merchant&&Math.abs(parseFloat(e.amount)-parseFloat(amount))<0.01&&Math.abs(new Date(e.date)-new Date(date))<172800000;
+    return (e.merchant||'').trim().toLowerCase()===m&&Math.abs(parseFloat(e.amount)-parseFloat(amount))<0.01&&Math.abs(new Date(e.date)-new Date(date))<604800000;
   });
 }
 
@@ -7882,6 +8007,15 @@ window.addEventListener("popstate",function(e){if(e.state&&e.state.page)navigate
 // ══════════════════════════════════════════════════════
 // STYLED CONFIRM SYSTEM
 // ══════════════════════════════════════════════════════
+// Promise wrapper around confirmAction — lets the old synchronous
+// browser-confirm call sites convert to `if(!await confirmAsync(...))return;`
+// so they use the app's styled modal instead of the browser's blocking dialog.
+function confirmAsync(opts){
+  if(typeof opts==='string')opts={message:opts};
+  return new Promise(resolve=>{
+    confirmAction({...opts,onConfirm:()=>resolve(true),onCancel:()=>resolve(false)});
+  });
+}
 function confirmAction(opts){
   var title=opts.title||'Confirm',message=opts.message||'',confirmText=opts.confirmText||'Confirm';
   var danger=opts.danger||false,requireType=opts.requireType||null;
@@ -8099,6 +8233,88 @@ function openLightbox(url){
 // ══════════════════════════════════════════════════════
 // MESSAGE BROADCAST
 // ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+// ANNOUNCEMENTS — office-managed notices shown on employee Home
+// ═══════════════════════════════════════════════════
+const ANN_SQL=`CREATE TABLE IF NOT EXISTS announcements (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  body text,
+  image_url text,
+  important boolean default false,
+  active boolean default true,
+  created_at timestamptz default now()
+);
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url text;`;
+async function loadAnnouncementsAdmin(){
+  const el=document.getElementById('annAdminList');if(!el)return;
+  const r=await sb.from('announcements').select('*').order('created_at',{ascending:false});
+  if(r.error){
+    if(/relation|does not exist|schema cache/i.test(r.error.message)){
+      el.innerHTML='<div style="font-size:12px;color:var(--amb);line-height:1.6;">One-time setup needed — run this in your Supabase SQL Editor, then reopen this page:<pre style="background:var(--card2);border:1px solid var(--bdr);border-radius:6px;padding:8px;font-size:11px;overflow-x:auto;margin-top:6px;">'+ANN_SQL+'</pre><button class="btn btn-o btn-sm" onclick="navigator.clipboard.writeText(ANN_SQL).then(()=>toast(\'SQL copied!\',\'s\'))"><i class="fa-solid fa-copy"></i>Copy SQL</button></div>';
+    } else el.innerHTML='<div style="font-size:12px;color:var(--red);">'+escapeHtml(r.error.message)+'</div>';
+    return;
+  }
+  const anns=r.data||[];
+  if(!anns.length){el.innerHTML='<div style="font-size:12px;color:var(--txtm);">No announcements yet — click New to post one.</div>';return;}
+  el.innerHTML=anns.map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);">
+    ${a.image_url?`<img src="${a.image_url}" onclick="openLightbox('${a.image_url}')" style="width:38px;height:38px;object-fit:cover;border-radius:6px;cursor:zoom-in;flex-shrink:0;">`:''}
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:13px;font-weight:700;">${a.important?'<i class="fa-solid fa-triangle-exclamation" style="color:var(--red);margin-right:4px;"></i>':''}${escapeHtml(a.title)}${!a.active?' <span style="font-size:10px;color:var(--txtm);font-weight:400;">(off)</span>':''}</div>
+      ${a.body?`<div style="font-size:11px;color:var(--txtm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(a.body)}</div>`:''}
+    </div>
+    <button class="btn btn-o btn-sm" onclick="toggleAnn('${a.id}',${!a.active})" title="${a.active?'Turn off':'Turn on'}">${a.active?'<i class="fa-solid fa-eye"></i>':'<i class="fa-solid fa-eye-slash"></i>'}</button>
+    <button class="btn btn-d btn-sm" onclick="deleteAnn('${a.id}')"><i class="fa-solid fa-trash"></i></button>
+  </div>`).join('');
+}
+function openAnnModal(){
+  const overlay=document.createElement('div');
+  overlay.className='confirm-overlay';
+  overlay.innerHTML=`<div class="confirm-box" style="max-width:460px;text-align:left;">
+    <div class="confirm-title" style="text-align:center;">📢 New Announcement</div>
+    <div class="fg" style="margin-bottom:10px;"><label>Title</label><input id="annTitle" placeholder="e.g. Site closed Monday" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:14px;font-family:inherit;outline:none;color:var(--txt);background:var(--card);"></div>
+    <div class="fg" style="margin-bottom:10px;"><label>Message (optional)</label><textarea id="annBody" placeholder="Details..." style="width:100%;box-sizing:border-box;padding:9px 11px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:inherit;outline:none;resize:vertical;min-height:70px;color:var(--txt);background:var(--card);"></textarea></div>
+    <div class="fg" style="margin-bottom:10px;"><label>Image (optional)</label><input type="file" id="annImg" accept="image/*" style="font-size:12px;"></div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:14px;cursor:pointer;"><input type="checkbox" id="annImportant"><span><strong>Important</strong> — pops up full-screen once when each employee next opens the app (use sparingly)</span></label>
+    <div class="confirm-btns">
+      <button id="annCancel" class="btn btn-o" style="flex:1;">Cancel</button>
+      <button id="annPost" class="btn btn-p" style="flex:1;"><i class="fa-solid fa-bullhorn"></i> Post</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.querySelector('#annCancel').onclick=()=>overlay.remove();
+  overlay.querySelector('#annPost').onclick=async()=>{
+    const title=overlay.querySelector('#annTitle').value.trim();
+    if(!title){toast('Enter a title','e');return;}
+    const body=overlay.querySelector('#annBody').value.trim();
+    const important=overlay.querySelector('#annImportant').checked;
+    const imgFile=overlay.querySelector('#annImg').files?.[0]||null;
+    if(imgFile&&imgFile.size>5*1024*1024){toast('Image must be under 5MB','e');return;}
+    const btn=overlay.querySelector('#annPost');btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i>';
+    let imageUrl=null;
+    if(imgFile){
+      try{imageUrl=await uploadMsgImage(imgFile);}
+      catch(e){toast('Image upload failed','e');btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-bullhorn"></i> Post';return;}
+    }
+    const r=await sb.from('announcements').insert({title,body:body||null,image_url:imageUrl,important,active:true});
+    if(r.error){toast(r.error.message,'e');btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-bullhorn"></i> Post';return;}
+    overlay.remove();
+    toast('Announcement posted 📢','s');
+    loadAnnouncementsAdmin();
+  };
+}
+async function toggleAnn(id,active){
+  const r=await sb.from('announcements').update({active}).eq('id',id);
+  if(r.error){toast(r.error.message,'e');return;}
+  loadAnnouncementsAdmin();
+}
+async function deleteAnn(id){
+  if(!await confirmAsync({title:'Delete announcement?',message:'It disappears from all employee Home screens.',danger:true,confirmText:'Delete'}))return;
+  const r=await sb.from('announcements').delete().eq('id',id);
+  if(r.error){toast(r.error.message,'e');return;}
+  loadAnnouncementsAdmin();
+}
 function openBroadcastModal(){
   var modal=document.createElement('div');
   modal.className='confirm-overlay';
@@ -8111,8 +8327,10 @@ function openBroadcastModal(){
     '<div class="fg" style="margin-bottom:12px;"><label>Send to</label>'+
     '<select id="bcGroup" style="width:100%;padding:10px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:14px;font-family:inherit;outline:none;color:var(--txt);background:var(--card);">'+
     groups.map(function(g){return'<option>'+g+'</option>';}).join('')+'</select></div>'+
-    '<div class="fg" style="margin-bottom:16px;"><label>Message</label>'+
+    '<div class="fg" style="margin-bottom:12px;"><label>Message</label>'+
     '<textarea id="bcMessage" placeholder="Type your message..." style="width:100%;padding:10px;border:1.5px solid var(--bdr);border-radius:var(--rs);font-size:14px;font-family:inherit;outline:none;resize:vertical;min-height:80px;color:var(--txt);background:var(--card);"></textarea></div>'+
+    '<div class="fg" style="margin-bottom:12px;"><label>Image (optional)</label>'+
+    '<input type="file" id="bcImgFile" accept="image/*" style="font-size:12px;"></div>'+
     '<div id="bcCount" style="font-size:12px;color:var(--txtm);margin-bottom:14px;"></div>'+
     '<div class="confirm-btns">'+
     '<button id="bcCancelBtn2" class="btn btn-o" style="flex:1;">Cancel</button>'+
@@ -8134,12 +8352,25 @@ function openBroadcastModal(){
 async function sendBroadcast(){
   var grp=document.getElementById('bcGroup')?.value;
   var body=document.getElementById('bcMessage')?.value.trim();
-  if(!body){toast('Enter a message','e');return;}
+  var imgFile=document.getElementById('bcImgFile')?.files?.[0]||null;
+  if(!body&&!imgFile){toast('Enter a message or attach an image','e');return;}
+  if(imgFile&&imgFile.size>5*1024*1024){toast('Image must be under 5MB','e');return;}
   var emps=employees.filter(function(e){return e.status==='Active';});
   if(grp&&grp!=='All Active')emps=emps.filter(function(e){return e.role===grp;});
-  var rows=emps.map(function(e){return{employee_id:e.id,sender:'office',body:body,read:false};});
+  var imageUrl=null;
+  if(imgFile){
+    try{imageUrl=await uploadMsgImage(imgFile);}
+    catch(e){toast('Image upload failed: '+(e.message||''),'e');return;}
+  }
+  // 📢 prefix so broadcasts read as announcements in each employee's chat
+  var tagged=body?('📢 '+body):'📢';
+  var rows=emps.map(function(e){return{employee_id:e.id,sender:'office',body:tagged,read:false,image_url:imageUrl};});
   var r=await sb.from('messages').insert(rows);
-  if(r.error){toast(r.error.message,'e');return;}
+  if(r.error){
+    if(/image_url|column|schema cache/i.test(r.error.message)){toast('Run once in Supabase SQL Editor: ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url text;','e');}
+    else toast(r.error.message,'e');
+    return;
+  }
   var bcModal=document.querySelector('.confirm-overlay');
   if(bcModal)bcModal.remove();
   var bcMsg=document.getElementById('bcMessage');
