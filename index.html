@@ -1132,6 +1132,10 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div class="ch"><div><div class="ct"><i class="fa-solid fa-bullhorn" style="color:var(--amb);margin-right:6px;"></i>Announcements</div><div class="cs">Shown on every employee's Home screen — "Important" ones pop up once when they open the app</div></div><button class="btn btn-p btn-sm" onclick="openAnnModal()"><i class="fa-solid fa-plus"></i>New</button></div>
         <div class="cb" id="annAdminList"><div style="font-size:12px;color:var(--txtm);">Loading…</div></div>
       </div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="ch"><div><div class="ct"><i class="fa-solid fa-tower-broadcast" style="color:var(--acc);margin-right:6px;"></i>Recent Broadcasts</div><div class="cs">Every broadcast sent — delete one here to remove it from every employee's chat at once</div></div></div>
+        <div class="cb" id="bcHistList"><div style="font-size:12px;color:var(--txtm);">Loading…</div></div>
+      </div>
       <div class="cr cr2">
         <div class="card"><div class="ch"><div class="ct">Select Employee</div></div><div class="cb"><select id="msgEmpSel" onchange="loadMessages(this.value)" style="width:100%;padding:8px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;"><option value="">— Choose employee —</option></select></div>
           <div class="cb" id="msgEmpList" style="max-height:300px;overflow-y:auto;"></div>
@@ -2547,7 +2551,10 @@ function setupOfficeRealtime(){
           _rtRefresh(emp?`💬 Message from ${emp.name}`:null);
         } else _rtRefresh(null);
       })
-      .subscribe();
+      .subscribe(status=>{
+        console.log('[office realtime]',status);
+        if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')console.warn('[office realtime] not receiving live events — check Supabase: Database → Publications → supabase_realtime includes the tables');
+      });
   }catch(e){console.warn('Realtime setup failed (poll still active):',e);}
 }
 async function loadAllDataSilent(){
@@ -2857,7 +2864,7 @@ function navigate(page){
   else if(page==='search'){setTimeout(()=>document.getElementById('srchInput')?.focus(),80);}
   else if(page==='payroll')renderPayroll();
   else if(page==='employees')renderEmployees();
-  else if(page==='messages'){populateMsgSel();populateMsgEmpList();loadAnnouncementsAdmin();}
+  else if(page==='messages'){populateMsgSel();populateMsgEmpList();loadAnnouncementsAdmin();renderBroadcastHistory();}
   else if(page==='flags')renderFlags();
   else if(page==='settings')loadSettings();
   else if(page==='att-requests')renderAttRequests();
@@ -8315,6 +8322,40 @@ async function deleteAnn(id){
   if(r.error){toast(r.error.message,'e');return;}
   loadAnnouncementsAdmin();
 }
+// ── BROADCAST HISTORY + RECALL ──
+// Groups messages by broadcast_id so a broadcast is one row here, however
+// many employees received it — with a single delete that removes every copy.
+function renderBroadcastHistory(){
+  const el=document.getElementById('bcHistList');if(!el)return;
+  const groups={};
+  (messages||[]).forEach(m=>{
+    if(!m.broadcast_id)return;
+    if(!groups[m.broadcast_id])groups[m.broadcast_id]={id:m.broadcast_id,body:m.body,image_url:m.image_url,created_at:m.created_at,count:0};
+    groups[m.broadcast_id].count++;
+    if(m.created_at<groups[m.broadcast_id].created_at)groups[m.broadcast_id].created_at=m.created_at;
+  });
+  const list=Object.values(groups).sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,10);
+  if(!list.length){el.innerHTML='<div style="font-size:12px;color:var(--txtm);">No broadcasts yet. (Broadcasts sent before this feature was added can\'t be tracked — they were saved without a shared id.)</div>';return;}
+  el.innerHTML=list.map(b=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr);">
+    ${b.image_url?`<img src="${b.image_url}" onclick="openLightbox('${b.image_url}')" style="width:34px;height:34px;object-fit:cover;border-radius:6px;cursor:zoom-in;flex-shrink:0;">`:'<i class="fa-solid fa-bullhorn" style="color:var(--txtm);width:34px;text-align:center;flex-shrink:0;"></i>'}
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(b.body||'(image only)')}</div>
+      <div style="font-size:11px;color:var(--txtm);">${fmtDate(b.created_at.slice(0,10))} · sent to ${b.count} employee${b.count!==1?'s':''}</div>
+    </div>
+    <button class="btn btn-d btn-sm" onclick="deleteBroadcast('${b.id}',${b.count})" title="Delete from every employee's chat"><i class="fa-solid fa-trash"></i></button>
+  </div>`).join('');
+}
+async function deleteBroadcast(bid,count){
+  if(!await confirmAsync({title:'Delete broadcast?',message:`This removes it from all ${count} employees' chats at once. This can't be undone.`,danger:true,confirmText:'Delete for everyone'}))return;
+  const r=await sb.from('messages').delete().eq('broadcast_id',bid);
+  if(r.error){toast(r.error.message,'e');return;}
+  messages=messages.filter(m=>m.broadcast_id!==bid);
+  renderBroadcastHistory();
+  // Refresh the open chat if it's showing one of the deleted copies
+  const sel=document.getElementById('msgEmpSel')?.value;
+  if(sel)loadMessages(sel);
+  toast('Broadcast deleted from all chats','s');
+}
 function openBroadcastModal(){
   var modal=document.createElement('div');
   modal.className='confirm-overlay';
@@ -8364,10 +8405,13 @@ async function sendBroadcast(){
   }
   // 📢 prefix so broadcasts read as announcements in each employee's chat
   var tagged=body?('📢 '+body):'📢';
-  var rows=emps.map(function(e){return{employee_id:e.id,sender:'office',body:tagged,read:false,image_url:imageUrl};});
+  // One shared id stamped on every copy — this is what makes a broadcast
+  // recallable ("delete for everyone") instead of 20 unrelated messages.
+  var bid=(crypto.randomUUID?crypto.randomUUID():uid());
+  var rows=emps.map(function(e){return{employee_id:e.id,sender:'office',body:tagged,read:false,image_url:imageUrl,broadcast_id:bid};});
   var r=await sb.from('messages').insert(rows);
   if(r.error){
-    if(/image_url|column|schema cache/i.test(r.error.message)){toast('Run once in Supabase SQL Editor: ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url text;','e');}
+    if(/image_url|broadcast_id|column|schema cache/i.test(r.error.message)){toast('Run once in Supabase SQL Editor: ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url text; ALTER TABLE messages ADD COLUMN IF NOT EXISTS broadcast_id uuid;','e');}
     else toast(r.error.message,'e');
     return;
   }
@@ -8376,6 +8420,7 @@ async function sendBroadcast(){
   var bcMsg=document.getElementById('bcMessage');
   if(bcMsg)bcMsg.value='';
   toast('Broadcast sent to '+emps.length+' employees','s');
+  renderBroadcastHistory();
 }
 
 // ══════════════════════════════════════════════════════
