@@ -624,6 +624,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
       <div onclick="openChangePhoto();togglePillMenu()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-image" style="width:16px;color:var(--txtm);"></i>Change Photo</div>
       <div onclick="openChangePin()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-key" style="width:16px;color:var(--txtm);"></i>Change PIN</div>
       <div onclick="sessionStorage.removeItem('dam_page_sig');location.reload();" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-arrows-rotate" style="width:16px;color:var(--txtm);"></i>Reload App</div>
+      <div onclick="openNotifSettings();togglePillMenu()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-bell" style="width:16px;color:var(--txtm);"></i>Notifications<span id="notifStatusDot" style="margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--txtm);"></span></div>
       <div onclick="toggleTheme()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-circle-half-stroke" style="width:16px;color:var(--txtm);"></i>Toggle Theme</div>
       <div onclick="confirmLogout()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--red);cursor:pointer;" onmouseover="this.style.background='var(--redl)'" onmouseout="this.style.background=''"><i class="fa-solid fa-right-from-bracket" style="width:16px;"></i>Sign Out</div>
     </div>
@@ -1014,6 +1015,64 @@ function toast(msg,type='i',duration=3200){
 function togglePillMenu(){
   const m=document.getElementById('pillMenu');
   if(m)m.style.display=m.style.display==='none'?'block':'none';
+  if(m&&m.style.display==='block')updateNotifStatusDot();
+}
+// ── NOTIFICATION SETTINGS (profile menu) ──
+function updateNotifStatusDot(){
+  const dot=document.getElementById('notifStatusDot');if(!dot)return;
+  if(!('Notification' in window)){dot.style.background='var(--txtm)';return;}
+  dot.style.background=Notification.permission==='granted'?'var(--grn)':Notification.permission==='denied'?'var(--red)':'var(--amb,#d97706)';
+}
+function openNotifSettings(){
+  const perm=('Notification' in window)?Notification.permission:'unsupported';
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:22px;';
+  let inner='';
+  if(perm==='unsupported'){
+    inner=`<div style="font-size:13px;color:var(--txt2,#444);line-height:1.6;">This browser doesn't support notifications. If you're opening the app from inside another app (like a WhatsApp link), open it in Chrome or Safari directly instead.</div>`;
+  } else if(perm==='granted'){
+    inner=`<div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--grn);margin-bottom:10px;"><i class="fa-solid fa-circle-check"></i>Notifications are ON</div>
+      <div style="font-size:12px;color:var(--txt2,#555);line-height:1.6;margin-bottom:14px;">You'll be notified when expenses are approved, payments are sent, and messages arrive — while the app is open in the background.</div>
+      <button id="notifTestBtn" style="width:100%;padding:11px 0;border:1px solid var(--bdr);border-radius:12px;background:var(--card2,#f5f5f5);color:var(--txt);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;"><i class="fa-solid fa-bell" style="margin-right:6px;"></i>Send test notification</button>`;
+  } else if(perm==='default'){
+    inner=`<div style="font-size:12px;color:var(--txt2,#555);line-height:1.6;margin-bottom:14px;">Get notified when your expenses are approved, payments are sent, or the office messages you — even when the app is in the background.</div>
+      <button id="notifEnableBtn" style="width:100%;padding:12px 0;border:none;border-radius:12px;background:var(--acc,#2563eb);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;"><i class="fa-solid fa-bell" style="margin-right:6px;"></i>Turn on notifications</button>`;
+  } else {
+    // 'denied' — browsers do NOT allow a website to re-ask once blocked;
+    // the person has to flip it back on in browser/site settings themselves.
+    const ua=navigator.userAgent;
+    const isIOS=/iPhone|iPad|iPod/.test(ua);
+    const isAndroid=/Android/.test(ua);
+    const steps=isIOS
+      ?'1. Open iPhone <strong>Settings</strong><br>2. Scroll to <strong>Safari</strong> → <strong>Advanced</strong> → <strong>Website Data</strong>, or if you added this app to your Home Screen: Settings → <strong>Notifications</strong> → find this app → turn Allow Notifications on<br>3. Come back here and reopen this screen'
+      :isAndroid
+      ?'1. Tap the <strong>⋮ menu</strong> (top right of Chrome) → <strong>Settings</strong><br>2. <strong>Site settings</strong> → <strong>Notifications</strong><br>3. Find this site under "Blocked" and change it to <strong>Allow</strong><br>4. Come back and reopen this screen'
+      :'1. Click the <strong>🔒 padlock</strong> (or ⓘ) next to the web address<br>2. Find <strong>Notifications</strong> and change it to <strong>Allow</strong><br>3. Reload the page';
+    inner=`<div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--red);margin-bottom:10px;"><i class="fa-solid fa-bell-slash"></i>Notifications are blocked</div>
+      <div style="font-size:12px;color:var(--txt2,#555);line-height:1.6;margin-bottom:10px;">Your browser was told "Block" at some point — and browsers don't let apps ask again after that. It takes 20 seconds to switch back on:</div>
+      <div style="font-size:12px;color:var(--txt2,#555);line-height:1.9;background:var(--card2,#f5f5f5);border:1px solid var(--bdr);border-radius:10px;padding:10px 13px;">${steps}</div>`;
+  }
+  overlay.innerHTML=`<div style="background:var(--card,#fff);border-radius:18px;padding:20px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <span style="font-size:15px;font-weight:800;"><i class="fa-solid fa-bell" style="margin-right:7px;color:var(--acc);"></i>Notifications</span>
+      <button id="notifCloseBtn" style="border:none;background:none;color:var(--txtm);cursor:pointer;font-size:16px;padding:4px;"><i class="fa-solid fa-xmark"></i></button>
+    </div>${inner}</div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.querySelector('#notifCloseBtn').onclick=()=>overlay.remove();
+  const enableBtn=overlay.querySelector('#notifEnableBtn');
+  if(enableBtn)enableBtn.onclick=async()=>{
+    const result=await Notification.requestPermission();
+    overlay.remove();
+    updateNotifStatusDot();
+    if(result==='granted'){toast('Notifications turned on ✅','s');try{new Notification('OHM Attendance',{body:'Notifications are working! 🎉'});}catch(e){}}
+    else if(result==='denied')openNotifSettings(); // show the unblock steps straight away
+  };
+  const testBtn=overlay.querySelector('#notifTestBtn');
+  if(testBtn)testBtn.onclick=()=>{
+    try{new Notification('OHM Attendance',{body:'Test notification — everything\'s working! 🎉'});toast('Test sent — check your notification tray','s');}
+    catch(e){toast('Could not send — try reloading the app','e');}
+  };
 }
 async function checkForUpdateAndReload(isFirstCheck){
   try{
@@ -1618,6 +1677,16 @@ function startRealtime(){
       if(document.getElementById('pg-msg').classList.contains('on'))renderMsgs();
       else showPopupNotif('<i class="fa-solid fa-bell" style="margin-right:5px;"></i>New message from Office');
     })
+    .on('postgres_changes',{event:'DELETE',schema:'public',table:'messages'},payload=>{
+      // No employee filter possible on DELETE (payload only carries the id) —
+      // just remove it if it was ours. Covers broadcast recall from the office.
+      const before=myMsgs.length;
+      myMsgs=myMsgs.filter(m=>m.id!==payload.old?.id);
+      if(myMsgs.length!==before){
+        updateBadges();
+        if(document.getElementById('pg-msg').classList.contains('on'))renderMsgs();
+      }
+    })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'expense_batches',filter:`employee_id=eq.${emp.id}`},async payload=>{
       const idx=myBatches.findIndex(b=>b.id===payload.new.id);
       if(idx>=0)myBatches[idx]=payload.new;else myBatches.push(payload.new);
@@ -1691,7 +1760,10 @@ function startRealtime(){
       myAnns=myAnns.filter(a=>a.id!==payload.old?.id);
       renderAnnBanners();
     })
-    .subscribe();
+    .subscribe(status=>{
+      console.log('[realtime]',status);
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')console.warn('[realtime] not receiving live events — check Supabase: Database → Publications → supabase_realtime includes the tables, or the toggle on each table in Table Editor');
+    });
 }
 
 function showPopupNotif(msg){
