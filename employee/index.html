@@ -199,6 +199,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .bubble{max-width:82%;padding:10px 13px;border-radius:14px;font-size:13px;word-break:break-word;line-height:1.45;}
 .bubble.me{background:var(--acc);color:#fff;align-self:flex-end;border-radius:14px 14px 4px 14px;}
 .bubble.them{background:var(--card);border:1px solid var(--bdr);align-self:flex-start;border-radius:14px 14px 14px 4px;}
+.bubble.bubble-announce{background:var(--ambl,#fef3c7);border:1px solid rgba(217,119,6,0.35);font-weight:600;}
 .bubble-wrap{display:flex;flex-direction:column;}
 .bubble-wrap.me{align-items:flex-end;}
 .bubble-wrap.them{align-items:flex-start;}
@@ -635,6 +636,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
     <!-- HOME -->
     <div class="pg on" id="pg-home">
       <div class="pull-tag">OHM Electrical · Employee Portal</div>
+      <div id="annBanners"></div>
       <!-- TODAY MARK SECTION on home -->
       <div id="homeTodayMark"></div>
       <!-- Salary card -->
@@ -1336,6 +1338,7 @@ async function enterApp(e){
   populateCats();
   renderHome();
   startRealtime();
+  loadAnnouncements();
   setSyncUI('live');
   applyAutoTheme();
   setInterval(applyAutoTheme, 3600000);
@@ -1547,6 +1550,64 @@ function requestNotifPermission(){
     setTimeout(()=>{Notification.requestPermission();},4000);
   }catch(e){}
 }
+// ═══════════════════════════════════════════════════
+// ANNOUNCEMENTS — office notices on Home. Normal ones show as a slim
+// dismissible banner; "important" ones pop up full-screen once. Dismissals
+// are remembered per-device in localStorage so nothing nags twice.
+// ═══════════════════════════════════════════════════
+let myAnns=[];
+function _dismissedAnns(){try{return JSON.parse(localStorage.getItem('dam_dismissed_anns')||'[]');}catch(e){return[];}}
+function dismissAnn(id){
+  const d=_dismissedAnns();
+  if(!d.includes(id)){d.push(id);localStorage.setItem('dam_dismissed_anns',JSON.stringify(d.slice(-100)));}
+  renderAnnBanners();
+}
+async function loadAnnouncements(){
+  try{
+    const r=await sb.from('announcements').select('*').eq('active',true).order('created_at',{ascending:false});
+    if(r.error)return; // table may not exist yet — silently skip
+    myAnns=r.data||[];
+    renderAnnBanners();
+    showImportantAnnPopup();
+  }catch(e){/* silent */}
+}
+function renderAnnBanners(){
+  const el=document.getElementById('annBanners');if(!el)return;
+  const dismissed=_dismissedAnns();
+  const visible=myAnns.filter(a=>!dismissed.includes(a.id));
+  el.innerHTML=visible.map(a=>`
+    <div style="display:flex;align-items:flex-start;gap:9px;background:${a.important?'var(--redl,#fee2e2)':'var(--ambl,#fef3c7)'};border:1px solid ${a.important?'rgba(220,38,38,0.3)':'rgba(217,119,6,0.3)'};border-radius:12px;padding:10px 12px;margin-bottom:9px;">
+      <i class="fa-solid ${a.important?'fa-triangle-exclamation':'fa-bullhorn'}" style="color:${a.important?'var(--red)':'var(--amb,#d97706)'};margin-top:2px;flex-shrink:0;"></i>
+      <div style="flex:1;min-width:0;" ${a.image_url?`onclick="openImgViewer('${a.image_url}')" role="button"`:''}>
+        <div style="font-size:13px;font-weight:700;">${eH(a.title)}</div>
+        ${a.body?`<div style="font-size:12px;color:var(--txt2,#555);margin-top:2px;">${eH(a.body)}</div>`:''}
+        ${a.image_url?`<img src="${a.image_url}" style="max-width:100%;max-height:130px;border-radius:8px;margin-top:6px;cursor:zoom-in;">`:''}
+      </div>
+      <button onclick="dismissAnn('${a.id}')" style="border:none;background:none;color:var(--txtm);cursor:pointer;padding:2px;flex-shrink:0;" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+    </div>`).join('');
+}
+function showImportantAnnPopup(){
+  const dismissed=_dismissedAnns();
+  const imp=myAnns.find(a=>a.important&&!dismissed.includes(a.id));
+  if(!imp)return;
+  if(document.getElementById('annPopupOverlay'))return; // one at a time
+  const overlay=document.createElement('div');
+  overlay.id='annPopupOverlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:22px;';
+  overlay.innerHTML=`<div style="background:var(--card,#fff);border-radius:18px;padding:22px 20px;max-width:400px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--red);font-size:20px;"></i><span style="font-size:16px;font-weight:800;">${eH(imp.title)}</span></div>
+    ${imp.body?`<div style="font-size:13px;color:var(--txt2,#444);line-height:1.6;margin-bottom:12px;white-space:pre-wrap;">${eH(imp.body)}</div>`:''}
+    ${imp.image_url?`<img src="${imp.image_url}" onclick="openImgViewer('${imp.image_url}')" style="width:100%;border-radius:10px;margin-bottom:14px;cursor:zoom-in;">`:''}
+    <button id="annPopupGotIt" style="width:100%;padding:12px 0;border:none;border-radius:12px;background:var(--acc,#2563eb);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">Got it</button>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#annPopupGotIt').onclick=()=>{
+    dismissAnn(imp.id);
+    overlay.remove();
+    // If another important one is queued, show it next
+    setTimeout(showImportantAnnPopup,300);
+  };
+}
 function startRealtime(){
   requestNotifPermission();
   realtimeChannel=sb.channel('emp-'+emp.id)
@@ -1610,6 +1671,25 @@ function startRealtime(){
       showPopupNotif(msg,'att-req');
       updateBadges();
       if(document.getElementById('pg-att').classList.contains('on'))renderAtt();
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'announcements'},payload=>{
+      if(payload.new?.active){
+        myAnns.unshift(payload.new);
+        renderAnnBanners();
+        sysNotify(payload.new.important?'⚠️ '+payload.new.title:'📢 '+payload.new.title,(payload.new.body||'').slice(0,80));
+        showPopupNotif('<i class="fa-solid fa-bullhorn" style="margin-right:5px;"></i>New announcement: '+eH(payload.new.title));
+        if(payload.new.important)showImportantAnnPopup();
+      }
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'announcements'},payload=>{
+      const idx=myAnns.findIndex(a=>a.id===payload.new.id);
+      if(payload.new.active){if(idx>=0)myAnns[idx]=payload.new;else myAnns.unshift(payload.new);}
+      else if(idx>=0)myAnns.splice(idx,1);
+      renderAnnBanners();
+    })
+    .on('postgres_changes',{event:'DELETE',schema:'public',table:'announcements'},payload=>{
+      myAnns=myAnns.filter(a=>a.id!==payload.old?.id);
+      renderAnnBanners();
     })
     .subscribe();
 }
@@ -2372,6 +2452,12 @@ async function pasteReceipt(){
 function openRcptPopup(){
   const src=document.getElementById('rcptPreview')?.src;
   if(!src||src===window.location.href)return;
+  openImgViewer(src);
+}
+// Generic full-screen image viewer — reuses the receipt popup elements, so
+// message images, announcement images, and receipts all share one viewer.
+function openImgViewer(src){
+  if(!src)return;
   const popup=document.getElementById('rcptPopupBg');
   const img=document.getElementById('rcptPopupImg');
   if(popup&&img){img.src=src;popup.classList.add('open');}
@@ -3173,7 +3259,7 @@ async function renderMsgs(){
   area.innerHTML=myMsgs.map(m=>{
     const isMe=m.sender!=='office';
     return`<div class="bubble-wrap ${isMe?'me':'them'}">
-      <div class="bubble ${isMe?'me':'them'}">${eH(m.body)}</div>
+      <div class="bubble ${isMe?'me':'them'}${!isMe&&(m.body||'').startsWith('📢')?' bubble-announce':''}">${m.image_url?`<img src="${m.image_url}" onclick="openImgViewer('${m.image_url}')" style="max-width:200px;max-height:220px;border-radius:8px;display:block;margin-bottom:${m.body?'6px':'0'};cursor:zoom-in;">`:''}${eH(m.body)}</div>
       <div class="bubble-time">${isMe?'You':'Office'} · ${new Date(m.created_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
     </div>`;
   }).join('');
