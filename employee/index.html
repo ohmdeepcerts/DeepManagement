@@ -2625,11 +2625,54 @@ async function pdfToJpegBase64(pdfFile) {
   
   return { base64, blob, dataUrl: canvas.toDataURL('image/jpeg', 0.92) };
 }
+// Downscale a photo before upload/scan. Phone cameras produce 3-5MB images;
+// at 20 employees × dozens of receipts/month that fills the Supabase free
+// storage tier within weeks — and receipts don't need anywhere near that
+// resolution to stay readable. Max 1600px, JPEG q0.85 ≈ 150-350KB per photo.
+// Returns the original file untouched if anything fails (never blocks upload).
+function compressReceiptImage(file){
+  return new Promise(resolve=>{
+    try{
+      if(!/^image\//.test(file.type)||file.type==='image/gif'){resolve(file);return;}
+      const img=new Image();
+      const url=URL.createObjectURL(file);
+      img.onload=()=>{
+        try{
+          URL.revokeObjectURL(url);
+          const MAX=1600;
+          let w=img.naturalWidth,h=img.naturalHeight;
+          // Already small — don't recompress and risk quality loss for nothing
+          if(w<=MAX&&h<=MAX&&file.size<600*1024){resolve(file);return;}
+          if(w>h&&w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+          else if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}
+          const canvas=document.createElement('canvas');
+          canvas.width=w;canvas.height=h;
+          canvas.getContext('2d').drawImage(img,0,0,w,h);
+          canvas.toBlob(blob=>{
+            if(!blob||blob.size>=file.size){resolve(file);return;}
+            resolve(new File([blob],file.name.replace(/\.\w+$/,'')+'.jpg',{type:'image/jpeg'}));
+          },'image/jpeg',0.85);
+        }catch(e){resolve(file);}
+      };
+      img.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};
+      img.src=url;
+    }catch(e){resolve(file);}
+  });
+}
 function _setRcptFile(file,target){
   if(!file)return;
   target=target||'add';
   const isEd=target==='edit';
   if(file.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');return;}
+  const isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
+  if(!isPdf){
+    // Compress first, then continue with the (smaller) file
+    compressReceiptImage(file).then(cf=>_setRcptFileReady(cf,isEd));
+    return;
+  }
+  _setRcptFileReady(file,isEd);
+}
+function _setRcptFileReady(file,isEd){
   if(isEd){_edRcptFile=file;}else{_rcptFile=file;}
   const isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
   const wrap=document.getElementById(isEd?'edReceiptPreviewWrap':'rcptPreviewWrap');
@@ -3115,6 +3158,14 @@ async function deleteExp(id,btnEl){
     toast(r.error.message,'e');
     if(btnEl){btnEl.disabled=false;btnEl.innerHTML=origLabel;}
     return;
+  }
+  // Clean up the receipt file too — otherwise deleted expenses leave orphaned
+  // images in storage forever, silently eating the storage quota.
+  if(e.receipt_url){
+    try{
+      const _sp=e.receipt_url.split('/employee-docs/')[1];
+      if(_sp)sb.storage.from('employee-docs').remove([decodeURIComponent(_sp.split('?')[0])]);
+    }catch(err){/* best-effort — never block the delete over cleanup */}
   }
   myExp=myExp.filter(x=>x.id!==id);
   closeExpDetailModal();
