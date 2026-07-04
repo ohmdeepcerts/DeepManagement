@@ -1025,14 +1025,29 @@ function updateNotifStatusDot(){
 }
 function openNotifSettings(){
   const perm=('Notification' in window)?Notification.permission:'unsupported';
+  const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent);
+  const isStandalone=window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
   const overlay=document.createElement('div');
   overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:22px;';
   let inner='';
-  if(perm==='unsupported'){
+  if(isIOS&&!isStandalone){
+    // iPhones do not support web notifications in a plain Safari tab at all,
+    // on any iOS version — this isn't a permission issue, "unsupported" was
+    // a genuinely accurate but unhelpful message. The only way notifications
+    // work on iPhone is adding the app to the Home Screen first.
+    inner=`<div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--amb,#d97706);margin-bottom:10px;"><i class="fa-solid fa-triangle-exclamation"></i>One extra step needed on iPhone</div>
+      <div style="font-size:12px;color:var(--txt2,#555);line-height:1.7;margin-bottom:10px;">iPhones don't allow notifications in a normal Safari tab — this isn't something you did wrong, Apple simply doesn't allow it that way. The fix is quick and only needed once:</div>
+      <div style="font-size:12px;color:var(--txt2,#555);line-height:1.9;background:var(--card2,#f5f5f5);border:1px solid var(--bdr);border-radius:10px;padding:10px 13px;">
+        1. Tap the <strong>Share</strong> button (square with an arrow, at the bottom of Safari)<br>
+        2. Tap <strong>"Add to Home Screen"</strong><br>
+        3. Close Safari, then open the app using the new icon on your Home Screen (not Safari)<br>
+        4. Open this menu again from there to turn notifications on
+      </div>`;
+  } else if(perm==='unsupported'){
     inner=`<div style="font-size:13px;color:var(--txt2,#444);line-height:1.6;">This browser doesn't support notifications. If you're opening the app from inside another app (like a WhatsApp link), open it in Chrome or Safari directly instead.</div>`;
   } else if(perm==='granted'){
     inner=`<div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--grn);margin-bottom:10px;"><i class="fa-solid fa-circle-check"></i>Notifications are ON</div>
-      <div style="font-size:12px;color:var(--txt2,#555);line-height:1.6;margin-bottom:14px;">You'll be notified when expenses are approved, payments are sent, and messages arrive — while the app is open in the background.</div>
+      <div style="font-size:12px;color:var(--txt2,#555);line-height:1.6;margin-bottom:14px;">You'll be notified when expenses are approved, payments are sent, and messages arrive — while the app is open, including in the background. Note: phones eventually pause apps to save battery if left untouched for a long time, which can delay notifications until you reopen the app. Keeping the app open (even backgrounded) during work hours gives the most reliable delivery.</div>
       <button id="notifTestBtn" style="width:100%;padding:11px 0;border:1px solid var(--bdr);border-radius:12px;background:var(--card2,#f5f5f5);color:var(--txt);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;"><i class="fa-solid fa-bell" style="margin-right:6px;"></i>Send test notification</button>`;
   } else if(perm==='default'){
     inner=`<div style="font-size:12px;color:var(--txt2,#555);line-height:1.6;margin-bottom:14px;">Get notified when your expenses are approved, payments are sent, or the office messages you — even when the app is in the background.</div>
