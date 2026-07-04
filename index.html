@@ -2525,6 +2525,31 @@ function _rtRefresh(noticeMsg){
     }catch(e){/* silent — poll will pick it up */}
   },800);
 }
+// ── STALE-DEPLOYMENT DETECTION ──
+// Fetches the page fresh every 5 minutes and compares a signature; if a new
+// version was deployed, shows a persistent toast prompting a reload rather
+// than force-reloading (the admin may be mid-edit in the ledger).
+let _updateCheckIv=null,_updateNotified=false;
+async function checkOfficeUpdate(){
+  try{
+    const res=await fetch(location.pathname+'?_v='+Date.now(),{cache:'no-store'});
+    if(!res.ok)return;
+    const text=await res.text();
+    const sig=text.length+':'+text.slice(0,300)+text.slice(-300);
+    const stored=sessionStorage.getItem('dam_office_sig');
+    if(!stored){sessionStorage.setItem('dam_office_sig',sig);return;}
+    if(sig!==stored&&!_updateNotified){
+      _updateNotified=true;
+      toast('🔄 A new version of the app is available — refresh the page (Ctrl+R) when convenient','i');
+    }
+  }catch(e){/* offline etc — silent */}
+}
+function startOfficeUpdateCheck(){
+  if(_updateCheckIv)clearInterval(_updateCheckIv);
+  checkOfficeUpdate();
+  _updateCheckIv=setInterval(checkOfficeUpdate,5*60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkOfficeUpdate();});
+}
 function setupOfficeRealtime(){
   try{
     if('Notification' in window&&Notification.permission==='default')setTimeout(()=>{try{Notification.requestPermission();}catch(e){}},4000);
@@ -2771,6 +2796,11 @@ async function loadAllData(){
     // attendance requests, and messages appear the moment they happen.
     // The 11s poll above stays as a safety net in case realtime drops.
     setupOfficeRealtime();
+    // Stale-deployment check (GitHub Pages caches aggressively; the employee
+    // app has had this for a while — the office app could silently run an old
+    // version for days after a redeploy). Non-intrusive: shows a toast rather
+    // than force-reloading, since the office may be mid-edit.
+    startOfficeUpdateCheck();
     // employeeDocuments already loaded above - no separate call needed
   }catch(e){
     // Ignore CORS/manifest errors from file:// protocol — these are not real data errors
@@ -4332,6 +4362,13 @@ async function deleteLedRow(id){
   if(!await confirmAsync('Delete this expense row?'))return;
   const r=await sb.from('expenses').delete().eq('id',id);
   if(r.error){toast(r.error.message,'e');return;}
+  // Clean up the receipt file too — orphaned images otherwise eat storage forever
+  if(exp&&exp.receipt_url){
+    try{
+      const _sp=exp.receipt_url.split('/employee-docs/')[1];
+      if(_sp)sb.storage.from('employee-docs').remove([decodeURIComponent(_sp.split('?')[0])]);
+    }catch(err){/* best-effort */}
+  }
   expenses=expenses.filter(e=>e.id!==id);renderLedger();toast('Row deleted','i');
   if(exp&&exp.employee_id&&exp.date){
     const d=new Date(exp.date+'T00:00:00');
