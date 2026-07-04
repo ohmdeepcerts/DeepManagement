@@ -1207,6 +1207,10 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 
       <div class="sett-sec" id="settTab-data">
         <div class="card" style="margin-bottom:14px;">
+          <div class="ch"><div><div class="ct"><i class="fa-solid fa-database" style="color:var(--acc);margin-right:6px;"></i>Storage Usage</div><div class="cs">Receipt photos, message images, and documents — Supabase's free tier includes 1GB</div></div><button class="btn btn-o btn-sm" onclick="loadStorageUsage()"><i class="fa-solid fa-rotate"></i>Refresh</button></div>
+          <div class="cb" id="storageUsageBox"><div style="font-size:12px;color:var(--txtm);">Click Refresh to check current usage (scans all files — takes a few seconds).</div></div>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
           <div class="ch"><div><div class="ct"><i class="fa-solid fa-file-export" style="color:var(--grn);margin-right:6px;"></i>Export Data</div><div class="cs">Choose what to export and download</div></div></div>
           <div class="cb">
             <div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:700;color:var(--txtm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">What to export</div>
@@ -2503,13 +2507,24 @@ async function hardRefresh(){
 // ═══════════════════════════════════════════════════
 let _officeRTChannel=null;
 let _rtRefreshTimer=null;
-function _rtRefresh(noticeMsg){
-  if(noticeMsg){
-    toast(noticeMsg,'i');
-    // Also fire a real OS notification if the office tab is backgrounded
+// opts can be a plain string (old behavior — simple toast + generic OS
+// notification) or an object {toastMsg, notifTitle, notifBody, onClick} for
+// a richer notification that lands the office on the exact record.
+function _rtRefresh(opts){
+  if(opts){
+    const isObj=typeof opts==='object';
+    const toastMsg=isObj?opts.toastMsg:opts;
+    if(toastMsg)toast(toastMsg,'i');
     try{
       if('Notification' in window&&Notification.permission==='granted'&&document.hidden){
-        new Notification('OHM Attendance',{body:noticeMsg.replace(/^[^\w£]*/,''),tag:'ohm-office'});
+        const n=new Notification(isObj&&opts.notifTitle?opts.notifTitle:'OHM Attendance',{
+          body:isObj&&opts.notifBody?opts.notifBody:(toastMsg||'').replace(/^[^\w£]*/,''),
+          tag:isObj&&opts.notifTag?opts.notifTag:'ohm-office',
+          icon:'icon-192.png'
+        });
+        if(isObj&&typeof opts.onClick==='function'){
+          n.onclick=()=>{window.focus();opts.onClick();n.close();};
+        }
       }
     }catch(e){}
   }
@@ -2524,6 +2539,33 @@ function _rtRefresh(noticeMsg){
       if(typeof fn==='function')fn();
     }catch(e){/* silent — poll will pick it up */}
   },800);
+}
+// Jumps straight to a specific expense in the Ledger — used by the "new
+// expense" notification's click action, and by the in-app popup toast too.
+function goToExpenseInLedger(expenseId,employeeId,date){
+  navigate('ledger');
+  if(employeeId)ledgerStaff=employeeId;
+  if(date){
+    const d=new Date(date+'T00:00:00');
+    ledgerMonth=String(d.getMonth()+1).padStart(2,'0');
+    ledgerYear=d.getFullYear();
+  }
+  renderLedger();
+  // Give the DOM a tick to render the newly-selected employee/month, then
+  // scroll to and flash the specific row so it's unmistakable which one to act on.
+  setTimeout(()=>{
+    const row=document.getElementById('ledrow-'+expenseId);
+    if(row){
+      row.scrollIntoView({behavior:'smooth',block:'center'});
+      row.style.transition='background-color 0.3s';
+      const orig=row.style.backgroundColor;
+      let flashes=0;
+      const flashIv=setInterval(()=>{
+        row.style.backgroundColor=row.style.backgroundColor?'':'rgba(37,99,235,0.25)';
+        if(++flashes>=6){clearInterval(flashIv);row.style.backgroundColor=orig;}
+      },350);
+    }
+  },350);
 }
 // ── STALE-DEPLOYMENT DETECTION ──
 // Fetches the page fresh every 5 minutes and compares a signature; if a new
@@ -2556,24 +2598,60 @@ function setupOfficeRealtime(){
     if(_officeRTChannel){sb.removeChannel(_officeRTChannel);_officeRTChannel=null;}
     _officeRTChannel=sb.channel('office-live')
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'expenses'},payload=>{
-        const emp=employeeMap?.get(payload.new?.employee_id);
-        _rtRefresh(emp?`💷 New expense from ${emp.name}`:null);
+        const e=payload.new;
+        const emp=employeeMap?.get(e?.employee_id);
+        // Skip blank draft rows (created when anyone — office or a saved
+        // partial — starts a new ledger row) and skip the office's own
+        // manual entries which have no receipt/notes/items to show for them.
+        const hasRealData=e&&e.merchant&&parseFloat(e.amount)>0;
+        const looksEmployeeSubmitted=e&&(e.receipt_url||e.notes||e.items||e.status==='pending');
+        if(emp&&hasRealData&&looksEmployeeSubmitted){
+          _rtRefresh({
+            toastMsg:`💷 New expense from ${emp.name} — ${e.merchant} (${fmt(e.amount)})`,
+            notifTitle:'💷 New Expense Request',
+            notifBody:`${emp.name}\n${e.merchant} · ${fmt(e.amount)}`,
+            notifTag:'ohm-expense-'+e.id,
+            onClick:()=>goToExpenseInLedger(e.id,e.employee_id,e.date)
+          });
+        } else {
+          _rtRefresh(null);
+        }
       })
       .on('postgres_changes',{event:'UPDATE',schema:'public',table:'expenses'},()=>_rtRefresh(null))
       .on('postgres_changes',{event:'DELETE',schema:'public',table:'expenses'},()=>_rtRefresh(null))
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'expense_batches'},payload=>{
-        const emp=employeeMap?.get(payload.new?.employee_id);
-        _rtRefresh(emp?`📨 ${emp.name} submitted expenses for approval`:null);
+        const b=payload.new;
+        const emp=employeeMap?.get(b?.employee_id);
+        _rtRefresh(emp?{
+          toastMsg:`📨 ${emp.name} submitted expenses for approval`,
+          notifTitle:'📨 Expenses Submitted',
+          notifBody:`${emp.name} submitted a batch for approval`,
+          notifTag:'ohm-batch-'+b.id,
+          onClick:()=>{navigate('ledger');ledgerStaff=b.employee_id;if(b.month!=null&&b.year!=null){ledgerMonth=String(b.month+1).padStart(2,'0');ledgerYear=b.year;}renderLedger();}
+        }:null);
       })
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'attendance_requests'},payload=>{
-        const emp=employeeMap?.get(payload.new?.employee_id);
-        _rtRefresh(emp?`🕐 Attendance request from ${emp.name}`:null);
+        const req=payload.new;
+        const emp=employeeMap?.get(req?.employee_id);
+        _rtRefresh(emp?{
+          toastMsg:`🕐 Attendance request from ${emp.name}`,
+          notifTitle:'🕐 Attendance Request',
+          notifBody:`${emp.name} — ${req.date||''}`,
+          notifTag:'ohm-attreq-'+req.id,
+          onClick:()=>navigate('att-requests')
+        }:null);
       })
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},payload=>{
         // Only notify for messages sent BY employees (not our own)
         if(payload.new?.sender==='employee'){
           const emp=employeeMap?.get(payload.new?.employee_id);
-          _rtRefresh(emp?`💬 Message from ${emp.name}`:null);
+          _rtRefresh(emp?{
+            toastMsg:`💬 Message from ${emp.name}`,
+            notifTitle:'💬 New Message',
+            notifBody:`${emp.name}: ${(payload.new.body||'').slice(0,100)}`,
+            notifTag:'ohm-msg-'+payload.new.id,
+            onClick:()=>{navigate('messages');const sel=document.getElementById('msgEmpSel');if(sel){sel.value=payload.new.employee_id;loadMessages(payload.new.employee_id);}}
+          }:null);
         } else _rtRefresh(null);
       })
       .subscribe(status=>{
@@ -4147,7 +4225,7 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
   // Rows with a negative amount (advances, refunds, deductions) get a red
   // tint instead of the usual blue glass tint, so they stand out at a glance.
   const rowTint=parseFloat(row.amount)<0?'rgba(220,38,38,0.07)':'rgba(37,99,235,0.06)';
-  return`<tr style="--rowbg:${rowTint};">
+  return`<tr id="ledrow-${row.id}" style="--rowbg:${rowTint};">
     <td style="text-align:center;width:24px;"><span style="font-size:11px;color:var(--txtm);">${i+1}</span>${stBadge}</td>
     <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)"></td>
     <td>
@@ -4759,7 +4837,7 @@ async function renderEmpReport(){
   const absent=mRecs.filter(r=>r.status==='A').length;
   const totalH=mRecs.reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
   const totalOT=mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
-  const presentDays=mRecs.filter(function(r){return r.status==='P'||r.status==='HD'||r.status==='LA';}).length;
+  const presentDays=mRecs.filter(function(r){return isP(r.status);}).length;
   const contractedH=parseFloat(emp.contracted_hours||0)>0?parseFloat(emp.contracted_hours)*presentDays:0;
   const totalBonus=mRecs.reduce((s,r)=>s+(parseFloat(r.bonus)||0),0);
   const pct=wD>0?Math.round(present/wD*100):0;
@@ -4776,7 +4854,7 @@ async function renderEmpReport(){
   if(emp.pay_type==='daily'&&emp.contracted_hours&&emp.daily_rate){
     var ch=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     var dr=parseFloat(emp.daily_rate)||0;
-    var fullDayRecs=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';});
+    var fullDayRecs=mRecs.filter(function(r){return isP(r.status);});
     grossPay=fullDayRecs.length*parseFloat(dr.toFixed(2))+recOT+totalBonus;
     var actualBase=_erSav?(parseFloat(_erSav.base_pay)||0):fullDayRecs.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
     totalHoursDeduction=_erSav?(parseFloat(_erSav.deduction_total)||0):Math.max(0,parseFloat((fullDayRecs.length*parseFloat(dr.toFixed(2))-actualBase).toFixed(2)));
@@ -4788,7 +4866,7 @@ async function renderEmpReport(){
     // Work out daily equivalent for this month
     var wDays=workDaysInMonth(emp,year,month);
     var dailyEq=wDays>0?monthlySal/wDays:0;
-    var fullDayRecs2=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';});
+    var fullDayRecs2=mRecs.filter(function(r){return isP(r.status);});
     var roundedDailyEq=parseFloat(dailyEq.toFixed(2));
     grossPay=fullDayRecs2.length*roundedDailyEq+recOT+totalBonus;
     var actualBase2=_erSav?(parseFloat(_erSav.base_pay)||0):fullDayRecs2.reduce(function(s,r){return s+calcPay(emp,r).base;},0);
@@ -4797,7 +4875,7 @@ async function renderEmpReport(){
   } else if(emp.pay_type==='hourly'&&emp.hourly_rate&&emp.contracted_hours){
     var ch2=parseFloat(emp.contracted_hours)||CONFIG_APP.DEFAULT_HOURS;
     var hr=parseFloat(emp.hourly_rate)||0;
-    var presentDaysCount=mRecs.filter(function(r){return r.status==='P'||r.status==='LA';}).length;
+    var presentDaysCount=mRecs.filter(function(r){return isP(r.status);}).length;
     grossPay=presentDaysCount*ch2*hr+recOT+totalBonus;
     totalHoursDeduction=Math.max(0,parseFloat((grossPay-totalPay).toFixed(2)));
     baseCalcLabel=(presentDaysCount*ch2).toFixed(1)+'h × '+C+hr.toFixed(2)+'/h';
@@ -6546,6 +6624,7 @@ async function resolveFlag(id){
 // ═══════════════════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════════════════
+let _storageUsageLoaded=false;
 function setSettTab(tab,el){
   document.querySelectorAll('#page-settings .tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.sett-sec').forEach(function(s){
@@ -6558,7 +6637,7 @@ function setSettTab(tab,el){
     target.classList.add('active');
     target.style.display='block';
   }
-  if(tab==='data')initExportUI();
+  if(tab==='data'){initExportUI();if(!_storageUsageLoaded){_storageUsageLoaded=true;loadStorageUsage();}}
 }
 function loadSettings(){
   initExportUI();
@@ -6613,6 +6692,76 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS from_email text;</pre>
   overlay.querySelector('#rcmCopy').onclick=()=>{
     navigator.clipboard.writeText("ALTER TABLE settings ADD COLUMN IF NOT EXISTS resend_key text;\nALTER TABLE settings ADD COLUMN IF NOT EXISTS from_email text;").then(()=>toast('SQL copied! Paste in Supabase SQL Editor and run.','s'));
   };
+}
+// ═══════════════════════════════════════════════════
+// STORAGE USAGE — Settings → Data
+// Walks the employee-docs bucket recursively, summing file sizes per
+// category, so the office can see usage vs Supabase's 1GB free tier
+// without leaving the app or touching the Supabase dashboard.
+// ═══════════════════════════════════════════════════
+async function _listStorageRecursive(prefix,depth){
+  if(depth>4)return[]; // safety guard against unexpectedly deep trees
+  const r=await sb.storage.from('employee-docs').list(prefix,{limit:1000,sortBy:{column:'name',order:'asc'}});
+  if(r.error||!r.data)return[];
+  let files=[];
+  for(const entry of r.data){
+    const fullPath=prefix?`${prefix}/${entry.name}`:entry.name;
+    if(entry.id===null){
+      // Folder — recurse
+      const sub=await _listStorageRecursive(fullPath,depth+1);
+      files=files.concat(sub);
+    } else {
+      files.push({path:fullPath,size:entry.metadata?.size||0});
+    }
+  }
+  return files;
+}
+function _categorizeStoragePath(path){
+  if(path.startsWith('receipts/')||path.startsWith('ledger-receipts/'))return'Receipts';
+  if(path.startsWith('msg-images/'))return'Message images';
+  if(path.startsWith('docs/'))return'Employee documents';
+  return'Other';
+}
+function _fmtBytes(bytes){
+  if(bytes<1024)return bytes+' B';
+  if(bytes<1024*1024)return(bytes/1024).toFixed(1)+' KB';
+  if(bytes<1024*1024*1024)return(bytes/(1024*1024)).toFixed(1)+' MB';
+  return(bytes/(1024*1024*1024)).toFixed(2)+' GB';
+}
+async function loadStorageUsage(){
+  const box=document.getElementById('storageUsageBox');if(!box)return;
+  box.innerHTML='<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txtm);"><i class="fa-solid fa-spinner fa-spin"></i>Scanning storage (this can take 10-20 seconds with a few hundred files)...</div>';
+  try{
+    const files=await _listStorageRecursive('',0);
+    const totalBytes=files.reduce((s,f)=>s+f.size,0);
+    const byCategory={};
+    files.forEach(f=>{
+      const cat=_categorizeStoragePath(f.path);
+      byCategory[cat]=(byCategory[cat]||0)+f.size;
+    });
+    const FREE_TIER_BYTES=1024*1024*1024; // 1GB Supabase free tier
+    const pct=Math.min(100,(totalBytes/FREE_TIER_BYTES)*100);
+    const pctColor=pct>85?'var(--red)':pct>60?'var(--amb)':'var(--grn)';
+    const catRows=Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).map(([cat,bytes])=>{
+      const catPct=totalBytes>0?(bytes/totalBytes*100):0;
+      return`<div style="display:flex;align-items:center;gap:10px;padding:6px 0;">
+        <div style="width:130px;font-size:12px;color:var(--txt2,#555);flex-shrink:0;">${cat}</div>
+        <div style="flex:1;background:var(--card2);border-radius:6px;height:8px;overflow:hidden;"><div style="width:${catPct}%;height:100%;background:${pctColor};"></div></div>
+        <div style="width:70px;text-align:right;font-size:12px;font-weight:600;flex-shrink:0;">${_fmtBytes(bytes)}</div>
+      </div>`;
+    }).join('');
+    box.innerHTML=`
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;">
+        <div style="font-size:20px;font-weight:800;color:${pctColor};">${_fmtBytes(totalBytes)}</div>
+        <div style="font-size:12px;color:var(--txtm);">of 1 GB free tier · ${pct.toFixed(1)}%</div>
+      </div>
+      <div style="background:var(--card2);border-radius:8px;height:10px;overflow:hidden;margin-bottom:14px;"><div style="width:${pct}%;height:100%;background:${pctColor};transition:width 0.4s;"></div></div>
+      ${catRows||'<div style="font-size:12px;color:var(--txtm);">No files found.</div>'}
+      <div style="font-size:11px;color:var(--txtm);margin-top:12px;">${files.length} file${files.length!==1?'s':''} total.${pct>70?' Consider archiving/downloading old VAT receipts once processed, then deleting them from expenses to free space.':''}</div>
+    `;
+  }catch(err){
+    box.innerHTML=`<div style="font-size:12px;color:var(--red);">Couldn't scan storage: ${escapeHtml(err.message||'unknown error')}</div>`;
+  }
 }
 async function saveGeminiKey(){
   const key=document.getElementById('sGeminiKey').value.trim();
@@ -7461,8 +7610,26 @@ async function doExport(format){
       if(checks.includes('expenses')&&filteredExp.length){
         const headers=['Date','Employee','Merchant','Category','Amount','Tags','Receipt URL'];
         const C2=cur();
-        const rows=filteredExp.map(r=>[r.date,`"${(empMap[r.employee_id]||'').replace(/"/g,'""')}"`,`"${(r.merchant||r.description||'').replace(/"/g,'""')}"`,`"${(r.category||'').replace(/"/g,'""')}"`,r.amount,`"${(r.tags||[]).join(';')}"`,r.receipt_url||'']);
-        sheets.push({name:'expenses',csv:[headers,...rows].map(r=>r.join(',')).join('\n')});
+        // Grouped by employee (not flat date order) so one person's expenses
+        // are easy to review together during an audit, instead of everyone's
+        // rows interleaved by date.
+        const grp={};
+        filteredExp.forEach(r=>{const k=r.employee_id||'_unknown';(grp[k]=grp[k]||[]).push(r);});
+        const sortedIds=Object.keys(grp).sort((a,b)=>(empMap[a]||'zzz').localeCompare(empMap[b]||'zzz'));
+        const lines=[headers.join(',')];
+        sortedIds.forEach(empId=>{
+          const empName=empMap[empId]||'Unknown';
+          const rows=[...grp[empId]].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+          lines.push(`"— ${empName.toUpperCase()} —"`);
+          let subtotal=0;
+          rows.forEach(r=>{
+            subtotal+=parseFloat(r.amount)||0;
+            lines.push([r.date,`"${empName.replace(/"/g,'""')}"`,`"${(r.merchant||r.description||'').replace(/"/g,'""')}"`,`"${(r.category||'').replace(/"/g,'""')}"`,r.amount,`"${(r.tags||[]).join(';')}"`,r.receipt_url||''].join(','));
+          });
+          lines.push(`"${empName} — Subtotal",,,,${subtotal.toFixed(2)},,`);
+          lines.push(''); // spacer
+        });
+        sheets.push({name:'expenses',csv:lines.join('\n')});
       }
       if(checks.includes('employees')&&filteredEmps.length){
         const headers=['Name','Role','Contract','Phone','Join Date','Status','Contracted Hours','Work Start','Work End'];
@@ -7775,49 +7942,83 @@ async function doExportXLSX(){
       const aoa3=[]; const merges3=[]; const heights3=[]; let r3=0;
       const push3=(row,h)=>{aoa3.push(row);heights3.push(h||18);};
 
-      push3([{v:'OHM ELECTRICAL — Expense Ledger',s:S(WHITE,NAVY,true,15,'left')},
-             ...Array(6).fill(BL(NAVY))],32);
-      merges3.push({s:{r:r3,c:0},e:{r:r3,c:6}});r3++;
+      push3([{v:'OHM ELECTRICAL — Expense Ledger',s:S(WHITE,NAVY,true,15,'center')},
+             ...Array(7).fill(BL(NAVY))],32);
+      merges3.push({s:{r:r3,c:0},e:{r:r3,c:7}});r3++;
 
-      push3([{v:`${dateRangeStr}   ·   ${empStr}   ·   Exported: ${today}`,s:S('CBD5E1',NAVY2,false,10,'left')},
-             ...Array(6).fill(BL(NAVY2))],18);
-      merges3.push({s:{r:r3,c:0},e:{r:r3,c:6}});r3++;
+      push3([{v:`${dateRangeStr}   ·   ${empStr}   ·   Exported: ${today}`,s:S('CBD5E1',NAVY2,false,10,'center')},
+             ...Array(7).fill(BL(NAVY2))],18);
+      merges3.push({s:{r:r3,c:0},e:{r:r3,c:7}});r3++;
 
-      push3(Array(7).fill(BL(GRAY_L)),6);r3++;
+      push3(Array(8).fill(BL(GRAY_L)),6);r3++;
 
-      push3(['Date','Employee','Merchant / Supplier','Category','Tags','Amount','Receipt']
+      push3(['Date','Employee','Merchant / Supplier','Category','Tags','Amount','Running','Receipt']
         .map(h=>({v:h,s:SH(WHITE,BLUE,true,10)})),22);r3++;
 
       let expGT=0;
-      [...filtExp].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach((exp,ei)=>{
-        const emp2=empMap[exp.employee_id];
-        const amt=parseFloat(exp.amount)||0; expGT+=amt;
-        const isNeg=amt<0; const rb=ei%2===0?WHITE:GRAY_L;
-        const tags=(exp.tags||[]);
-        const tagsStr=Array.isArray(tags)?tags.join(', '):String(tags||'');
+      // Grouped by employee (not flat date order) — each employee gets a
+      // header band, their own expenses sorted by date, and a subtotal.
+      // Much easier to audit one person's spending at a glance this way.
+      const empGroups={};
+      filtExp.forEach(exp=>{
+        const key=exp.employee_id||'_unknown';
+        if(!empGroups[key])empGroups[key]=[];
+        empGroups[key].push(exp);
+      });
+      const sortedEmpIds=Object.keys(empGroups).sort((a,b)=>{
+        const nA=(empMap[a]?.name||'zzz_unknown');
+        const nB=(empMap[b]?.name||'zzz_unknown');
+        return nA.localeCompare(nB);
+      });
+      sortedEmpIds.forEach(empId=>{
+        const emp2=empMap[empId];
+        const empName=emp2?.name||'Unknown';
+        const empExpenses=[...empGroups[empId]].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+        // Employee header band
+        push3([{v:empName.toUpperCase(),s:S(WHITE,EMP_F,true,11,'left')},
+               ...Array(7).fill(BL(EMP_F))],24);
+        merges3.push({s:{r:r3,c:0},e:{r:r3,c:7}});r3++;
+        let empSubtotal=0,running=0;
+        empExpenses.forEach((exp,ei)=>{
+          const amt=parseFloat(exp.amount)||0; empSubtotal+=amt; expGT+=amt; running+=amt;
+          const isNeg=amt<0; const rb=ei%2===0?WHITE:GRAY_L;
+          const runNeg=running<0;
+          const tags=(exp.tags||[]);
+          const tagsStr=Array.isArray(tags)?tags.join(', '):String(tags||'');
+          push3([
+            {v:exp.date||'',s:S('374151',rb,false,10,'center')},
+            {v:empName,s:S(GRAY_T,rb,false,9,'left')},
+            {v:exp.merchant||exp.description||'—',s:S('374151',rb,false,10,'left',false,true)},
+            {v:exp.category||'—',s:S('374151',rb,false,10,'center')},
+            {v:tagsStr||'—',s:S(GRAY_T,rb,false,9,'center')},
+            {v:parseFloat(Math.abs(amt).toFixed(2))*(isNeg?-1:1),s:S(isNeg?RED_F:EXP_F,isNeg?RED_B:EXP_B,true,10,'right')},
+            {v:parseFloat(Math.abs(running).toFixed(2))*(runNeg?-1:1),s:S(runNeg?RED_F:'374151',rb,false,10,'right')},
+            {v:exp.receipt_url?'✓ Yes':'—',s:S(exp.receipt_url?GRN_F:GRAY_T,exp.receipt_url?GRN_B:rb,!!exp.receipt_url,10,'center')},
+          ],18);r3++;
+        });
+        // Per-employee subtotal
         push3([
-          {v:exp.date||'',s:S('374151',rb,false,10,'center')},
-          {v:emp2?.name||'?',s:S(EMP_F,EMP_B,true,10,'left')},
-          {v:exp.merchant||exp.description||'—',s:S('374151',rb,false,10,'left',false,true)},
-          {v:exp.category||'—',s:S('374151',rb,false,10,'center')},
-          {v:tagsStr||'—',s:S(GRAY_T,rb,false,9,'center')},
-          {v:parseFloat(Math.abs(amt).toFixed(2))*(isNeg?-1:1),s:S(isNeg?RED_F:EXP_F,isNeg?RED_B:EXP_B,true,10,'right')},
-          {v:exp.receipt_url?'✓ Yes':'—',s:S(exp.receipt_url?GRN_F:GRAY_T,exp.receipt_url?GRN_B:rb,!!exp.receipt_url,10,'center')},
-        ],18);r3++;
+          {v:`${empName} — Subtotal`,s:S(EMP_F,EMP_B,true,10,'left')},
+          BL(EMP_B),BL(EMP_B),BL(EMP_B),BL(EMP_B),
+          {v:parseFloat(empSubtotal.toFixed(2)),s:S(EMP_F,EMP_B,true,10,'right')},
+          BL(EMP_B),BL(EMP_B),
+        ],20);
+        merges3.push({s:{r:r3,c:0},e:{r:r3,c:4}});r3++;
+        push3(Array(8).fill(BL(WHITE)),6);r3++; // spacer between employees
       });
 
       push3([
         {v:'GRAND TOTAL',s:S(WHITE,NAVY,true,12,'left')},
         BL(NAVY),BL(NAVY),BL(NAVY),BL(NAVY),
         {v:parseFloat(expGT.toFixed(2)),s:S(WHITE,NAVY,true,12,'right')},
-        BL(NAVY),
+        BL(NAVY),BL(NAVY),
       ],26);
       merges3.push({s:{r:r3,c:0},e:{r:r3,c:4}});r3++;
 
       const ws3=XLSX.utils.aoa_to_sheet(aoa3);
       ws3['!merges']=merges3;
       ws3['!rows']=heights3.map(h=>({hpt:h}));
-      ws3['!cols']=[13,22,30,17,15,15,12].map(w=>({wch:w}));
+      ws3['!cols']=[13,22,30,17,15,15,15,12].map(w=>({wch:w}));
       XLSX.utils.book_append_sheet(wb,ws3,'Expenses');
     }catch(e){console.error('Sheet3 error:',e);}
   }
