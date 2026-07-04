@@ -663,6 +663,10 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <div class="tb-right">
       <span class="pg-title" id="pgTitle">DASHBOARD</span>
       <div class="thm-tog" onclick="toggleTheme()"><i class="fa-solid fa-sun"></i><div class="tog-sw"></div><i class="fa-solid fa-moon"></i></div>
+      <button id="notifBellBtn" onclick="openOfficeNotifSettings()" title="Notification settings" style="position:relative;width:34px;height:34px;border-radius:50%;border:1px solid var(--bdr);background:var(--card);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:var(--tr);">
+        <i class="fa-solid fa-bell"></i>
+        <span id="officeNotifDot" style="position:absolute;top:5px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--txtm);border:1.5px solid var(--card);"></span>
+      </button>
       <button id="hardRefreshBtn" onclick="hardRefresh()" title="Refresh data" title="Refresh data from Supabase" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--bdr);background:var(--card);color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:var(--tr);"><i class="fa-solid fa-rotate-right"></i></button>
       <div class="sync saved" id="syncBadge"><i class="fa-solid fa-circle-check"></i><span id="syncTxt">Saved</span></div>
       <!-- ADMIN DROPDOWN -->
@@ -2592,9 +2596,72 @@ function startOfficeUpdateCheck(){
   _updateCheckIv=setInterval(checkOfficeUpdate,5*60000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkOfficeUpdate();});
 }
+// ═══════════════════════════════════════════════════
+// OFFICE NOTIFICATION SETTINGS — bell icon in the topbar
+// Same idea as the employee app's version: shows real status, explains why
+// notifications might not be arriving, and gives a direct test so you can
+// verify system notifications work AT ALL on this browser/PC — independent
+// of whether realtime happens to fire during the test.
+// ═══════════════════════════════════════════════════
+function updateOfficeNotifDot(){
+  const dot=document.getElementById('officeNotifDot');if(!dot)return;
+  if(!('Notification' in window)){dot.style.background='var(--txtm)';return;}
+  dot.style.background=Notification.permission==='granted'?'var(--grn)':Notification.permission==='denied'?'var(--red)':'var(--amb,#d97706)';
+}
+function openOfficeNotifSettings(){
+  const perm=('Notification' in window)?Notification.permission:'unsupported';
+  const isFileProtocol=location.protocol==='file:';
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:22px;';
+  let inner='';
+  if(isFileProtocol){
+    inner=`<div style="font-size:12px;color:var(--txt2,#444);line-height:1.7;">You're opening this file directly from your computer (<code>file://...</code>) rather than the deployed GitHub Pages site. Some browsers restrict notifications on local files. For real use, open the app from its actual web address (the one your team uses), not a downloaded copy — that's also the only way you'll reliably get the latest version.</div>`;
+  } else if(perm==='unsupported'){
+    inner=`<div style="font-size:13px;color:var(--txt2,#444);line-height:1.6;">This browser doesn't support notifications.</div>`;
+  } else if(perm==='granted'){
+    inner=`<div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--grn);margin-bottom:10px;"><i class="fa-solid fa-circle-check"></i>Notifications are ON</div>
+      <div style="font-size:12px;color:var(--txt2,#555);line-height:1.6;margin-bottom:14px;">You'll be notified for new expenses, submissions, attendance requests, and messages — while this tab is minimized or you're on a different tab. It won't notify while you're actively looking at this tab (you'll see the in-app toast instead).</div>
+      <button id="officeNotifTestBtn" style="width:100%;padding:11px 0;border:1px solid var(--bdr);border-radius:12px;background:var(--card2,#f5f5f5);color:var(--txt);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;"><i class="fa-solid fa-bell" style="margin-right:6px;"></i>Send test notification</button>
+      <div style="font-size:11px;color:var(--txtm);margin-top:10px;">Test fires immediately regardless of tab visibility, so you can check it right here.</div>`;
+  } else if(perm==='default'){
+    inner=`<div style="font-size:12px;color:var(--txt2,#555);line-height:1.6;margin-bottom:14px;">Turn on desktop notifications for new expenses, submissions, attendance requests, and messages — so you see them even with this tab minimized or in the background.</div>
+      <button id="officeNotifEnableBtn" style="width:100%;padding:12px 0;border:none;border-radius:12px;background:var(--acc,#2563eb);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;"><i class="fa-solid fa-bell" style="margin-right:6px;"></i>Turn on notifications</button>`;
+  } else {
+    const ua=navigator.userAgent;
+    const isMac=/Macintosh/.test(ua);
+    const steps=isMac
+      ?'1. Click the <strong>🔒 padlock</strong> (or ⓘ) next to the web address<br>2. Find <strong>Notifications</strong> → set to <strong>Allow</strong><br>3. Also check macOS <strong>System Settings → Notifications</strong> → your browser → notifications are allowed<br>4. Reload the page'
+      :'1. Click the <strong>🔒 padlock</strong> (or ⓘ) next to the web address<br>2. Find <strong>Notifications</strong> → set to <strong>Allow</strong><br>3. Reload the page';
+    inner=`<div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--red);margin-bottom:10px;"><i class="fa-solid fa-bell-slash"></i>Notifications are blocked</div>
+      <div style="font-size:12px;color:var(--txt2,#555);line-height:1.6;margin-bottom:10px;">Your browser was told "Block" at some point — browsers don't allow websites to ask again after that. Switching it back on takes 20 seconds:</div>
+      <div style="font-size:12px;color:var(--txt2,#555);line-height:1.9;background:var(--card2,#f5f5f5);border:1px solid var(--bdr);border-radius:10px;padding:10px 13px;">${steps}</div>`;
+  }
+  overlay.innerHTML=`<div style="background:var(--card,#fff);border-radius:18px;padding:20px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <span style="font-size:15px;font-weight:800;"><i class="fa-solid fa-bell" style="margin-right:7px;color:var(--acc);"></i>Notifications</span>
+      <button id="officeNotifCloseBtn" style="border:none;background:none;color:var(--txtm);cursor:pointer;font-size:16px;padding:4px;"><i class="fa-solid fa-xmark"></i></button>
+    </div>${inner}</div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.querySelector('#officeNotifCloseBtn').onclick=()=>overlay.remove();
+  const enableBtn=overlay.querySelector('#officeNotifEnableBtn');
+  if(enableBtn)enableBtn.onclick=async()=>{
+    const result=await Notification.requestPermission();
+    overlay.remove();
+    updateOfficeNotifDot();
+    if(result==='granted'){toast('Notifications turned on ✅','s');try{new Notification('OHM Attendance',{body:'Notifications are working! 🎉'});}catch(e){}}
+    else if(result==='denied')openOfficeNotifSettings();
+  };
+  const testBtn=overlay.querySelector('#officeNotifTestBtn');
+  if(testBtn)testBtn.onclick=()=>{
+    try{new Notification('💷 New Expense Request',{body:'Test — Shoaib · Selco · £154.80'});toast('Test sent — check your notification tray/corner','s');}
+    catch(e){toast('Could not send: '+(e.message||'unknown error'),'e');}
+  };
+}
 function setupOfficeRealtime(){
   try{
-    if('Notification' in window&&Notification.permission==='default')setTimeout(()=>{try{Notification.requestPermission();}catch(e){}},4000);
+    if('Notification' in window&&Notification.permission==='default')setTimeout(()=>{try{Notification.requestPermission().then(updateOfficeNotifDot);}catch(e){}},4000);
+    updateOfficeNotifDot();
     if(_officeRTChannel){sb.removeChannel(_officeRTChannel);_officeRTChannel=null;}
     _officeRTChannel=sb.channel('office-live')
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'expenses'},payload=>{
@@ -5167,6 +5234,18 @@ async function renderEmpReport(){
         </tr>`:''}
       </tfoot>
     </table>
+    ${(()=>{
+      const catTotals={};
+      mExpenses.forEach(e=>{const cat=e.category||'Uncategorized';catTotals[cat]=(catTotals[cat]||0)+(parseFloat(e.amount)||0);});
+      const catRows=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+      if(catRows.length<2)return''; // not worth a breakdown for a single category
+      return`<div style="margin-top:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--txtm);margin-bottom:6px;">BY CATEGORY</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${catRows.map(row=>{const neg=row[1]<0;return`<div style="display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--bdr);border-radius:8px;padding:6px 11px;font-size:12px;"><span style="color:var(--txtm);">${row[0]}</span><span style="font-weight:700;color:${neg?'var(--red)':'var(--txt)'};">${neg?'−':''}${C}${Math.abs(row[1]).toFixed(2)}</span></div>`;}).join('')}
+        </div>
+      </div>`;
+    })()}
   </div>`}
   </div>`:''}
 `;
@@ -5205,6 +5284,17 @@ function printTimesheet(){
     const mRecs=attendance.filter(function(r){var d=new Date(r.date+'T00:00:00');return r.employee_id===empId&&d.getMonth()===month&&d.getFullYear()===year;});
     const totalBase=_ptSav?(parseFloat(_ptSav.base_pay)||0):mRecs.filter(r=>isP(r.status)).reduce(function(s,r){return s+calcPay(emp,r).base;},0);
     const totalPay2=_ptSav?(parseFloat(_ptSav.total_pay)||totalBase):mRecs.filter(r=>isP(r.status)).reduce(function(s,r){const p=calcPay(emp,r);return s+p.base+p.ot+(parseFloat(r.bonus)||0);},0);
+    // Positive entries first (date order), deductions/advances last as their
+    // own group — same "everything owed, then everything taken off" ordering
+    // as the Ledger's own Report button, so both print the same way.
+    const sortedExp=[...mExp].sort(function(a,b){return a.date.localeCompare(b.date);});
+    const orderedExp=[...sortedExp.filter(e=>(parseFloat(e.amount)||0)>=0),...sortedExp.filter(e=>(parseFloat(e.amount)||0)<0)];
+    // Category breakdown — same idea as the Tags & Analytics page, condensed
+    // into the printed report so an auditor can see spend-by-category at a glance.
+    const catTotals={};
+    mExp.forEach(e=>{const cat=e.category||'Uncategorized';catTotals[cat]=(catTotals[cat]||0)+(parseFloat(e.amount)||0);});
+    const catRows=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+    let running=0;
     expSection='<div style="page-break-before:always;font-family:sans-serif;padding:20px;">'
       +'<div style="text-align:center;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:8px;">'
       +'<strong style="font-size:15px;">'+(cfg.company||'DAM Pro')+'</strong><br>'
@@ -5212,19 +5302,25 @@ function printTimesheet(){
       +'<span style="font-size:11px;">'+MONTHS[month]+' '+year+'</span>'
       +'</div>'
       +'<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-      +'<thead><tr style="background:#f1f5f9;"><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Date</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Merchant</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Category</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Notes</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Amount</th></tr></thead>'
-      +'<tbody>'+mExp.sort(function(a,b){return a.date.localeCompare(b.date);}).map(function(e){
-        var neg=parseFloat(e.amount)<0;
-        return'<tr><td style="padding:5px 7px;border:1px solid #ccc;">'+e.date+'</td>'
+      +'<thead><tr style="background:#f1f5f9;"><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Date</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Merchant</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Category</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Notes</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Amount</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Running</th></tr></thead>'
+      +'<tbody>'+orderedExp.map(function(e){
+        var amt=parseFloat(e.amount)||0;var neg=amt<0;running+=amt;var runNeg=running<0;
+        return'<tr'+(neg?' style="background:#fef2f2;"':'')+'><td style="padding:5px 7px;border:1px solid #ccc;">'+e.date+'</td>'
           +'<td style="padding:5px 7px;border:1px solid #ccc;font-weight:600;">'+(e.merchant||'—')+'</td>'
           +'<td style="padding:5px 7px;border:1px solid #ccc;">'+(e.category||'—')+'</td>'
           +'<td style="padding:5px 7px;border:1px solid #ccc;">'+(e.notes||'—')+'</td>'
-          +'<td style="padding:5px 7px;border:1px solid #ccc;text-align:right;font-weight:700;color:'+(neg?'#dc2626':'#0d9488')+';">'+(neg?'−':'+')+C2+Math.abs(parseFloat(e.amount)).toFixed(2)+'</td></tr>';
-      }).join('')+'</tbody>'
-      +'<tfoot>'
-      +'<tr style="font-weight:bold;background:#f8fafc;"><td colspan="4" style="padding:5px 7px;border:1px solid #ccc;">Total Expenses</td><td style="padding:5px 7px;border:1px solid #ccc;text-align:right;">'+(mExpNet<0?'−':'')+C2+Math.abs(mExpNet).toFixed(2)+'</td></tr>'
-      +(hasRate?'<tr style="font-weight:bold;font-size:14px;background:#f0fdf4;"><td colspan="4" style="padding:6px 7px;border:2px solid #16a34a;">TOTAL PAYABLE (Pay + Expenses)</td><td style="padding:6px 7px;border:2px solid #16a34a;text-align:right;color:#16a34a;">'+C2+(totalPay2+mExpNet).toFixed(2)+'</td></tr>':'')
-      +'</tfoot></table></div>';
+          +'<td style="padding:5px 7px;border:1px solid #ccc;text-align:right;font-weight:700;color:'+(neg?'#dc2626':'#0d9488')+';">'+(neg?'−':'')+C2+Math.abs(amt).toFixed(2)+'</td>'
+          +'<td style="padding:5px 7px;border:1px solid #ccc;text-align:right;color:'+(runNeg?'#dc2626':'#374151')+';">'+(runNeg?'−':'')+C2+Math.abs(running).toFixed(2)+'</td></tr>';
+      }).join('')
+      +'<tr style="font-weight:bold;background:#f8fafc;"><td colspan="4" style="padding:5px 7px;border:1px solid #ccc;">Total Expenses</td><td colspan="2" style="padding:5px 7px;border:1px solid #ccc;text-align:right;">'+(mExpNet<0?'−':'')+C2+Math.abs(mExpNet).toFixed(2)+'</td></tr>'
+      +(hasRate?'<tr style="font-weight:bold;font-size:14px;background:#f0fdf4;"><td colspan="4" style="padding:6px 7px;border:2px solid #16a34a;">TOTAL PAYABLE (Pay + Expenses)</td><td colspan="2" style="padding:6px 7px;border:2px solid #16a34a;text-align:right;color:#16a34a;">'+C2+(totalPay2+mExpNet).toFixed(2)+'</td></tr>':'')
+      +'</tbody></table>'
+      +'<div style="margin-top:20px;">'
+      +'<div style="font-size:13px;font-weight:700;margin-bottom:6px;">By Category</div>'
+      +'<table style="width:280px;border-collapse:collapse;font-size:12px;">'
+      +'<thead><tr style="background:#f1f5f9;"><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Category</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Amount</th></tr></thead>'
+      +'<tbody>'+catRows.map(function(row){var neg=row[1]<0;return'<tr><td style="padding:5px 7px;border:1px solid #ccc;">'+row[0]+'</td><td style="padding:5px 7px;border:1px solid #ccc;text-align:right;'+(neg?'color:#dc2626;':'')+'">'+(neg?'−':'')+C2+Math.abs(row[1]).toFixed(2)+'</td></tr>';}).join('')+'</tbody>'
+      +'</table></div></div>';
   }
   const c=document.getElementById('tsSheet');c.innerHTML=sheets+expSection;
   const pageEl=document.getElementById('page-emp-report');
@@ -5262,6 +5358,11 @@ function printExpenseReport(){
   const orderedRows=[...rows.filter(e=>(parseFloat(e.amount)||0)>=0),...rows.filter(e=>(parseFloat(e.amount)||0)<0)];
   const statusLabel=st=>st==='approved'?'Approved':st==='rejected'?'Rejected':st==='pending'?'Pending':'Draft';
   let running=0;
+  // Category breakdown — same idea as the Tags & Analytics page, condensed
+  // into the printed report so an auditor can see spend-by-category at a glance.
+  const catTotals={};
+  rows.forEach(e=>{const cat=e.category||'Uncategorized';catTotals[cat]=(catTotals[cat]||0)+(parseFloat(e.amount)||0);});
+  const catRows=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
   const html=`<div style="font-family:sans-serif;padding:0;">
     <div style="text-align:center;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:8px;">
       <strong style="font-size:15px;">${escapeHtml(co)}</strong><br>
@@ -5296,7 +5397,14 @@ function printExpenseReport(){
       <tr style="font-weight:bold;font-size:14px;background:#f0fdf4;"><td colspan="7" style="padding:6px 7px;border:2px solid #16a34a;">TOTAL</td><td style="padding:6px 7px;border:2px solid #16a34a;text-align:right;color:#16a34a;">${total<0?'−':''}${C}${Math.abs(total).toFixed(2)}</td></tr>
       </tbody>
     </table>
-    <div style="margin-top:26px;font-size:11px;color:#555;">${rows.length} entr${rows.length===1?'y':'ies'} · Generated ${fmtDate(dateKey(new Date()))}</div>
+    <div style="margin-top:20px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px;">By Category</div>
+      <table style="width:280px;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#f1f5f9;"><th style="padding:5px 7px;border:1px solid #ccc;text-align:left;">Category</th><th style="padding:5px 7px;border:1px solid #ccc;text-align:right;">Amount</th></tr></thead>
+        <tbody>${catRows.map(row=>{const neg=row[1]<0;return`<tr><td style="padding:5px 7px;border:1px solid #ccc;">${escapeHtml(row[0])}</td><td style="padding:5px 7px;border:1px solid #ccc;text-align:right;${neg?'color:#dc2626;':''}">${neg?'−':''}${C}${Math.abs(row[1]).toFixed(2)}</td></tr>`;}).join('')}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:20px;font-size:11px;color:#555;">${rows.length} entr${rows.length===1?'y':'ies'} · Generated ${fmtDate(dateKey(new Date()))}</div>
   </div>`;
   const c=document.getElementById('ledgerTsSheet');c.innerHTML=html;
   const pageEl=document.getElementById('page-ledger');
