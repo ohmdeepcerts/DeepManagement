@@ -3979,8 +3979,19 @@ async function saveAttSilent(){
   const isLocked=(cfg.locked_months||[]).includes(`${markDate.getFullYear()}_${markDate.getMonth()}`);
   if(isLocked)return;
   const toSave=[];
+  // BUGFIX: _touched was previously never cleared after a successful silent save. Since this
+  // function re-reads and re-upserts EVERY id currently in _touched (not just the one just edited),
+  // every subsequent keystroke on Mark Attendance re-sent the full, growing list of everyone touched
+  // so far that session — one field edit could balloon into 20+ duplicate Supabase writes by the end
+  // of the day, each re-triggering a payroll recalculation for every prior employee too.
+  // Fix: track which ids were fully handled this pass (row gone, cleared, or saved OK) and remove
+  // them from _touched afterward. Only ids that actually failed to save stay tracked, so the next
+  // debounce cycle retries just those.
+  const rowsMissing=[]; // ids whose DOM row no longer exists — nothing to save, stop tracking them
+  const clearedIds=[];  // ids explicitly cleared/removed this pass
   _touched.forEach(empId=>{
-    const row=document.getElementById(`mr-${empId}`);if(!row)return;
+    const row=document.getElementById(`mr-${empId}`);
+    if(!row){rowsMissing.push(empId);return;}
     const g=f=>row.querySelector(`[data-f="${f}"]`)?.value||null;
     const status=g('status');
     if(status==='CLEAR'){
@@ -3992,19 +4003,25 @@ async function saveAttSilent(){
           recalcEmployeeMonth(empId,markDate.getMonth(),markDate.getFullYear());
         });
       }
+      clearedIds.push(empId);
       return;
     }
-    if(!status)return;
+    if(!status)return; // no status chosen yet — keep tracking, nothing to save
     const _si=g('sign_in'),_so=g('sign_out');
     if(_si&&_so&&_si>=_so){toast('Check times: end must be after start','e');return;}
     const h=g('hours'),ot=g('overtime');
     toSave.push({employee_id:empId,date:key,status,sign_in:g('sign_in')||null,sign_out:g('sign_out')||null,hours:h?parseFloat(h):null,overtime:ot?parseFloat(ot):null,bonus:g('bonus')?parseFloat(g('bonus')):null,jobs:g('jobs')?parseInt(g('jobs')):null,notes:g('notes')||null});
   });
+  rowsMissing.forEach(id=>_touched.delete(id));
+  clearedIds.forEach(id=>_touched.delete(id));
   if(toSave.length===0)return;
   setSyncStatus('saving');
   const results=await Promise.all(toSave.map(r=>sb.from('attendance').upsert(r,{onConflict:'employee_id,date'}).select().single()));
   results.forEach((res,i)=>{if(!res.error){const r=toSave[i];const _d=new Date(r.date+'T00:00:00');invalidatePayroll(r.employee_id,_d.getMonth(),_d.getFullYear());}});
   const hasErr=results.some(r=>r.error);
+  // Remove successfully-saved employees from _touched now — only rows that individually failed
+  // stay in _touched so the next debounce cycle retries just those, not the whole batch.
+  results.forEach((res,i)=>{if(!res.error)_touched.delete(toSave[i].employee_id);});
   if(hasErr){setSyncStatus('err');console.error('Att save errors:',results.filter(r=>r.error).map(r=>r.error));return;}
   // Update local state
   results.forEach(r=>{if(!r.data)return;const idx=attendance.findIndex(a=>a.employee_id===r.data.employee_id&&a.date===r.data.date);if(idx>=0)attendance[idx]=r.data;else attendance.push(r.data);});
