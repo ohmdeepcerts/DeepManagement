@@ -29,6 +29,7 @@
 </script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <style>
 :root{
   --sb:#0f172a;--sbh:#1e293b;--sbb:#1e293b;--sbt:#94a3b8;
@@ -129,7 +130,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .sync.err{background:var(--red);color:#fff;}
 
 /* CONTENT */
-.content{flex:1;overflow-y:auto;padding:18px 22px;min-height:0;}
+.content{flex:1;overflow-y:auto;padding:18px 22px;min-height:0;overflow-anchor:none;}
 .content.ledger-mode{padding:0;overflow:hidden;}
 .page{display:none;}
 .page.active{display:block;animation:pageIn 0.2s ease forwards;}
@@ -604,6 +605,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
   th,td{border:1px solid #ccc!important;padding:6px 8px!important;font-size:11px!important;}
   th{background:#f1f5f9!important;color:#000!important;}
 }
+.ac-active{background:var(--card2);}
 </style>
 </head>
 <body>
@@ -1692,6 +1694,7 @@ const sb=supabase.createClient(SUPA_URL,SUPA_KEY,{
   if(session){
     isLoggedIn=true;
     document.getElementById('auth-overlay').style.display='none';
+    document.getElementById('mainContent')?.scrollTo(0,0);
     if(session.user?.email)updateAdminPill(session.user.email);
     loadAllData();
   }
@@ -1726,7 +1729,7 @@ let currentPage='dashboard';
 function ukDate(dateStr){
   // Returns a Date object interpreted in UK local time
   if(!dateStr)return new Date();
-  return new Date(new Date(dateStr+'T00:00:00').toLocaleString('en-GB',{timeZone:'Europe/London'}));
+  return new Date(dateStr+'T00:00:00');
 }
 function todayUK(){
   return new Date().toLocaleDateString('en-CA',{timeZone:'Europe/London'}); // YYYY-MM-DD
@@ -1929,7 +1932,8 @@ function toast(msg,type='i'){
   haptic(type==='e'?'error':type==='s'?'success':'click');
   const ic={s:'fa-circle-check',e:'fa-circle-xmark',i:'fa-circle-info'};
   const t=document.createElement('div');t.className=`toast ${type}`;
-  t.innerHTML=`<i class="fa-solid ${ic[type]||ic.i}"></i>${msg}`;
+  t.innerHTML=`<i class="fa-solid ${ic[type]||ic.i}"></i><span></span>`;
+  t.querySelector('span').textContent=msg;
   document.getElementById('toasts').appendChild(t);
   setTimeout(()=>t.remove(),3500);
 }
@@ -1963,6 +1967,7 @@ function calcOT(h,emp){
  * @returns {{ base: number, ot: number, total: number, type: string }}
  */
 function calcPay(emp,rec){
+  if(!emp||!rec||!rec.date)return{base:0,ot:0,total:0};
   const payType=emp.pay_type||'hourly';
   const dt=new Date(rec.date+'T00:00:00');
   // Use the rate that was effective ON THIS RECORD'S DATE (from salary_history), not today's rate
@@ -2226,7 +2231,7 @@ function showMissingSalaryPopup(emp,fromDate){
         Pay calculations will return <strong style="color:var(--red);">£0.00</strong> until a rate is added.
       </p>
       <div style="display:flex;gap:8px;">
-        <button onclick="document.getElementById('missingSalaryPopup').remove();openEmpModal('${emp.id}');setTimeout(()=>setEmpTab('pay'),300);"
+        <button onclick="document.getElementById('missingSalaryPopup').remove();openEmpModal('${escapeHtml(emp.id)}');setTimeout(()=>setEmpTab('pay'),300);"
           style="flex:1;padding:10px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
           <i class="fa-solid fa-plus" style="margin-right:5px;"></i>Add Salary Rate
         </button>
@@ -2322,7 +2327,8 @@ function _showSaveRetryToast(empId,month,year){
     t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;padding:10px 16px;border-radius:10px;font-size:12px;font-weight:600;z-index:9998;display:flex;align-items:center;gap:10px;border:1px solid rgba(239,68,68,0.3);';
     document.body.appendChild(t);
   }
-  t.innerHTML=`<i class="fa-solid fa-triangle-exclamation" style="color:var(--red);"></i><span id="_srt">${name} payroll save failed — retrying in ${secs}s</span><button onclick="clearInterval(window._srtIv);document.getElementById('payrollSaveRetry')?.remove();savePayrollSummary('${empId}',${month},${year});" style="background:var(--acc);color:#fff;border:none;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;">Retry</button>`;
+  t.innerHTML=`<i class="fa-solid fa-triangle-exclamation" style="color:var(--red);"></i><span id="_srt"></span><button onclick="clearInterval(window._srtIv);document.getElementById('payrollSaveRetry')?.remove();savePayrollSummary('${empId}',${month},${year});" style="background:var(--acc);color:#fff;border:none;border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;">Retry</button>`;
+  document.getElementById('_srt').textContent=name+' payroll save failed — retrying in '+secs+'s';
   if(window._srtIv)clearInterval(window._srtIv);
   window._srtIv=setInterval(()=>{
     secs--;
@@ -2459,6 +2465,7 @@ async function doAdminLogin(){
   }
   isLoggedIn=true;
   document.getElementById('auth-overlay').style.display='none';
+  document.getElementById('mainContent')?.scrollTo(0,0);
   updateAdminPill(email);
   loadAllData();
 }
@@ -4149,8 +4156,14 @@ function buildOfficeExpHistory(){
   return Object.values(map).sort((a,b)=>b.count-a.count);
 }
 var _ledACTarget=null;
+var _ledACTimer=null;
+var _ledACIndex=-1;
 function ledMerchantAC(inp,rowId){
   _ledACTarget={inp,rowId};
+  if(_ledACTimer)clearTimeout(_ledACTimer);
+  _ledACTimer=setTimeout(function(){_doLedMerchantAC(inp,rowId);},120);
+}
+function _doLedMerchantAC(inp,rowId){
   var q=(inp.value||'').trim().toLowerCase();
   var ac=document.getElementById('ledAC');
   if(!ac){ac=document.createElement('div');ac.id='ledAC';ac.style.cssText='display:none;position:fixed;background:var(--card);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.18);z-index:9999;max-height:220px;overflow-y:auto;min-width:220px;';document.body.appendChild(ac);}
@@ -4198,15 +4211,48 @@ function pickLedAC(merchant,category){
     }
   }
   hideLedAC();
+
+function ledMerchantKeydown(e,inp,rowId){
+  var ac=document.getElementById('ledAC');
+  if(!ac||ac.style.display==='none')return;
+  var items=ac.querySelectorAll('.led-ac-item');
+  if(!items.length)return;
+  if(e.key==='ArrowDown'){e.preventDefault();_ledACIndex=Math.min(_ledACIndex+1,items.length-1);items.forEach(function(it,i){it.classList.toggle('ac-active',i===_ledACIndex);it.style.background=i===_ledACIndex?'var(--card2)':'';});}
+  else if(e.key==='ArrowUp'){e.preventDefault();_ledACIndex=Math.max(_ledACIndex-1,0);items.forEach(function(it,i){it.classList.toggle('ac-active',i===_ledACIndex);it.style.background=i===_ledACIndex?'var(--card2)':'';});}
+  else if(e.key==='Enter'){var sel=ac.querySelector('.ac-active');if(sel){e.preventDefault();pickLedAC(sel.dataset.merchant||'');}}
+  else if(e.key==='Escape'){hideLedAC();_ledACIndex=-1;}
+}
 }
 function hideLedAC(){var ac=document.getElementById('ledAC');if(ac)ac.style.display='none';}
 
+var _ledgerTyping=false;
+var _ledgerTypingTimer=null;
+function markLedgerTyping(){
+  _ledgerTyping=true;
+  if(_ledgerTypingTimer)clearTimeout(_ledgerTypingTimer);
+  _ledgerTypingTimer=setTimeout(function(){_ledgerTyping=false;},5000);
+}
+function isLedgerInputFocused(){
+  var el=document.activeElement;
+  return el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA')&&el.closest&&el.closest('#ledBody')!==null;
+}
+
 function renderLedger(){
-  // Debounced — rapid successive calls (tag edits, approvals) only trigger one rebuild
+  if(_ledgerTyping||isLedgerInputFocused())return;
   if(renderLedger._debounceTimer)clearTimeout(renderLedger._debounceTimer);
   renderLedger._debounceTimer=setTimeout(_doRenderLedger, 80);
 }
 function _doRenderLedger(){
+  // PRESERVE FOCUS: save active element and cursor position before rebuilding
+  var activeEl=document.activeElement;
+  var focusId=null,focusFieldIdx=null,focusSelStart=null,focusSelEnd=null;
+  if(activeEl&&(activeEl.tagName==='INPUT'||activeEl.tagName==='TEXTAREA')&&activeEl.closest('#ledBody')){
+    focusId=activeEl.closest('tr')?.id;
+    var _rInps=activeEl.closest('tr')?.querySelectorAll('input,textarea');
+    if(_rInps)for(var i=0;i<_rInps.length;i++)if(_rInps[i]===activeEl){focusFieldIdx=i;break;}
+    focusSelStart=activeEl.selectionStart;focusSelEnd=activeEl.selectionEnd;
+  }
+  if((_ledgerTyping||isLedgerInputFocused())&&focusId){updateLedgerFooterOnly();return;}
   // On-demand load: fetch this month's data if not already in memory (older than the default window)
   const _ledMonthIdx=parseInt(ledgerMonth)-1,_ledYr=ledgerYear;
   ensureMonthLoaded(_ledMonthIdx,_ledYr).then(fetched=>{
@@ -4277,6 +4323,14 @@ function _doRenderLedger(){
       }
     }
   }
+  // RESTORE FOCUS: after DOM rebuild, put cursor back
+  if(focusId&&focusFieldIdx!==null){
+    var restoredRow=document.getElementById(focusId);
+    if(restoredRow){
+      var rrInps=restoredRow.querySelectorAll('input,textarea');
+      if(rrInps[focusFieldIdx]){rrInps[focusFieldIdx].focus();if(focusSelStart!==null)rrInps[focusFieldIdx].setSelectionRange(focusSelStart,focusSelEnd);}
+    }
+  }
   renderLedRight(realData,C);
 }
 function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
@@ -4289,17 +4343,18 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
                 st==='pending'?'<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:#fef3c7;color:#b45309;">⏳</span>':'';
   // Blank new-entry row — dimmed, no row number, no running total, no action buttons
   if(isBlankRow){
-    return`<tr style="opacity:0.45;">
+    return`<tr data-exp-id="${row.id}" style="opacity:0.45;" ondragover="event.preventDefault();event.stopPropagation();this.style.outline='2px dashed #2563eb'" ondragleave="this.style.outline=''" ondrop="event.preventDefault();event.stopPropagation();this.style.outline='';handleLedRowDrop(event,'${row.id}')">
       <td style="text-align:center;width:24px;"><span style="font-size:10px;color:var(--txtm);">+</span></td>
-      <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)" onfocus="this.closest('tr').style.opacity='1'" onblur="this.closest('tr').style.opacity=this.value?'1':'0.45'"></td>
+      <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="checkExpDateChange('${row.id}',this.value)" onfocus="this.closest('tr').style.opacity='1'" onblur="this.closest('tr').style.opacity=this.value?'1':'0.45'"></td>
       <td>
         <input type="text" class="shi" placeholder="Type to add new expense..." value="" ${isEx?'disabled':''} autocomplete="off" oninput="updateExp('${row.id}','merchant',this.value);this.closest('tr').style.opacity='1';checkAutoNextRow('${row.id}',${i<0?0:i},${totalRows||1});ledMerchantAC(this,'${row.id}')" onblur="setTimeout(hideLedAC,200)">
         <div style="display:flex;align-items:center;gap:4px;margin-top:3px;"><label title="Attach receipt" style="width:22px;height:22px;border-radius:5px;border:1px dashed var(--bdr);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--txtm);font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label>
         <button type="button" title="Paste receipt from clipboard" onclick="pasteAdminReceipt('${row.id}')" style="background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.25);border-radius:6px;padding:3px 7px;cursor:pointer;color:var(--acc);font-size:11px;margin-left:4px;"><i class="fa-solid fa-clipboard"></i></button>
+        ${row.receipt_url?`<button type="button" id="ledScanBtn-${row.id}" title="Auto-fill from Receipt (AI)" onclick="scanLedReceiptWithAI('${row.id}')" style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:6px;padding:3px 7px;cursor:pointer;color:#7c3aed;font-size:11px;margin-left:4px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>`:''}
       </div></td>
       <td><input type="text" class="shi cat-inp" list="ledCatList" placeholder="Category" value="" style="" ${isEx?'disabled':''} oninput="updateExp('${row.id}','category',this.value);this.style.cssText=getCatStyle(this.value)" onfocus="this.closest('tr').style.opacity='1'"></td>
       <td><div class="tc" id="tc-${row.id}">${tagsHtml}</div></td>
-      <td><input type="text" inputmode="decimal" class="shi amt-i" placeholder="0.00" value="" ${isEx?'disabled':''} oninput="sanitizeAmountInput(this);updateExp('${row.id}','amount',parseFloat(this.value)||0);this.closest('tr').style.opacity='1'" onblur="renderLedger()" onfocus="this.closest('tr').style.opacity='1'"></td>
+      <td><input type="text" inputmode="decimal" class="shi amt-i" placeholder="0.00" value="" ${isEx?'disabled':''} onfocus="markLedgerTyping();this.closest('tr').style.opacity='1'" oninput="markLedgerTyping();sanitizeAmountInput(this);updateExp('${row.id}','amount',parseFloat(this.value)||0);this.closest('tr').style.opacity='1'" onblur="setTimeout(function(){_ledgerTyping=false;},400)"></td>
       <td class="run-t" style="color:transparent;">—</td>
       <td style="text-align:center;white-space:nowrap;">
         <button class="ra-btn del" onclick="deleteLedRow('${row.id}')" title="Delete" style="opacity:0.5;"><i class="fa-solid fa-trash-alt"></i></button>
@@ -4309,18 +4364,18 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
   // Rows with a negative amount (advances, refunds, deductions) get a red
   // tint instead of the usual blue glass tint, so they stand out at a glance.
   const rowTint=parseFloat(row.amount)<0?'rgba(220,38,38,0.07)':'rgba(37,99,235,0.06)';
-  return`<tr id="ledrow-${row.id}" style="--rowbg:${rowTint};">
+  return`<tr id="ledrow-${row.id}" data-exp-id="${row.id}" style="--rowbg:${rowTint};" ondragover="event.preventDefault();event.stopPropagation();this.style.outline='2px dashed #2563eb'" ondragleave="this.style.outline=''" ondrop="event.preventDefault();event.stopPropagation();this.style.outline='';handleLedRowDrop(event,'${row.id}')">
     <td style="text-align:center;width:24px;"><span style="font-size:11px;color:var(--txtm);">${i+1}</span>${stBadge}</td>
-    <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="updateExp('${row.id}','date',this.value)"></td>
+    <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="checkExpDateChange('${row.id}',this.value)"></td>
     <td>
       <input type="text" class="shi" placeholder="Merchant / Supplier..." value="${(row.merchant||'').replace(/"/g,'&quot;')}" ${isEx?'disabled':''} autocomplete="off" oninput="updateExp('${row.id}','merchant',this.value);checkAutoNextRow('${row.id}',${i},${totalRows||1});ledMerchantAC(this,'${row.id}')" onblur="setTimeout(hideLedAC,200)">
-      <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">${row.receipt_url?`<div onclick="openLightbox('${row.receipt_url}')" style="width:30px;height:30px;border-radius:5px;border:1px solid var(--bdr);overflow:hidden;cursor:pointer;flex-shrink:0;background:var(--card2);display:flex;align-items:center;justify-content:center;position:relative;"><img src="${row.receipt_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;" onerror="this.style.display='none'"><i class="fa-solid fa-file-image" style="font-size:14px;color:var(--acc);"></i></div><a href="${row.receipt_url}" target="_blank" title="Open receipt" style="font-size:10px;color:var(--acc);"><i class="fa-solid fa-eye"></i></a>`:''}<label title="${row.receipt_url?'Replace receipt':'Attach receipt'}" style="width:22px;height:22px;border-radius:5px;border:1px dashed ${row.receipt_url?'var(--acc)':'var(--bdr)'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:${row.receipt_url?'var(--acc)':'var(--txtm)'};font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label></div>
+      <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">${row.receipt_url?`<div onclick="openLightbox('${row.receipt_url}')" style="width:30px;height:30px;border-radius:5px;border:1px solid var(--bdr);overflow:hidden;cursor:pointer;flex-shrink:0;background:var(--card2);display:flex;align-items:center;justify-content:center;position:relative;"><img src="${row.receipt_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;" onerror="this.style.display='none'"><i class="fa-solid fa-file-image" style="font-size:14px;color:var(--acc);"></i></div><a href="${row.receipt_url}" target="_blank" title="Open receipt" style="font-size:10px;color:var(--acc);"><i class="fa-solid fa-eye"></i></a>`:''}<label title="${row.receipt_url?'Replace receipt':'Attach receipt'}" style="width:22px;height:22px;border-radius:5px;border:1px dashed ${row.receipt_url?'var(--acc)':'var(--bdr)'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:${row.receipt_url?'var(--acc)':'var(--txtm)'};font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label>${row.receipt_url?`<button type="button" id="ledScanBtn-${row.id}" title="Auto-fill from Receipt (AI)" onclick="scanLedReceiptWithAI('${row.id}')" style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:6px;padding:3px 7px;cursor:pointer;color:#7c3aed;font-size:11px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>`:''}</div>
       ${row.items?`<div onclick="editLedItems('${row.id}','${(row.items||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" title="Click to edit items" style="font-size:10px;color:var(--acc);margin-top:1px;cursor:pointer;"><i class="fa-solid fa-list" style="font-size:9px;margin-right:2px;"></i>${row.items}</div>`:!isEx?`<div onclick="editLedItems('${row.id}','')" style="font-size:10px;color:var(--txtm);margin-top:1px;cursor:pointer;opacity:0.6;"><i class="fa-solid fa-plus" style="font-size:8px;"></i> Add items</div>`:''}
       ${row.notes?`<div style="font-size:10px;color:var(--txtm);margin-top:1px;font-style:italic;">"${row.notes}"</div>`:''}
     </td>
     <td><input type="text" class="shi cat-inp" list="ledCatList" placeholder="Category" value="${(row.category||'').replace(/"/g,'&quot;')}" style="${catStyle}" ${isEx?'disabled':''} oninput="updateExp('${row.id}','category',this.value);this.style.cssText=getCatStyle(this.value)"></td>
     <td><div class="tc" id="tc-${row.id}">${tagsHtml}</div></td>
-    <td><input type="text" inputmode="decimal" class="shi amt-i" placeholder="0.00" value="${row.amount===0?'':row.amount}" ${isEx?'disabled':''} oninput="sanitizeAmountInput(this);updateExp('${row.id}','amount',parseFloat(this.value)||0)" onblur="renderLedger()"></td>
+    <td><input type="text" inputmode="decimal" class="shi amt-i" placeholder="0.00" value="${row.amount===0?'':row.amount}" ${isEx?'disabled':''} onfocus="markLedgerTyping()" oninput="markLedgerTyping();sanitizeAmountInput(this);updateExp('${row.id}','amount',parseFloat(this.value)||0)" onblur="setTimeout(function(){_ledgerTyping=false;},400)"></td>
     <td class="run-t">${C}${running.toFixed(2)}</td>
     <td style="text-align:center;white-space:nowrap;">
       ${st==='approved'?`<span style="font-size:11px;font-weight:600;background:var(--grnl);color:var(--grn);padding:3px 10px;border-radius:20px;margin-right:6px;display:inline-block;">Approved</span>`:''}
@@ -4397,6 +4452,38 @@ function editLedItems(id,current){
   const val=prompt('Items on this receipt (comma-separated):',current||'');
   if(val===null)return; // cancelled
   updateExp(id,'items',val.trim());
+}
+
+var _officeMonthPending=null;
+function closeMonthCheckPopup(){
+  document.getElementById('monthCheckPopup').style.display='none';
+  _officeMonthPending=null;
+}
+function confirmOfficeMonthCheck(){
+  document.getElementById('monthCheckPopup').style.display='none';
+  if(_officeMonthPending){
+    var p=_officeMonthPending;
+    _officeMonthPending=null;
+    updateExp(p.expId,'date',p.date);
+  }
+}
+// Warn when editing an expense's date into a different month than the current real-world
+// month, before saving. This popup previously existed with no way to ever trigger it (no
+// caller, and the markup itself was missing from the page) — wired up here so date edits
+// on the ledger get the same "different month" confirmation the employee app already has.
+function checkExpDateChange(expId,newDate){
+  if(!newDate){updateExp(expId,'date',newDate);return;}
+  const d=new Date(newDate+'T00:00:00');
+  const now=new Date();
+  if(d.getFullYear()!==now.getFullYear()||d.getMonth()!==now.getMonth()){
+    _officeMonthPending={expId:expId,date:newDate};
+    const mName=d.toLocaleString('en-GB',{month:'long',year:'numeric'});
+    const cName=now.toLocaleString('en-GB',{month:'long',year:'numeric'});
+    document.getElementById('monthCheckMsg').innerHTML='You\'re changing this expense to <strong style="color:var(--acc);">'+mName+'</strong>, but the current month is <strong>'+cName+'</strong>.<br><br>Are you sure this is correct?';
+    document.getElementById('monthCheckPopup').style.display='flex';
+    return;
+  }
+  updateExp(expId,'date',newDate);
 }
 async function updateExp(id,field,val){
   const exp=expenses.find(e=>e.id===id);if(!exp)return;
@@ -8915,6 +9002,162 @@ async function downloadReceiptAsPDF(expId,url,date,merchant){
 
 
 
+// ══ LEDGER RECEIPT AI SCAN ══
+// Same "Auto-fill from Receipt" feature as the employee app, using the same Gemini key
+// (set once in Settings → AI, shared by both apps). The employee-side version scans a
+// file the user just picked, before it's uploaded; here the receipt is already sitting
+// in storage (attached via paperclip/clipboard), so this fetches it back by URL first.
+async function scanLedReceiptWithAI(expId){
+  const exp=expenses.find(e=>e.id===expId);
+  if(!exp||!exp.receipt_url){toast('Attach a receipt first','e');return;}
+  if(!cfg.gemini_key){toast('AI scanner not set up — add a Gemini key in Settings → AI','e');return;}
+  const btn=document.getElementById('ledScanBtn-'+expId);
+  const btnOrigHtml=btn?btn.innerHTML:null;
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i>';}
+  toast('Reading receipt...','i',4000);
+  try{
+    const fileResp=await fetch(exp.receipt_url);
+    if(!fileResp.ok)throw new Error('Could not load the attached receipt file');
+    const blob=await fileResp.blob();
+    const mimeType=blob.type||'image/jpeg';
+    if(!mimeType.startsWith('image/')){toast('AI scan only works on image receipts, not PDFs','e');return;}
+    const b64=await new Promise((res,rej)=>{
+      const r=new FileReader();
+      r.onload=()=>res(r.result.split(',')[1]);
+      r.onerror=rej;
+      r.readAsDataURL(blob);
+    });
+    const yr=new Date().getFullYear();
+    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {"merchant":"store name","amount":0.00,"date":"YYYY-MM-DD","category":"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other","vat_amount":0.00,"items":"item list"}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=the individual line items on the receipt, ONE PER LINE separated by \\n (like a real itemized receipt), each formatted as "QTYx Item name" with quantities where shown, e.g. "2x cable ties\\n1x 10mm drill bit\\n1x junction box" — null if the receipt doesn't show itemized lines (e.g. fuel, parking).`;
+    // Same retry/fallback pattern as the employee app: a few quick retries on the
+    // high-quota free model, then one try on a separate model (its own quota and
+    // server capacity) if that's still down. Bail immediately on 429 — quota
+    // won't come back within this session.
+    async function tryGeminiModel(model,maxAttempts){
+      let resp,lastErrBody='';
+      for(let attempt=1;attempt<=maxAttempts;attempt++){
+        resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.gemini_key}`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mimeType,data:b64}},{text:prompt}]}]})
+        }).catch(networkErr=>{lastErrBody=String(networkErr);return null;});
+        if(resp&&resp.ok)return{resp,lastErrBody:null};
+        if(resp){lastErrBody=await resp.text().catch(()=>'');console.warn(`Gemini (${model}) attempt ${attempt}/${maxAttempts} failed (${resp.status}):`,lastErrBody);}
+        else console.warn(`Gemini (${model}) attempt ${attempt}/${maxAttempts} — network error:`,lastErrBody);
+        if(resp&&resp.status===429)break;
+        if(attempt<maxAttempts&&(!resp||resp.status!==429))await new Promise(r=>setTimeout(r,700*attempt));
+      }
+      return{resp,lastErrBody};
+    }
+    let{resp,lastErrBody}=await tryGeminiModel('gemini-2.5-flash-lite',3);
+    if(!resp||!resp.ok){
+      const fallback=await tryGeminiModel('gemini-2.5-flash',1);
+      resp=fallback.resp;lastErrBody=fallback.lastErrBody;
+    }
+    if(!resp||!resp.ok){
+      console.error('Gemini scan failed on both models:',resp?resp.status:'network error',lastErrBody);
+      throw new Error(`Gemini error ${resp?resp.status:'network'}`);
+    }
+    const data=await resp.json();
+    const raw=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const result=JSON.parse(clean);
+    const row=document.getElementById('ledrow-'+expId)||document.querySelector(`input[onchange*="'${expId}'"]`)?.closest('tr');
+    const filled=[];
+    if(result.merchant){
+      const mInp=row?.querySelector('td:nth-child(3) input[type="text"]');
+      if(mInp)mInp.value=result.merchant;
+      updateExp(expId,'merchant',result.merchant);
+      filled.push('merchant');
+    }
+    if(result.amount!=null&&result.amount>0){
+      const amt=parseFloat(result.amount);
+      const aInp=row?.querySelector('.amt-i');
+      if(aInp)aInp.value=amt.toFixed(2);
+      updateExp(expId,'amount',amt);
+      filled.push('amount');
+    }
+    if(result.date){
+      const dInp=row?.querySelector('input[type="date"]');
+      if(dInp)dInp.value=result.date;
+      checkExpDateChange(expId,result.date);
+      filled.push('date');
+    }
+    if(result.items){
+      updateExp(expId,'items',result.items.trim());
+      filled.push('items');
+    }
+    if(result.category){
+      const cInp=row?.querySelector('.cat-inp');
+      if(cInp){cInp.value=result.category;cInp.style.cssText=getCatStyle(result.category);}
+      updateExp(expId,'category',result.category);
+      filled.push('category');
+    }
+    if(result.vat_amount!=null&&result.vat_amount>0&&!(exp.tags||[]).includes('VAT')){
+      toggleTag(expId,'VAT');
+      filled.push('VAT');
+    }
+    if(filled.length>0)toast(`Receipt scanned — filled: ${filled.join(', ')}`,'s');
+    else toast('Could not read receipt clearly — fill in manually','e');
+  }catch(err){
+    console.error('Gemini scan error:',err);
+    const msg=err.message||'';
+    if(msg.includes('429'))toast('Daily AI scan limit reached — fill in manually, try again later','e');
+    else if(msg.includes('503'))toast('AI scanner is busy right now — try again shortly, or fill in manually','e');
+    else toast('Could not scan receipt — fill in manually','e');
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML=btnOrigHtml||'<i class="fa-solid fa-wand-magic-sparkles"></i>';}
+  }
+}
+// ══ PDF → JPEG CONVERTER (PDF.js — client-side, same approach as the employee app) ══
+// A PDF receipt is converted to a JPEG of its first page before upload, so it previews
+// properly here AND so the AI scan above (which only reads images) can read it too.
+async function pdfToJpegBase64(pdfFile){
+  if(typeof pdfjsLib==='undefined')throw new Error('PDF.js not loaded');
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  const arrayBuffer=await new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result);
+    r.onerror=rej;
+    r.readAsArrayBuffer(pdfFile);
+  });
+  const pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
+  const page=await pdf.getPage(1);
+  const viewport=page.getViewport({scale:2.0});
+  const canvas=document.createElement('canvas');
+  canvas.width=viewport.width;canvas.height=viewport.height;
+  const ctx=canvas.getContext('2d');
+  await page.render({canvasContext:ctx,viewport}).promise;
+  const blob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.92));
+  return{blob};
+}
+// Given any attached file, converts PDFs to JPEG first (so previews and AI scan both
+// work). Returns the original file untouched for images, or if conversion fails —
+// never blocks the upload itself.
+async function convertPdfIfNeeded(file){
+  const isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
+  if(!isPdf)return file;
+  toast('Converting PDF to image...','i',4000);
+  try{
+    const{blob}=await pdfToJpegBase64(file);
+    return new File([blob],(file.name||'receipt').replace(/\.pdf$/i,'.jpg'),{type:'image/jpeg'});
+  }catch(err){
+    console.error('PDF convert error:',err);
+    toast('Could not convert PDF — attaching as-is (AI scan won\'t work on a PDF)','i');
+    return file;
+  }
+}
+// Drag-and-drop a receipt file straight onto a ledger row — wired to ondrop on the <tr>
+// in buildLedRow(). Same validation and upload path as the paperclip picker.
+function handleLedRowDrop(e,expId){
+  const file=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+  if(!file)return;
+  const ALLOWED=['image/jpeg','image/png','image/webp','application/pdf','image/heic'];
+  if(!ALLOWED.includes(file.type)&&!file.name.match(/\.(jpg|jpeg|png|pdf|heic|webp)$/i)){
+    toast('File type not allowed. Use JPG, PNG or PDF.','e');return;
+  }
+  _uploadFileAsReceipt(expId,file);
+}
 async function pasteAdminReceipt(expId){
   try{
     if(!navigator.clipboard||!navigator.clipboard.read){toast('Use Ctrl+V on keyboard — clipboard API not available','e');return;}
@@ -8933,6 +9176,7 @@ async function pasteAdminReceipt(expId){
 }
 async function _uploadFileAsReceipt(expId,file){
   if(!file)return;
+  file=await convertPdfIfNeeded(file);
   if(file.size>CONFIG_APP.MAX_FILE_BYTES){toast('File must be under 5MB','e');return;}
   const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
   const path=`ledger-receipts/${expId}/${Date.now()}.${ext}`;
@@ -8942,17 +9186,19 @@ async function _uploadFileAsReceipt(expId,file){
   const url=ud?.publicUrl;if(!url){toast('Could not get file URL','e');return;}
   await safeWrite(()=>sb.from('expenses').update({receipt_url:url}).eq('id',expId),'Receipt saved');
   const idx=expenses.findIndex(e=>e.id===expId);if(idx>=0)expenses[idx].receipt_url=url;
-  toast('Receipt saved from clipboard ✓','s');
+  renderLedger();
+  toast('Receipt saved ✓','s');
 }
 // ══ LEDGER RECEIPT UPLOAD ══
 async function uploadLedReceipt(expId, input){
-  const file=input.files[0];
+  let file=input.files[0];
   if(!file)return;
   const ALLOWED=['image/jpeg','image/png','image/webp','application/pdf','image/heic'];
   if(!ALLOWED.includes(file.type)&&!file.name.match(/\.(jpg|jpeg|png|pdf|heic|webp)$/i)){
     toast('File type not allowed. Use JPG, PNG or PDF.','e');return;
   }
   if(file.size>10*1024*1024){toast('File too large. Max 10MB.','e');return;}
+  file=await convertPdfIfNeeded(file);
   toast('Uploading receipt...','i',3000);
   const ext=file.name.split('.').pop()||'jpg';
   const path='receipts/office/'+expId+'_'+Date.now()+'.'+ext;
@@ -8992,5 +9238,16 @@ window.addEventListener('unhandledrejection',function(e){
     toast('Connection error — check internet','e');
 });
 </script>
+<div id="monthCheckPopup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:1px solid var(--bdr);border-radius:16px;padding:24px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
+    <div style="font-size:42px;margin-bottom:12px;">📅</div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:var(--txt);">Different Month Detected</div>
+    <div id="monthCheckMsg" style="font-size:13px;color:var(--txtm);margin-bottom:20px;line-height:1.5;"></div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="closeMonthCheckPopup()" class="btn btn-o" style="flex:1;font-size:12px;">Cancel</button>
+      <button onclick="confirmOfficeMonthCheck()" class="btn btn-p" style="flex:1;font-size:12px;">Yes, Change It</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
