@@ -639,6 +639,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <div class="nav-item" data-page="ledger"><i class="fa-solid fa-receipt"></i><span>Expense Ledger</span><span class="nb" id="ledgerBadge" style="display:none">0</span></div>
     <div class="nav-item" data-page="approvals"><i class="fa-solid fa-check-circle"></i><span>Approvals</span><span class="nb" id="aprBadge" style="display:none">0</span></div>
     <div class="nav-item" data-page="tags"><i class="fa-solid fa-tags"></i><span>Tags &amp; Analytics</span></div>
+    <div class="nav-item" data-page="materials"><i class="fa-solid fa-boxes-stacked"></i><span>Materials</span></div>
     <div class="sb-sec">Reports</div>
     <div class="nav-item" data-page="monthly"><i class="fa-solid fa-table-cells"></i><span>Monthly View</span></div>
     <div class="nav-item" data-page="daily"><i class="fa-solid fa-calendar-day"></i><span>Daily View</span></div>
@@ -987,6 +988,66 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       <div class="cr cr4" id="tagStats"></div>
       <div class="cr cr2"><div class="card"><div class="ch"><div class="ct">Spend by Tag</div></div><div class="cb" id="tagBreakdown"></div></div><div class="card"><div class="ch"><div class="ct">VAT Summary</div></div><div class="cb" id="vatSummary"></div></div></div>
       <div class="card" style="margin-top:13px;"><div class="ch"><div class="ct">Manage Tags</div></div><div class="cb" id="tagsMgmt"></div></div>
+    </div>
+
+    <!-- MATERIALS -->
+    <div class="page" id="page-materials">
+      <div class="ph" style="flex-wrap:wrap;gap:9px;">
+        <div><h1>Materials</h1><p>Spend by category, and AI-grouped items across all suppliers</p></div>
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--txtm);cursor:pointer;"><input type="checkbox" id="matAllTime" onchange="renderMaterials()"> All time</label>
+          <div class="nav-pills" id="matMonthNav">
+            <div class="np-seg">
+              <button class="np-seg-btn" onclick="shiftMaterials(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+              <div class="np-seg-div"></div>
+              <span class="np-seg-label" id="matDisp_m" style="min-width:72px;">June</span>
+              <div class="np-seg-div"></div>
+              <button class="np-seg-btn" onclick="shiftMaterials(1)"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+            <div class="np-seg">
+              <button class="np-seg-btn" onclick="shiftMaterials(-12)"><i class="fa-solid fa-chevron-left"></i></button>
+              <div class="np-seg-div"></div>
+              <span class="np-seg-label narrow" id="matDisp_y" style="min-width:52px;">2026</span>
+              <div class="np-seg-div"></div>
+              <button class="np-seg-btn" onclick="shiftMaterials(12)"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <select id="matMonth" style="display:none;"></select><select id="matYear" style="display:none;"></select>
+      <div class="card">
+        <div class="ch"><div class="ct">Spend by Category</div></div>
+        <div class="cb" id="matCatGrid" style="display:flex;flex-wrap:wrap;gap:10px;"></div>
+      </div>
+      <div class="card" style="margin-top:13px;">
+        <div class="ch" style="flex-wrap:wrap;gap:8px;">
+          <div class="ct">Materials &amp; Items (AI-grouped, all time)</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <input type="text" id="matSearch" placeholder="Search items (e.g. socket, cable tie)..." oninput="renderMaterialsList()" style="padding:6px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;width:220px;font-family:inherit;outline:none;background:var(--card);color:var(--txt);">
+            <button class="btn btn-p btn-sm" id="matAIBtn" onclick="groupItemsWithAI()"><i class="fa-solid fa-wand-magic-sparkles"></i>Group New Items with AI</button>
+          </div>
+        </div>
+        <div class="cb">
+          <div id="matAIStatus" style="font-size:12px;color:var(--txtm);margin-bottom:10px;"></div>
+          <div id="matList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CATEGORY DRILL-DOWN MODAL -->
+    <div class="mo" id="catDrillModal">
+      <div class="modal" style="max-width:560px;">
+        <div class="mh"><div class="mt" id="catDrillTitle">Category</div><button class="mc" onclick="closeCategoryDrill()"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="cb" id="catDrillBody" style="padding:16px;"></div>
+      </div>
+    </div>
+
+    <!-- MATERIAL ITEM DRILL-DOWN MODAL -->
+    <div class="mo" id="matDrillModal">
+      <div class="modal" style="max-width:560px;">
+        <div class="mh"><div class="mt" id="matDrillTitle">Item</div><button class="mc" onclick="closeMaterialDrill()"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="cb" id="matDrillBody" style="padding:16px;"></div>
+      </div>
     </div>
 
     <!-- MONTHLY VIEW -->
@@ -3017,7 +3078,7 @@ async function sbUpsertSettings(data){
 // ═══════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════
-const PG_TITLES={dashboard:'DASHBOARD',mark:'MARK ATTENDANCE',ledger:'EXPENSE LEDGER',approvals:'APPROVALS',tags:'TAGS & ANALYTICS',monthly:'MONTHLY VIEW',daily:'DAILY VIEW','emp-report':'EMPLOYEE REPORT',yearly:'YEARLY SUMMARY',search:'GLOBAL SEARCH',payroll:'PAYROLL',employees:'EMPLOYEES',messages:'MESSAGES',flags:'FLAGGED ITEMS',settings:'SETTINGS & TOOLS'};
+const PG_TITLES={dashboard:'DASHBOARD',mark:'MARK ATTENDANCE',ledger:'EXPENSE LEDGER',approvals:'APPROVALS',tags:'TAGS & ANALYTICS',materials:'MATERIALS',monthly:'MONTHLY VIEW',daily:'DAILY VIEW','emp-report':'EMPLOYEE REPORT',yearly:'YEARLY SUMMARY',search:'GLOBAL SEARCH',payroll:'PAYROLL',employees:'EMPLOYEES',messages:'MESSAGES',flags:'FLAGGED ITEMS',settings:'SETTINGS & TOOLS'};
 
 function navigate(page){
   if(page!=="ledger")document.getElementById("mainContent")?.classList.remove("ledger-mode");
@@ -3039,6 +3100,7 @@ function navigate(page){
   else if(page==='ledger')renderLedger();
   else if(page==='approvals')renderApprovals();
   else if(page==='tags')renderTags();
+  else if(page==='materials')renderMaterials();
   else if(page==='monthly')renderMonthly();
   else if(page==='daily')renderDaily();
   else if(page==='emp-report'){populateEmpSel('erEmp');renderEmpReport();}
@@ -3075,11 +3137,12 @@ function updateBadges(){
 function initSelectors(){
   populateMY('dashMonth','dashYear');populateMY('erMonth','erYear');
   populateMY('prMonth','prYear');populateMY('tagsMonth','tagsYear');
+  populateMY('matMonth','matYear');
   populateMY('mvMonth','mvYear'); // monthly view hidden selects
   populateYr('yrSel');populateYr('tagsYear');
   // Init nav pill displays
   const now=new Date();const nm=MONTHS[now.getMonth()],ny=now.getFullYear();
-  [['mvDisp','erDisp','tagsDisp','dashDisp','prDisp']].flat().forEach(id=>{
+  [['mvDisp','erDisp','tagsDisp','dashDisp','prDisp','matDisp']].flat().forEach(id=>{
     const em=document.getElementById(id+'_m'),ey=document.getElementById(id+'_y');
     if(em)em.textContent=nm;if(ey)ey.textContent=ny;
   });
@@ -4274,7 +4337,7 @@ function _doRenderLedger(){
   const isEx=emp.status==='ex';
   const C=cur();
   // Filter expenses for this employee/month/year — blank rows always sorted last
-  const isBlank=function(r){return !r.merchant&&!r.description&&(!r.amount||parseFloat(r.amount)===0)&&!r.category;};
+  const isBlank=function(r){return !r.merchant&&!r.description&&(!r.amount||parseFloat(r.amount)===0)&&!r.category&&!r.receipt_url;};
   const data=expenses.filter(e=>{
     const d=new Date(e.date+'T00:00:00');
     return e.employee_id===ledgerStaff&&d.getFullYear()===ledgerYear&&String(d.getMonth()+1).padStart(2,'0')===ledgerMonth;
@@ -4821,6 +4884,266 @@ function renderTags(){
       </div>
       <div style="font-size:12px;color:var(--txt2);">These expenses have VAT tags and file attachments. Download for your accountant.</div>
     </div>`:'<p style="font-size:12px;color:var(--txtm);">No VAT receipts with attachments found for this period.</p>'}`;
+}
+
+// ══ MATERIALS PAGE ══
+// Loads several years back so "All time" category totals and AI item-grouping really
+// do cover everything — by default the app only keeps a rolling recent window in
+// memory (see _dataFromDate/ensureMonthLoaded above), which is fine for day-to-day
+// pages but would silently under-count anything explicitly asking for "all data".
+let _matHistoryLoaded=false;
+async function ensureFullHistoryLoaded(){
+  if(_matHistoryLoaded)return;
+  const curYear=new Date().getFullYear();
+  const years=[];for(let y=curYear-6;y<=curYear;y++)years.push(y);
+  await Promise.all(years.map(ensureYearLoaded));
+  _matHistoryLoaded=true;
+}
+function shiftMaterials(n){
+  const m=document.getElementById('matMonth'),y=document.getElementById('matYear');
+  let mo=parseInt(m.value)+n,yr=parseInt(y.value);
+  if(mo<0){mo=11;yr--;}else if(mo>11){mo=0;yr++;}
+  m.value=mo;y.value=yr;
+  const dm=document.getElementById('matDisp_m'),dy=document.getElementById('matDisp_y');
+  if(dm)dm.textContent=MONTHS[mo];if(dy)dy.textContent=yr;
+  renderMaterials();
+}
+async function renderMaterials(){
+  const allTime=document.getElementById('matAllTime')?.checked;
+  const monthNav=document.getElementById('matMonthNav');
+  if(monthNav){monthNav.style.opacity=allTime?'0.35':'1';monthNav.style.pointerEvents=allTime?'none':'';}
+  if(allTime){
+    const grid=document.getElementById('matCatGrid');
+    if(grid)grid.innerHTML='<p style="color:var(--txtm);font-size:13px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading full history...</p>';
+    await ensureFullHistoryLoaded();
+  }
+  const month=parseInt(document.getElementById('matMonth')?.value??new Date().getMonth());
+  const year=parseInt(document.getElementById('matYear')?.value??new Date().getFullYear());
+  const C=cur();
+  const data=expenses.filter(e=>{
+    if(!e.category)return false;
+    if(allTime)return true;
+    const d=new Date(e.date+'T00:00:00');
+    return d.getMonth()===month&&d.getFullYear()===year;
+  });
+  const catTotals={};
+  data.forEach(e=>{const cat=e.category;catTotals[cat]=(catTotals[cat]||0)+(parseFloat(e.amount)||0);});
+  const sorted=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+  const grid=document.getElementById('matCatGrid');
+  if(grid){
+    grid.innerHTML=sorted.length?sorted.map(([cat,total])=>{
+      const style=getCatStyle(cat);
+      return`<div onclick="openCategoryDrill('${cat.replace(/'/g,"\\'")}',${allTime?'true':'false'},${month},${year})" style="cursor:pointer;padding:12px 16px;border-radius:10px;min-width:140px;${style}box-shadow:var(--sh);transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:12px;font-weight:700;opacity:0.85;">${escapeHtml(cat)}</div>
+        <div style="font-size:20px;font-weight:800;margin-top:4px;">${C}${total.toFixed(2)}</div>
+      </div>`;
+    }).join(''):'<p style="color:var(--txtm);font-size:13px;">No categorized expenses in this period.</p>';
+  }
+  renderMaterialsList();
+}
+// Category card clicked — breaks the total down by employee and by merchant for the
+// same period that was showing (respects the All Time toggle).
+function openCategoryDrill(cat,allTime,month,year){
+  const C=cur();
+  const data=expenses.filter(e=>{
+    if(e.category!==cat)return false;
+    if(allTime)return true;
+    const d=new Date(e.date+'T00:00:00');
+    return d.getMonth()===month&&d.getFullYear()===year;
+  });
+  const byEmp={},byMerch={};
+  data.forEach(e=>{
+    const empName=employeeMap?.get(e.employee_id)?.name||'Unknown';
+    byEmp[empName]=(byEmp[empName]||0)+(parseFloat(e.amount)||0);
+    const m=e.merchant||'(no merchant)';
+    byMerch[m]=(byMerch[m]||0)+(parseFloat(e.amount)||0);
+  });
+  const empRows=Object.entries(byEmp).sort((a,b)=>b[1]-a[1]);
+  const merchRows=Object.entries(byMerch).sort((a,b)=>b[1]-a[1]);
+  const total=data.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+  document.getElementById('catDrillTitle').textContent=`${cat} — ${C}${total.toFixed(2)} (${allTime?'all time':MONTHS[month]+' '+year})`;
+  document.getElementById('catDrillBody').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--txtm);text-transform:uppercase;margin-bottom:8px;">By Employee</div>
+        ${empRows.length?empRows.map(([n,v])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr);font-size:13px;"><span>${escapeHtml(n)}</span><strong>${C}${v.toFixed(2)}</strong></div>`).join(''):'<p style="color:var(--txtm);font-size:12px;">No data</p>'}
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--txtm);text-transform:uppercase;margin-bottom:8px;">By Merchant</div>
+        ${merchRows.length?merchRows.map(([n,v])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr);font-size:13px;"><span>${escapeHtml(n)}</span><strong>${C}${v.toFixed(2)}</strong></div>`).join(''):'<p style="color:var(--txtm);font-size:12px;">No data</p>'}
+      </div>
+    </div>
+    <div style="margin-top:14px;font-size:12px;color:var(--txtm);">${data.length} expense${data.length!==1?'s':''} total</div>
+  `;
+  document.getElementById('catDrillModal').classList.add('open');
+}
+function closeCategoryDrill(){document.getElementById('catDrillModal').classList.remove('open');}
+// Renders the AI-grouped materials list (from cfg.material_groups), filtered by the search box.
+function renderMaterialsList(){
+  const q=(document.getElementById('matSearch')?.value||'').trim().toLowerCase();
+  const groups=cfg.material_groups||{};
+  const processedCount=(cfg.material_processed_ids||[]).length;
+  const totalWithItems=expenses.filter(e=>e.items&&e.items.trim()).length;
+  const remaining=Math.max(0,totalWithItems-processedCount);
+  const statusEl=document.getElementById('matAIStatus');
+  if(statusEl){
+    statusEl.innerHTML=Object.keys(groups).length
+      ?`${Object.keys(groups).length} item${Object.keys(groups).length!==1?'s':''} grouped so far · ${remaining} expense${remaining!==1?'s':''} with items not yet processed`
+      :`No items grouped yet — click "Group New Items with AI" to analyze receipt items across all expenses.`;
+  }
+  const entries=Object.entries(groups).filter(([name])=>!q||name.toLowerCase().includes(q));
+  entries.sort((a,b)=>(b[1].totalQty||(b[1].items||[]).length||0)-(a[1].totalQty||(a[1].items||[]).length||0));
+  const list=document.getElementById('matList');
+  if(!list)return;
+  if(!entries.length){
+    list.innerHTML=`<p style="color:var(--txtm);font-size:13px;">${q?'No matching items.':'Nothing grouped yet.'}</p>`;
+    return;
+  }
+  list.innerHTML=`<div style="display:flex;flex-direction:column;gap:2px;">${entries.map(([name,g])=>{
+    const occ=g.items||[];
+    const merchants=[...new Set(occ.map(o=>o.merchant).filter(Boolean))];
+    return`<div onclick="openMaterialDrill('${name.replace(/'/g,"\\'")}')" style="display:flex;justify-content:space-between;align-items:center;padding:9px 4px;border-bottom:1px solid var(--bdr);cursor:pointer;">
+      <div><div style="font-size:13px;font-weight:700;">${escapeHtml(name)}</div><div style="font-size:11px;color:var(--txtm);">${merchants.slice(0,3).map(escapeHtml).join(', ')}${merchants.length>3?` +${merchants.length-3} more`:''}</div></div>
+      <div style="text-align:right;"><div style="font-size:15px;font-weight:800;">${g.totalQty||occ.length}</div><div style="font-size:10px;color:var(--txtm);">${occ.length} receipt${occ.length!==1?'s':''}</div></div>
+    </div>`;
+  }).join('')}</div>`;
+}
+function openMaterialDrill(name){
+  const g=(cfg.material_groups||{})[name];
+  if(!g)return;
+  document.getElementById('matDrillTitle').textContent=name;
+  const rows=(g.items||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  document.getElementById('matDrillBody').innerHTML=rows.length?`<div style="display:flex;flex-direction:column;gap:2px;">${rows.map(o=>`
+    <div style="padding:8px 0;border-bottom:1px solid var(--bdr);font-size:13px;">
+      <div style="display:flex;justify-content:space-between;"><strong>${escapeHtml(o.merchant||'—')}</strong><span style="color:var(--txtm);">${o.date?fmtDateS(new Date(o.date+'T00:00:00')):''}</span></div>
+      <div style="color:var(--txtm);font-size:12px;">${escapeHtml(o.employeeName||'')} · qty ${o.qty||1}${o.raw?` · "${escapeHtml(o.raw)}"`:''}</div>
+    </div>`).join('')}</div>`:'<p style="color:var(--txtm);font-size:13px;">No details available.</p>';
+  document.getElementById('matDrillModal').classList.add('open');
+}
+function closeMaterialDrill(){document.getElementById('matDrillModal').classList.remove('open');}
+async function saveMaterialData(groups,processedIds){
+  setSyncStatus('saving');
+  const r=await sb.from('settings').upsert({id:1,material_groups:groups,material_processed_ids:processedIds});
+  if(r.error){
+    setSyncStatus('err');
+    // Brand-new columns — won't exist until the one-time SQL below is run.
+    if(/column|schema cache/i.test(r.error.message)){
+      openMaterialsColumnMissingModal();
+    } else {
+      toast(r.error.message,'e');
+    }
+    return false;
+  }
+  cfg={...cfg,material_groups:groups,material_processed_ids:processedIds};
+  setSyncStatus('saved');
+  return true;
+}
+function openMaterialsColumnMissingModal(){
+  const overlay=document.createElement('div');
+  overlay.className='confirm-overlay';
+  overlay.innerHTML=`<div class="confirm-box" style="max-width:480px;text-align:left;">
+    <div class="confirm-title" style="text-align:center;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--amb);margin-right:6px;"></i>One-time database setup needed</div>
+    <div class="confirm-msg" style="margin-bottom:12px;">The <code>settings</code> table doesn't have the <code>material_groups</code> / <code>material_processed_ids</code> columns yet — these are brand-new fields for the Materials feature, so saving can't go through until they're added. This is a one-time fix.</div>
+    <div style="font-size:12px;color:var(--txtm);margin-bottom:8px;">1. Copy the SQL below<br>2. Open your Supabase project → SQL Editor<br>3. Paste and click Run<br>4. Come back here and click "Group New Items with AI" again</div>
+    <pre style="background:var(--card2);border:1px solid var(--bdr);border-radius:var(--rs);padding:10px 12px;font-size:12px;overflow-x:auto;margin-bottom:12px;">ALTER TABLE settings ADD COLUMN IF NOT EXISTS material_groups jsonb DEFAULT '{}'::jsonb;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS material_processed_ids jsonb DEFAULT '[]'::jsonb;</pre>
+    <div class="confirm-btns">
+      <button id="mcmClose" class="btn btn-o" style="flex:1;">Close</button>
+      <button id="mcmCopy" class="btn btn-p" style="flex:1;">Copy SQL</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.querySelector('#mcmClose').onclick=()=>overlay.remove();
+  overlay.querySelector('#mcmCopy').onclick=()=>{
+    navigator.clipboard.writeText("ALTER TABLE settings ADD COLUMN IF NOT EXISTS material_groups jsonb DEFAULT '{}'::jsonb;\nALTER TABLE settings ADD COLUMN IF NOT EXISTS material_processed_ids jsonb DEFAULT '[]'::jsonb;").then(()=>toast('SQL copied! Paste in Supabase SQL Editor and run.','s'));
+  };
+}
+// ══ AI MATERIALS GROUPING ══
+// Sends only expenses whose items text hasn't been processed before (tracked via
+// cfg.material_processed_ids) to Gemini, asking it to normalize/group item names
+// across different suppliers' wording (e.g. "socket", "twin skt" -> "Sockets"), and
+// merges the result into the persisted cfg.material_groups. Re-running only ever
+// costs a Gemini call for genuinely new expenses — already-processed ones are skipped,
+// which is the "remember what's already been done" behaviour that was asked for.
+async function groupItemsWithAI(){
+  if(!cfg.gemini_key){toast('AI scanner not set up — add a Gemini key in Settings → AI','e');return;}
+  const btn=document.getElementById('matAIBtn');
+  const origHtml=btn?btn.innerHTML:null;
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Loading full history...';}
+  await ensureFullHistoryLoaded();
+  const processedIds=new Set(cfg.material_processed_ids||[]);
+  const candidates=expenses.filter(e=>e.items&&e.items.trim()&&!processedIds.has(e.id));
+  if(!candidates.length){
+    if(btn){btn.disabled=false;btn.innerHTML=origHtml;}
+    toast('No new items to process — everything with items text has already been grouped','i');
+    return;
+  }
+  const BATCH=150;
+  const batch=candidates.slice(0,BATCH);
+  if(btn)btn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i> Analyzing ${batch.length} expense${batch.length!==1?'s':''}...`;
+  try{
+    const existingNames=Object.keys(cfg.material_groups||{});
+    const entriesText=batch.map(e=>`[${e.id}]\n${e.items}`).join('\n\n');
+    const prompt=`You are analyzing itemized receipt lines from a UK electrical business' expenses, to group similar materials/items together even when written differently by different suppliers (e.g. "socket", "twin skt", "13A socket" should all use the same canonical name like "Sockets"; "cable ties" and "cble tie" should group as "Cable Ties").
+
+Existing canonical item names already in use — REUSE these exact names whenever an item matches one, do not create a near-duplicate name:
+${existingNames.length?existingNames.join(', '):'(none yet)'}
+
+For each entry below (format: [EXPENSE_ID] followed by its raw items text, one item per line), extract each individual item line, assign it a short sensible canonical name (reusing an existing one where it matches), and estimate the quantity (default 1 if not stated).
+
+Entries:
+${entriesText}
+
+Return ONLY a JSON array, no markdown, no explanation, in this exact shape:
+[{"expense_id":"...","canonical":"Sockets","qty":2,"raw":"2x twin socket"}]`;
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cfg.gemini_key}`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+    });
+    if(!resp.ok){
+      const errBody=await resp.text().catch(()=>'');
+      console.error('Gemini materials grouping failed:',resp.status,errBody);
+      throw new Error(`Gemini error ${resp.status}`);
+    }
+    const data=await resp.json();
+    const raw=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const results=JSON.parse(clean);
+    const groups=JSON.parse(JSON.stringify(cfg.material_groups||{})); // deep clone before mutating
+    const expById={};batch.forEach(e=>expById[e.id]=e);
+    results.forEach(r=>{
+      if(!r.canonical||!r.expense_id)return;
+      const exp=expById[r.expense_id];if(!exp)return;
+      const name=String(r.canonical).trim();if(!name)return;
+      if(!groups[name])groups[name]={totalQty:0,items:[]};
+      const qty=parseFloat(r.qty)||1;
+      groups[name].totalQty=(groups[name].totalQty||0)+qty;
+      groups[name].items.push({
+        expenseId:exp.id,
+        employeeId:exp.employee_id,
+        employeeName:employeeMap?.get(exp.employee_id)?.name||'Unknown',
+        merchant:exp.merchant||'',
+        date:exp.date||'',
+        qty,
+        raw:r.raw||''
+      });
+    });
+    const newProcessedIds=[...new Set([...(cfg.material_processed_ids||[]),...batch.map(e=>e.id)])];
+    const ok=await saveMaterialData(groups,newProcessedIds);
+    if(ok){
+      toast(`Grouped items from ${batch.length} expense${batch.length!==1?'s':''}${candidates.length>batch.length?` — ${candidates.length-batch.length} more remaining, click again to continue`:''}`,'s');
+      renderMaterialsList();
+    }
+  }catch(err){
+    console.error('Materials AI grouping error:',err);
+    const msg=err.message||'';
+    if(msg.includes('429'))toast('Daily AI scan limit reached — try again later','e');
+    else if(msg.includes('503'))toast('AI is busy right now — try again shortly','e');
+    else toast('Could not group items — try again','e');
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML=origHtml||'<i class="fa-solid fa-wand-magic-sparkles"></i>Group New Items with AI';}
+  }
 }
 
 // Builds one .zip of every VAT receipt for the selected month/staff and
