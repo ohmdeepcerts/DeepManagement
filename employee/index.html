@@ -459,6 +459,8 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
 #elec-canvas{display:none;}
 @keyframes markPulse{0%{box-shadow:0 0 0 0 rgba(37,99,235,0.4);}70%{box-shadow:0 0 0 8px rgba(37,99,235,0);}100%{box-shadow:0 0 0 0 rgba(37,99,235,0);}}
 @media print{.bot-nav,.topbar,#elec-canvas{display:none!important;}body{background:#fff!important;}}
+/* Autocomplete keyboard navigation */
+.ac-active{background:var(--card2);}
 </style>
 <!-- 
   SHARE SHEET: To enable "Share → OHM Attendance" from Photos/Gmail/Files,
@@ -826,7 +828,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
         <div class="fg"><label>Date *</label><input type="date" id="expDate"></div>
         <div class="fg" style="position:relative;">
           <label>Merchant / Supplier *</label>
-          <input type="text" id="expMerchant" placeholder="e.g. Screwfix, Costa Coffee, Fuel" autocomplete="off" oninput="expMerchantInput(this.value)" onblur="setTimeout(()=>{hideExpAC();autoFillCatFromMerchant(this.value);},200)" onfocus="expMerchantInput(this.value)">
+          <input type="text" id="expMerchant" placeholder="e.g. Screwfix, Costa Coffee, Fuel" autocomplete="off" oninput="debouncedExpMerchantInput(this.value)" onblur="handleExpMerchantBlur(this.value)" onfocus="expMerchantInput(this.value)" onkeydown="handleExpMerchantKey(event)">
           <div id="expAC" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:200;max-height:220px;overflow-y:auto;margin-top:3px;"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -1006,7 +1008,8 @@ function avc(id){const i=allEmps.findIndex(e=>e.id===id);return AVCOLS[Math.abs(
 function toast(msg,type='i',duration=3200){
   const ic={s:'fa-circle-check',e:'fa-circle-xmark',i:'fa-circle-info'};
   const t=document.createElement('div');t.className=`toast ${type}`;
-  t.innerHTML=`<i class="fa-solid ${ic[type]}"></i><span style="flex:1;">${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--txtm);cursor:pointer;font-size:16px;padding:0 0 0 6px;line-height:1;">×</button>`;
+  t.innerHTML=`<i class="fa-solid ${ic[type]}"></i><span style="flex:1;"></span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--txtm);cursor:pointer;font-size:16px;padding:0 0 0 6px;line-height:1;">×</button>`;
+  t.querySelector('span').textContent=msg; // Safe: textContent escapes HTML
   document.getElementById('toasts').appendChild(t);
   if(duration>0)setTimeout(()=>{if(t.parentElement)t.remove();},duration);
 }
@@ -1128,6 +1131,12 @@ function openChangePin(){
 
 // ── PHOTO CHANGE ──
 var _empCrop={src:null,x:0,y:0,zoom:1,minZoom:0.3,dragging:false,lastX:0,lastY:0,imgW:0,imgH:0};
+// Holds the remove-listener function for the crop drag's window-level handlers (mousemove/mouseup).
+// These are attached to `window`, not the crop viewport element, so the "clone the element to drop
+// old listeners" trick inside empSetupCropDrag() can't reach them — cloning only replaces the
+// viewport, window keeps every old handler forever. Tracked here instead so we can explicitly
+// remove the previous pair before attaching a new one, and again when the photo modal closes.
+var _empCropWindowCleanup=null;
 
 function applyPortalVisibility(e){
   // show_pay_tab: default true if not set
@@ -1190,6 +1199,7 @@ function openChangePhoto(){
 function closePhotoModal(){
   document.getElementById('photoModal').style.display='none';
   _empCrop.dragging=false;
+  if(_empCropWindowCleanup){_empCropWindowCleanup();_empCropWindowCleanup=null;}
   _unlockBodyScroll();
 }
 function empPickPhoto(input){
@@ -1242,45 +1252,63 @@ function empUpdateCrop(){
   img.style.maxWidth='none';
 }
 function empSetupCropDrag(){
-  const vp=document.getElementById('empCropViewport');
+  var vp=document.getElementById('empCropViewport');
   if(!vp)return;
+  // Drop any window-level listeners left over from a previous time this modal was opened —
+  // cloning `vp` below only discards listeners attached to the viewport itself, not these.
+  if(_empCropWindowCleanup){_empCropWindowCleanup();_empCropWindowCleanup=null;}
+  // Clone to remove previous listeners (prevents accumulation)
   var newVp=vp.cloneNode(true);
   vp.parentNode.replaceChild(newVp,vp);
   var cv=document.getElementById('empCropViewport');
-  cv.addEventListener('mousedown',function(e){
+  // Named handlers so we can remove them later
+  var onMouseDown=function(e){
     e.preventDefault();
     _empCrop.dragging=true;_empCrop.lastX=e.clientX;_empCrop.lastY=e.clientY;
     cv.style.cursor='grabbing';
-  });
-  window.addEventListener('mousemove',function(e){
+  };
+  var onMouseMove=function(e){
     if(!_empCrop.dragging)return;
     _empCrop.x+=e.clientX-_empCrop.lastX;_empCrop.y+=e.clientY-_empCrop.lastY;
     _empCrop.lastX=e.clientX;_empCrop.lastY=e.clientY;
     empConstrainCrop();empUpdateCrop();
-  });
-  window.addEventListener('mouseup',function(){
+  };
+  var onMouseUp=function(){
     _empCrop.dragging=false;
     var c=document.getElementById('empCropViewport');if(c)c.style.cursor='grab';
-  });
-  cv.addEventListener('touchstart',function(e){
+  };
+  var onTouchStart=function(e){
     e.preventDefault();var t=e.touches[0];
     _empCrop.dragging=true;_empCrop.lastX=t.clientX;_empCrop.lastY=t.clientY;
-  },{passive:false});
-  cv.addEventListener('touchmove',function(e){
+  };
+  var onTouchMove=function(e){
     e.preventDefault();if(!_empCrop.dragging)return;
     var t=e.touches[0];
     _empCrop.x+=t.clientX-_empCrop.lastX;_empCrop.y+=t.clientY-_empCrop.lastY;
     _empCrop.lastX=t.clientX;_empCrop.lastY=t.clientY;
     empConstrainCrop();empUpdateCrop();
-  },{passive:false});
-  cv.addEventListener('touchend',function(){_empCrop.dragging=false;});
-  cv.addEventListener('wheel',function(e){
+  };
+  var onTouchEnd=function(){_empCrop.dragging=false;};
+  var onWheel=function(e){
     e.preventDefault();
     var delta=e.deltaY>0?-0.05:0.05;
     _empCrop.zoom=Math.max(_empCrop.minZoom,Math.min(2,parseFloat((_empCrop.zoom+delta).toFixed(2))));
     document.getElementById('empCropZoom').value=_empCrop.zoom;
     empConstrainCrop();empUpdateCrop();
-  },{passive:false});
+  };
+  cv.addEventListener('mousedown',onMouseDown);
+  window.addEventListener('mousemove',onMouseMove);
+  window.addEventListener('mouseup',onMouseUp);
+  cv.addEventListener('touchstart',onTouchStart,{passive:false});
+  cv.addEventListener('touchmove',onTouchMove,{passive:false});
+  cv.addEventListener('touchend',onTouchEnd);
+  cv.addEventListener('wheel',onWheel,{passive:false});
+  // Store cleanup for window-level listeners — called next time this function runs, and when
+  // the photo modal closes. (cv's own listeners are still handled by the clone-and-replace above.)
+  _empCropWindowCleanup=function(){
+    window.removeEventListener('mousemove',onMouseMove);
+    window.removeEventListener('mouseup',onMouseUp);
+  };
 }
 function empConstrainCrop(){
   // Enforce minimum zoom (image must cover circle)
@@ -1657,7 +1685,7 @@ function renderAnnBanners(){
         ${a.body?`<div style="font-size:12px;color:var(--txt2,#555);margin-top:2px;">${eH(a.body)}</div>`:''}
         ${a.image_url?`<img src="${a.image_url}" style="max-width:100%;max-height:130px;border-radius:8px;margin-top:6px;cursor:zoom-in;">`:''}
       </div>
-      <button onclick="dismissAnn('${a.id}')" style="border:none;background:none;color:var(--txtm);cursor:pointer;padding:2px;flex-shrink:0;" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+      <button onclick="dismissAnn('${eH(a.id)}')" style="border:none;background:none;color:var(--txtm);cursor:pointer;padding:2px;flex-shrink:0;" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>
     </div>`).join('');
 }
 function showImportantAnnPopup(){
@@ -2171,6 +2199,44 @@ function autoFillCatFromMerchant(merchantVal){
     }
   }
 }
+// Debounced merchant input — prevents dropdown flicker during fast typing
+let _expMerchantTimer=null;
+function debouncedExpMerchantInput(val){
+  if(_expMerchantTimer)clearTimeout(_expMerchantTimer);
+  _expMerchantTimer=setTimeout(function(){expMerchantInput(val);},150);
+}
+// Handle blur with delay so mousedown on dropdown items can fire first
+function handleExpMerchantBlur(val){
+  if(_expMerchantTimer)clearTimeout(_expMerchantTimer);
+  setTimeout(function(){hideExpAC();autoFillCatFromMerchant(val);},250);
+}
+// Keyboard navigation for autocomplete dropdown
+function handleExpMerchantKey(e){
+  var ac=document.getElementById('expAC');
+  if(!ac||ac.style.display==='none')return;
+  var items=ac.querySelectorAll('div[cursor]');
+  // Use broader selector since we don't have class on items
+  if(!items.length)items=ac.querySelectorAll('div[style*="cursor:pointer"]');
+  if(!items.length)return;
+  var activeItem=ac.querySelector('.ac-active');
+  var idx=-1;
+  for(var i=0;i<items.length;i++){if(items[i]===activeItem){idx=i;break;}}
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    idx=Math.min(idx+1,items.length-1);
+    items.forEach(function(it,i){it.classList.toggle('ac-active',i===idx);it.style.background=i===idx?'var(--card2)':'';});
+  }else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    idx=Math.max(idx-1,0);
+    items.forEach(function(it,i){it.classList.toggle('ac-active',i===idx);it.style.background=i===idx?'var(--card2)':'';});
+  }else if(e.key==='Enter'){
+    var sel=ac.querySelector('.ac-active');
+    if(sel){e.preventDefault();sel.onmousedown({preventDefault:function(){}});}
+  }else if(e.key==='Escape'){
+    hideExpAC();
+  }
+}
+
 function expMerchantInput(val){
   const ac=document.getElementById('expAC');
   if(!ac)return;
@@ -2190,7 +2256,7 @@ function expMerchantInput(val){
   if(!all.length){ac.style.display='none';return;}
   ac.innerHTML=all.map(function(h){
     const hi=h.merchant.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<strong>$1</strong>');
-    return '<div onclick="pickExpAC(\''+h.merchant.replace(/'/g,"\\'")+'\',' +
+    return '<div onmousedown="event.preventDefault();pickExpAC(\''+h.merchant.replace(/'/g,"\\'")+'\',' +
       '\''+((h.category||'').replace(/'/g,"\\'"))+'\')" '+
       'style="padding:10px 13px;cursor:pointer;border-bottom:0.5px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;gap:8px;" '+
       'onmouseover="this.style.background=\'var(--card2)\'" onmouseout="this.style.background=\'\'">' +
@@ -2202,7 +2268,7 @@ function expMerchantInput(val){
 }
 function pickExpAC(merchant,category){
   const inp=document.getElementById('expMerchant');
-  if(inp)inp.value=merchant;
+  if(inp){inp.value=merchant;}
   // Check shared merchant map first, then fall back to local history category
   const sharedCat=(window._merchantCatMap||{})[merchant.trim().toLowerCase()];
   const useCat=sharedCat||category;
@@ -2214,6 +2280,8 @@ function pickExpAC(merchant,category){
     }
   }
   hideExpAC();
+  // Keep focus on merchant input so user can continue typing/adjusting
+  if(inp){inp.focus();}
 }
 function hideExpAC(){
   const ac=document.getElementById('expAC');
@@ -2594,6 +2662,9 @@ function _setRcptFile(file,target){
   target=target||'add';
   const isEd=target==='edit';
   if(file.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');return;}
+  // Show scan button immediately so user knows AI is available
+  const scanBtn=document.getElementById(isEd?'edGeminiScanBtn':'geminiScanBtn');
+  if(scanBtn)scanBtn.style.display='block';
   const isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
   if(!isPdf){
     // Compress first, then continue with the (smaller) file
@@ -2610,6 +2681,8 @@ function _setRcptFileReady(file,isEd){
   const pdfWrap=document.getElementById(isEd?'edReceiptPdfWrap':'rcptPdfWrap');
   const scanBtn=document.getElementById(isEd?'edGeminiScanBtn':'geminiScanBtn');
   const scanSt=document.getElementById(isEd?'edGeminiScanStatus':'geminiScanStatus');
+  // Always ensure scan button is visible when a receipt file is ready
+  if(scanBtn)scanBtn.style.display='block';
   if(!isPdf){
     // Image — show preview thumbnail immediately
     if(pdfWrap)pdfWrap.style.display='none';
@@ -2670,14 +2743,27 @@ function isMonthLocked(month,year){
   const pr=myPayroll.find(p=>p.month===month&&p.year===year);
   return !!pr?.locked||pr?.status==='final';
 }
+// ── MONTH CONFIRMATION POPUP ────────────────────────────────
+var _monthCheckPending=null;
+function closeMonthCheckPopup(){
+  document.getElementById('monthCheckPopup').style.display='none';
+  _monthCheckPending=null;
+}
+function confirmMonthCheckSubmit(){
+  document.getElementById('monthCheckPopup').style.display='none';
+  if(_monthCheckPending){
+    var p=_monthCheckPending;
+    _monthCheckPending=null;
+    _doSubmitExpense(p.merchant,p.amt,p.date);
+  }
+}
 async function submitExp(){
   if(_submittingExp)return;
   const merchant=document.getElementById('expMerchant').value.trim();
   const amt=parseFloat(document.getElementById('expAmt').value);
   const date=document.getElementById('expDate').value;
   if(!merchant||!date||isNaN(parseFloat(document.getElementById('expAmt').value))){toast('Please fill date, merchant and amount','e');return;}
-  if(amt===0){toast('Amount cannot be zero','e');return;}
-  if(!merchant||!amt||!date){toast('Please fill date, merchant and amount','e');return;}
+  if(amt<=0){toast('Amount must be greater than zero','e');return;}
   const _expD=new Date(date+'T00:00:00');
   if(isMonthLocked(_expD.getMonth(),_expD.getFullYear())){toast('⛔ Payroll for this month is already locked by the office — pick a different date or contact them','e');return;}
   // Duplicate check: same merchant + same amount within 2 days = probably a
@@ -2686,6 +2772,21 @@ async function submitExp(){
   const _dupes=myExp.filter(x=>x.merchant&&x.merchant.trim().toLowerCase()===merchant.toLowerCase()&&Math.abs(parseFloat(x.amount)-amt)<0.01&&Math.abs(new Date(x.date)-_expD)<604800000);
   if(_dupes.length&&!confirm(`Possible duplicate: you already have "${merchant}" for ${fmt(amt)} on ${fmtDS(_dupes[0].date)}. Submit anyway?`))return;
   if(_rcptFile&&_rcptFile.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');return;}
+  // Month check — if not current month, show confirmation popup
+  var _now=new Date();
+  if(_expD.getFullYear()!==_now.getFullYear()||_expD.getMonth()!==_now.getMonth()){
+    _monthCheckPending={merchant:merchant,amt:amt,date:date};
+    var _mName=_expD.toLocaleString('en-GB',{month:'long',year:'numeric'});
+    var _cName=_now.toLocaleString('en-GB',{month:'long',year:'numeric'});
+    document.getElementById('monthCheckMsg').innerHTML='You are submitting an expense for <strong style="color:var(--acc);">'+_mName+'</strong>, but the current month is <strong>'+_cName+'</strong>.<br><br>Are you sure this is correct?';
+    document.getElementById('monthCheckPopup').style.display='flex';
+    return;
+  }
+  // Proceed with submission
+  await _doSubmitExpense(merchant,amt,date);
+}
+async function _doSubmitExpense(merchant,amt,date){
+  const _expD=new Date(date+'T00:00:00');
   // Only now — after every validation has passed — do we lock submission.
   // IMPORTANT: no fixed setTimeout to auto-release this. The old version reset
   // it after a flat 3 seconds regardless of whether the upload+insert had
@@ -2774,7 +2875,7 @@ function renderExpenses(){
     const isApproved=e.status==='approved';
     const isPending=e.status==='pending'&&!isApproved;
     const canEdit=true; // any expense can be edited; editing an approved one sends it back for re-approval
-    return`<div class="exp-row" id="expRow-${e.id}" onclick="${canEdit?`if(!event.target.closest('a,button'))toggleExpRowActions('${e.id}')`:''}" style="cursor:${canEdit?'pointer':'default'};position:relative;${isFlagged?'background:rgba(220,38,38,0.04);border-radius:10px;padding:8px;':isRejected?'background:rgba(220,38,38,0.03);border-radius:10px;padding:8px;':''}">
+    return`<div class="exp-row" id="expRow-${e.id}" onclick="${canEdit?`if(!event.target.closest('a,button'))toggleExpRowActions('${eH(e.id)}')`:''}" style="cursor:${canEdit?'pointer':'default'};position:relative;${isFlagged?'background:rgba(220,38,38,0.04);border-radius:10px;padding:8px;':isRejected?'background:rgba(220,38,38,0.03);border-radius:10px;padding:8px;':''}">
       <div class="exp-icon" style="background:${col}18;color:${col};"><i class="fa-solid fa-receipt"></i></div>
       <div style="flex:1;">
         <div class="exp-name">${eH(e.merchant)||'—'}</div>
@@ -2787,12 +2888,12 @@ function renderExpenses(){
       </div>
       <div style="text-align:right;flex-shrink:0;">
         <div class="exp-amt" style="color:${isApproved?'var(--grn)':isRejected?'var(--red)':'var(--grn)'};">${fmt(e.amount)}</div>
-        ${!isFlagged&&!isApproved?`<button onclick="event.stopPropagation();toggleFlag('${e.id}')" style="font-size:10px;color:var(--txtm);background:none;border:1px solid var(--bdr);border-radius:5px;padding:2px 6px;cursor:pointer;margin-top:4px;"><i class="fa-solid fa-flag" style="font-size:11px;"></i> Flag</button>`:''}
+        ${!isFlagged&&!isApproved?`<button onclick="event.stopPropagation();toggleFlag('${eH(e.id)}')" style="font-size:10px;color:var(--txtm);background:none;border:1px solid var(--bdr);border-radius:5px;padding:2px 6px;cursor:pointer;margin-top:4px;"><i class="fa-solid fa-flag" style="font-size:11px;"></i> Flag</button>`:''}
       </div>
-      ${canEdit?`<div id="expRowActions-${e.id}" style="display:none;position:absolute;inset:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background:rgba(255,255,255,0.45);border-radius:10px;align-items:center;justify-content:center;gap:8px;z-index:5;flex-wrap:wrap;">
-        <button onclick="event.stopPropagation();toggleExpRowActions('${e.id}')" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:1px solid var(--bdr);background:var(--card);color:var(--txt);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);">Close</button>
-        <button onclick="event.stopPropagation();deleteExp('${e.id}',this)" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:none;background:var(--red);color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.18);"><i class="fa-solid fa-trash"></i>Delete</button>
-        <button onclick="event.stopPropagation();openExpDetailModal('${e.id}')" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:none;background:var(--acc);color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.18);"><i class="fa-solid fa-pen"></i>Edit</button>
+      ${canEdit?`<div id="expRowActions-${eH(e.id)}" style="display:none;position:absolute;inset:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background:rgba(255,255,255,0.45);border-radius:10px;align-items:center;justify-content:center;gap:8px;z-index:5;flex-wrap:wrap;">
+        <button onclick="event.stopPropagation();toggleExpRowActions('${eH(e.id)}')" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:1px solid var(--bdr);background:var(--card);color:var(--txt);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);">Close</button>
+        <button onclick="event.stopPropagation();deleteExp('${eH(e.id)}',this)" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:none;background:var(--red);color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.18);"><i class="fa-solid fa-trash"></i>Delete</button>
+        <button onclick="event.stopPropagation();openExpDetailModal('${eH(e.id)}')" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:none;background:var(--acc);color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.18);"><i class="fa-solid fa-pen"></i>Edit</button>
       </div>`:''}
     </div>`;
   }).join('')+`<div style="border-top:1px solid var(--bdr);padding-top:9px;margin-top:9px;display:flex;justify-content:space-between;"><span style="font-size:13px;font-weight:700;">Total</span><span style="font-family:JetBrains Mono;font-size:14px;font-weight:800;color:var(--grn);">${fmt(total)}</span></div>`:
@@ -2916,6 +3017,9 @@ function _resetExpForm(){
   const fn=document.getElementById('rcptFileName');if(fn)fn.textContent='';
   const scanBtn=document.getElementById('geminiScanBtn');if(scanBtn)scanBtn.style.display='none';
   const scanSt=document.getElementById('geminiScanStatus');if(scanSt){scanSt.style.display='none';scanSt.textContent='';}
+  // Restore submit button from edit mode back to add mode
+  const btn=document.querySelector('#pg-exp .btn-p');
+  if(btn){btn.innerHTML='<i class="fa-solid fa-paper-plane"></i> Submit Expense';btn.onclick=submitExp;btn.disabled=false;}
 }
 
 // ── INLINE ROW ACTIONS + FLOATING EDIT WINDOW ──
@@ -3883,6 +3987,19 @@ function startElecCanvas(){
 <div class="rcpt-popup-bg" id="rcptPopupBg" onclick="if(event.target===this)closeRcptPopup()">
   <img class="rcpt-popup-img" id="rcptPopupImg" src="" alt="receipt preview">
   <button class="rcpt-popup-close" onclick="closeRcptPopup()"><i class="fa-solid fa-xmark" style="margin-right:6px;"></i>Close Preview</button>
+</div>
+
+<!-- Month Confirmation Popup -->
+<div id="monthCheckPopup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:1px solid var(--bdr);border-radius:16px;padding:24px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
+    <div style="font-size:42px;margin-bottom:12px;">📅</div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:var(--txt);">Different Month Detected</div>
+    <div id="monthCheckMsg" style="font-size:13px;color:var(--txtm);margin-bottom:20px;line-height:1.5;"></div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="closeMonthCheckPopup()" class="btn btn-o" style="flex:1;font-size:12px;">Change Date</button>
+      <button onclick="confirmMonthCheckSubmit()" class="btn btn-p" style="flex:1;font-size:12px;">Yes, Submit</button>
+    </div>
+  </div>
 </div>
 </body>
 </html>
