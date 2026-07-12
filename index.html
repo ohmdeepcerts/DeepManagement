@@ -5008,17 +5008,46 @@ function renderMaterialsList(){
     </div>`;
   }).join('')}</div>`;
 }
-function openMaterialDrill(name){
+async function openMaterialDrill(name){
   const g=(cfg.material_groups||{})[name];
   if(!g)return;
   document.getElementById('matDrillTitle').textContent=name;
+  document.getElementById('matDrillBody').innerHTML='<p style="color:var(--txtm);font-size:13px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>';
+  document.getElementById('matDrillModal').classList.add('open');
+  // Make sure the full expense history is in memory — items grouped in an earlier
+  // session, or before the receipt-link feature existed, need their expense record
+  // reloaded here to find the receipt. Cheap once loaded (cached for the session).
+  await ensureFullHistoryLoaded();
   const rows=(g.items||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  document.getElementById('matDrillBody').innerHTML=rows.length?`<div style="display:flex;flex-direction:column;gap:2px;">${rows.map(o=>`
+  document.getElementById('matDrillBody').innerHTML=rows.length?`<div style="display:flex;flex-direction:column;gap:2px;">${rows.map(o=>{
+    // Look up the receipt live from the current expense record — this is always
+    // accurate (covers items grouped before this field existed, and picks up a
+    // receipt attached/replaced after grouping) rather than trusting a value
+    // frozen at the moment the AI grouping ran.
+    const liveExp=expenses.find(e=>e.id===o.expenseId);
+    const receiptUrl=liveExp?.receipt_url||o.receiptUrl||'';
+    return`
     <div style="padding:8px 0;border-bottom:1px solid var(--bdr);font-size:13px;">
       <div style="display:flex;justify-content:space-between;"><strong>${escapeHtml(o.merchant||'—')}</strong><span style="color:var(--txtm);">${o.date?fmtDateS(new Date(o.date+'T00:00:00')):''}</span></div>
-      <div style="color:var(--txtm);font-size:12px;">${escapeHtml(o.employeeName||'')} · qty ${o.qty||1}${o.raw?` · "${escapeHtml(o.raw)}"`:''}</div>
-    </div>`).join('')}</div>`:'<p style="color:var(--txtm);font-size:13px;">No details available.</p>';
-  document.getElementById('matDrillModal').classList.add('open');
+      <div style="color:var(--txtm);font-size:12px;margin-bottom:6px;">${escapeHtml(o.employeeName||'')} · qty ${o.qty||1}${o.raw?` · "${escapeHtml(o.raw)}"`:''}</div>
+      <div style="display:flex;gap:6px;">
+        ${receiptUrl?`<button type="button" onclick="matViewReceipt('${receiptUrl.replace(/'/g,"\\'")}')" class="btn btn-o btn-sm" style="font-size:11px;padding:4px 9px;"><i class="fa-solid fa-image"></i> View Receipt</button>`:''}
+        <button type="button" onclick="matGoToExpense('${o.expenseId}','${o.employeeId||''}','${o.date||''}')" class="btn btn-o btn-sm" style="font-size:11px;padding:4px 9px;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open Expense</button>
+      </div>
+    </div>`;
+  }).join('')}</div>`:'<p style="color:var(--txtm);font-size:13px;">No details available.</p>';
+}
+// "View Receipt" button in the material drill-down — opens the receipt image straight
+// in the existing lightbox, no need to go find the expense first.
+function matViewReceipt(url){
+  if(!url)return;
+  openLightbox(url);
+}
+// "Open Expense" button in the material drill-down — jumps to that exact row in the
+// Ledger (closing this modal first so the flash/scroll isn't hidden behind it).
+function matGoToExpense(expenseId,employeeId,date){
+  closeMaterialDrill();
+  goToExpenseInLedger(expenseId,employeeId,date);
 }
 function closeMaterialDrill(){document.getElementById('matDrillModal').classList.remove('open');}
 async function saveMaterialData(groups,processedIds){
@@ -5126,7 +5155,8 @@ Return ONLY a JSON array, no markdown, no explanation, in this exact shape:
         merchant:exp.merchant||'',
         date:exp.date||'',
         qty,
-        raw:r.raw||''
+        raw:r.raw||'',
+        receiptUrl:exp.receipt_url||''
       });
     });
     const newProcessedIds=[...new Set([...(cfg.material_processed_ids||[]),...batch.map(e=>e.id)])];
