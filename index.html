@@ -4903,6 +4903,10 @@ function shiftMaterials(n){
   const m=document.getElementById('matMonth'),y=document.getElementById('matYear');
   let mo=parseInt(m.value)+n,yr=parseInt(y.value);
   if(mo<0){mo=11;yr--;}else if(mo>11){mo=0;yr++;}
+  // The hidden year selector only holds a window of years (see populateMY). Walking
+  // past it would set y.value='' and turn the labels into NaN — stop at the edge
+  // instead; anything older is what the "All time" toggle is for.
+  if(!y.querySelector(`option[value="${yr}"]`))return;
   m.value=mo;y.value=yr;
   const dm=document.getElementById('matDisp_m'),dy=document.getElementById('matDisp_y');
   if(dm)dm.textContent=MONTHS[mo];if(dy)dy.textContent=yr;
