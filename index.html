@@ -700,7 +700,17 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--sh);">
         <div style="flex:1;"><h1 style="font-size:20px;font-weight:800;line-height:1;">Dashboard</h1><p style="font-size:12px;color:var(--txt2);margin-top:3px;" id="dashDate"></p></div>
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
-          <select id="dashStaff" onchange="renderDashboard()" style="padding:6px 10px;border:1.5px solid var(--bdr);border-radius:20px;font-size:12px;font-weight:600;color:var(--txt2);background:var(--card);font-family:inherit;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;padding-right:24px;background-image:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M0 0l5 6 5-6z" fill="%2394a3b8"/></svg>');background-repeat:no-repeat;background-position:right 8px center;"><option value="All">All Staff</option></select>
+          <div style="position:relative;display:inline-block;">
+            <button type="button" id="dashStaffBtn" onclick="toggleDashStaffPanel(event)" style="padding:6px 12px;border:1.5px solid var(--bdr);border-radius:20px;font-size:12px;font-weight:600;color:var(--txt2);background:var(--card);font-family:inherit;outline:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;"><i class="fa-solid fa-user-group" style="font-size:10px;"></i><span id="dashStaffLbl">All Staff</span><i class="fa-solid fa-chevron-down" style="font-size:8px;color:var(--txtm);"></i></button>
+            <div id="dashStaffPanel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--card);border:1px solid var(--bdr);border-radius:12px;box-shadow:var(--shl);padding:10px;width:240px;text-align:left;">
+              <div style="display:flex;gap:6px;margin-bottom:8px;">
+                <button type="button" class="btn btn-o btn-sm" style="flex:1;font-size:11px;padding:4px 0;" onclick="dashStaffSelectAll()">All</button>
+                <button type="button" class="btn btn-o btn-sm" style="flex:1;font-size:11px;padding:4px 0;" onclick="dashStaffSelectNone()">None</button>
+              </div>
+              <div id="dashStaffList" style="max-height:260px;overflow-y:auto;"></div>
+              <div style="font-size:10px;color:var(--txtm);margin-top:8px;line-height:1.4;">Untick staff to exclude them from every number on this page. Your selection is remembered on this device.</div>
+            </div>
+          </div>
           <div class="nav-pills">
             <div class="np-seg">
               <button class="np-seg-btn" onclick="shiftDash(-1)"><i class="fa-solid fa-chevron-left"></i></button>
@@ -3147,7 +3157,7 @@ function initSelectors(){
     if(em)em.textContent=nm;if(ey)ey.textContent=ny;
   });
   // Staff in ledger/tags/dashboard
-  ['dashStaff','tagsStaff'].forEach(id=>{
+  ['tagsStaff'].forEach(id=>{ // dashStaff is now the multi-select panel, not a <select>
     const s=document.getElementById(id);if(!s)return;
     const cur=s.value;s.innerHTML='<option value="All">All Staff</option>';
     employees.forEach(e=>{s.appendChild(new Option(e.name,e.id));});
@@ -3232,6 +3242,63 @@ function shiftDash(n){
   renderDashboard();
 }
 
+// ══ DASHBOARD STAFF SCOPE (multi-select include/exclude) ══
+// _dashStaffSel === null  → everyone (default "All Staff")
+// _dashStaffSel === Set   → only those employee ids are counted in every dashboard
+// number, chart, calendar and list. Lets the office view "all except managers/office
+// staff" or "just these 3 engineers" — the old dropdown only did All-or-one.
+// Selection persists per device (localStorage) so an exclusion set survives reloads.
+let _dashStaffSel=null;
+function _dashInc(id){return !_dashStaffSel||_dashStaffSel.has(id);}
+function _saveDashStaffSel(){
+  try{
+    if(_dashStaffSel)localStorage.setItem('ohmDashStaffSel',JSON.stringify([..._dashStaffSel]));
+    else localStorage.removeItem('ohmDashStaffSel');
+  }catch(e){}
+}
+function updateDashStaffLbl(){
+  const lbl=document.getElementById('dashStaffLbl');if(!lbl)return;
+  const act=employees.filter(e=>e.status==='Active');
+  if(!_dashStaffSel){lbl.textContent='All Staff';return;}
+  const selActive=act.filter(e=>_dashStaffSel.has(e.id));
+  if(selActive.length===1){lbl.textContent=selActive[0].name;return;}
+  const excluded=act.length-selActive.length;
+  lbl.textContent=(excluded>0&&excluded<=selActive.length)?`All except ${excluded}`:`${selActive.length} of ${act.length}`;
+}
+function toggleDashStaffPanel(e){
+  if(e)e.stopPropagation();
+  const p=document.getElementById('dashStaffPanel');if(!p)return;
+  const opening=p.style.display==='none'||!p.style.display;
+  p.style.display=opening?'block':'none';
+  if(opening){
+    buildDashStaffList();
+    // Close when clicking anywhere outside the panel (one-shot listener)
+    setTimeout(()=>{
+      const closer=ev=>{if(!p.contains(ev.target)&&ev.target.id!=='dashStaffBtn'&&!ev.target.closest('#dashStaffBtn')){p.style.display='none';document.removeEventListener('click',closer);}};
+      document.addEventListener('click',closer);
+    },0);
+  }
+}
+function buildDashStaffList(){
+  const list=document.getElementById('dashStaffList');if(!list)return;
+  const act=employees.filter(e=>e.status==='Active').slice().sort((a,b)=>a.name.localeCompare(b.name));
+  list.innerHTML=act.map(e=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-radius:6px;cursor:pointer;font-size:13px;" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">
+      <input type="checkbox" ${_dashInc(e.id)?'checked':''} onchange="dashStaffToggle('${e.id}',this.checked)" style="accent-color:var(--acc);width:15px;height:15px;cursor:pointer;">
+      <span>${escapeHtml(e.name)}</span>
+    </label>`).join('')||'<p style="font-size:12px;color:var(--txtm);">No active staff</p>';
+}
+function dashStaffToggle(id,checked){
+  const allIds=employees.filter(e=>e.status==='Active').map(e=>e.id);
+  if(!_dashStaffSel)_dashStaffSel=new Set(allIds); // first untick: start from "everyone"
+  if(checked)_dashStaffSel.add(id);else _dashStaffSel.delete(id);
+  if(allIds.every(i=>_dashStaffSel.has(i)))_dashStaffSel=null; // everyone ticked again → back to All
+  _saveDashStaffSel();
+  updateDashStaffLbl();
+  renderDashboard();
+}
+function dashStaffSelectAll(){_dashStaffSel=null;_saveDashStaffSel();buildDashStaffList();updateDashStaffLbl();renderDashboard();}
+function dashStaffSelectNone(){_dashStaffSel=new Set();_saveDashStaffSel();buildDashStaffList();updateDashStaffLbl();renderDashboard();}
 function renderDashboard(){
   if(!employees||employees.length===0){
     const k=document.getElementById('kpiRow');
@@ -3241,13 +3308,22 @@ function renderDashboard(){
   const now=new Date();
   const month=parseInt(document.getElementById('dashMonth')?.value??now.getMonth());
   const year=parseInt(document.getElementById('dashYear')?.value??now.getFullYear());
-  const staffF=document.getElementById('dashStaff')?.value||'All';
-  const isSingle=staffF!=='All';
+  // Restore the persisted staff selection once employees are known (validated —
+  // ids of departed staff are dropped; if nothing valid remains, fall back to All)
+  if(!window._dashSelRestored&&employees.length){
+    window._dashSelRestored=true;
+    try{
+      const raw=localStorage.getItem('ohmDashStaffSel');
+      if(raw){const ids=JSON.parse(raw).filter(id=>employees.some(e=>e.id===id));_dashStaffSel=ids.length?new Set(ids):null;}
+    }catch(e){}
+  }
+  // isSingle (exactly one person selected) keeps powering the per-person extras —
+  // contracted-hours card, per-day calendar status, personal insights — same as before.
+  const _selIds=_dashStaffSel?[..._dashStaffSel]:null;
+  const isSingle=!!_selIds&&_selIds.length===1;
+  const staffF=isSingle?_selIds[0]:'All';
   const C=cur();
-
-  // Populate staff selector
-  const dss=document.getElementById('dashStaff');
-  if(dss&&dss.options.length<=1){employees.filter(e=>e.status==='Active').forEach(e=>{dss.appendChild(new Option(e.name,e.id));});}
+  updateDashStaffLbl();
 
   // Date display
   document.getElementById('dashDate').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -3257,13 +3333,13 @@ function renderDashboard(){
 
   // ── CORE DATA ─────────────────────────────────────────────
   const allActiveEmps=employees.filter(e=>e.status==='Active');
-  const scopeEmps=isSingle?allActiveEmps.filter(e=>e.id===staffF):allActiveEmps;
+  const scopeEmps=allActiveEmps.filter(e=>_dashInc(e.id));
   const scopeEmp=isSingle?allActiveEmps.find(e=>e.id===staffF):null;
   const todayKey=dateKey(now);
   const todayRecs=attendance.filter(r=>r.date===todayKey);
-  const scopeTodayRecs=isSingle?todayRecs.filter(r=>r.employee_id===staffF):todayRecs;
+  const scopeTodayRecs=todayRecs.filter(r=>_dashInc(r.employee_id));
   const mRecs=attendance.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===month&&d.getFullYear()===year;});
-  const scopeMRecs=isSingle?mRecs.filter(r=>r.employee_id===staffF):mRecs;
+  const scopeMRecs=mRecs.filter(r=>_dashInc(r.employee_id));
   let pm=month-1,py=year;if(pm<0){pm=11;py--;}
   // On-demand load: fetch this month + prior month if not already in memory (older than the default window)
   Promise.all([ensureMonthLoaded(month,year),ensureMonthLoaded(pm,py)]).then(([f1,f2])=>{
@@ -3273,7 +3349,7 @@ function renderDashboard(){
     }
   });
   const prevMRecs=attendance.filter(r=>{const d=new Date(r.date+'T00:00:00');return d.getMonth()===pm&&d.getFullYear()===py;});
-  const scopePrevMRecs=isSingle?prevMRecs.filter(r=>r.employee_id===staffF):prevMRecs;
+  const scopePrevMRecs=prevMRecs.filter(r=>_dashInc(r.employee_id));
   const days=dim(year,month);
   const scopeWDSingle=scopeEmp?Array.from({length:days},(_,i)=>isWDFor(scopeEmp,new Date(year,month,i+1))?1:0).reduce((a,b)=>a+b,0):0;
 
@@ -3295,8 +3371,8 @@ function renderDashboard(){
   const prevOTH=scopePrevMRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
 
   // Expenses
-  const scopeExpenses=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===month&&d.getFullYear()===year&&(isSingle?e.employee_id===staffF:true);});
-  const prevScopeExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===pm&&d.getFullYear()===py&&(isSingle?e.employee_id===staffF:true);});
+  const scopeExpenses=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===month&&d.getFullYear()===year&&_dashInc(e.employee_id);});
+  const prevScopeExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===pm&&d.getFullYear()===py&&_dashInc(e.employee_id);});
   const totalExp=scopeExpenses.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   const prevTotalExp=prevScopeExp.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   const vatTotal=scopeExpenses.filter(r=>r.tags?.includes('VAT')).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
@@ -3353,7 +3429,7 @@ function renderDashboard(){
   const thr=cfg.threshold||80;
   const warnDays=Array.from({length:days},(_,i)=>new Date(year,month,i+1).getDay()!==0).filter(Boolean).length;
   const warns=allActiveEmps.filter(emp=>{
-    const recs=(isSingle&&emp.id!==staffF)?[]:mRecs.filter(r=>r.employee_id===emp.id);
+    const recs=!_dashInc(emp.id)?[]:mRecs.filter(r=>r.employee_id===emp.id);
     const pw=recs.filter(r=>isP(r.status)&&new Date(r.date+'T00:00:00').getDay()!==0).length;
     return warnDays>0&&Math.round(pw/warnDays*100)<thr;
   });
@@ -3454,8 +3530,8 @@ function renderDashboard(){
             else if(['L','S','H','UL','HD'].includes(rec.status)){bg='var(--ambl)';txt='var(--amb)';label=rec.status;}
           }
         }else{
-          const dayRecs=attendance.filter(r=>r.date===key&&isP(r.status));
-          const total=allActiveEmps.length;
+          const dayRecs=attendance.filter(r=>r.date===key&&isP(r.status)&&_dashInc(r.employee_id));
+          const total=scopeEmps.length;
           const pct=total>0?dayRecs.length/total:0;
           if(pct===0)bg='var(--bdr)';
           else if(pct<0.5){bg='#dcfce7';txt='#16a34a';}
@@ -3496,7 +3572,7 @@ function renderDashboard(){
   })();
 
   // ── LEFT COL C: STAFF PERFORMANCE RINGS ──────────────────
-  document.getElementById('perfSub').textContent=`${MONTHS[month]} ${year}${isSingle?' · '+scopeEmp?.name:' · all staff'}`;
+  document.getElementById('perfSub').textContent=`${MONTHS[month]} ${year}${isSingle?' · '+scopeEmp?.name:(_dashStaffSel?' · '+scopeEmps.length+' selected':' · all staff')}`;
   const perfEl=document.getElementById('staffPerfRings');
   if(perfEl){perfEl.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;">${scopeEmps.map(emp=>{
     const recs=scopeMRecs.filter(r=>r.employee_id===emp.id);
@@ -3538,7 +3614,7 @@ function renderDashboard(){
 
   // ── RIGHT COL: EXPENSE KPI MINI-CARDS ───────────────────────
   // YTD total (all expenses this year, scoped)
-  const ytdExps=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getFullYear()===year&&(isSingle?e.employee_id===staffF:true);});
+  const ytdExps=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getFullYear()===year&&_dashInc(e.employee_id);});
   const ytdTotal=ytdExps.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
   // Active months = months that have at least one expense record
   const activeMonthSet=new Set(ytdExps.filter(e=>parseFloat(e.amount||0)>0).map(e=>e.date?.slice(0,7)));
@@ -3567,7 +3643,7 @@ function renderDashboard(){
   // ── RIGHT COL: EXPENDITURE TREND LINE (12 months of this year) ──
   const trendLabels=MONTHS.map(m=>m.slice(0,3));
   const trendData=MONTHS.map((_,mi)=>{
-    const mExps=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===mi&&d.getFullYear()===year&&(isSingle?e.employee_id===staffF:true);});
+    const mExps=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===mi&&d.getFullYear()===year&&_dashInc(e.employee_id);});
     return parseFloat(mExps.reduce((s,e)=>s+(parseFloat(e.amount)||0),0).toFixed(2));
   });
   const expTrendSub=document.getElementById('expTrendSub');
@@ -3602,7 +3678,7 @@ function renderDashboard(){
     const matSub=document.getElementById('matrixSub');
     // Show months Jan-Dec of selected year
     const yearExps=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getFullYear()===year;});
-    const matEmps=isSingle?scopeEmps:allActiveEmps;
+    const matEmps=scopeEmps;
     // Filter to employees who have any expense this year
     const activeMatEmps=matEmps.filter(emp=>yearExps.some(e=>e.employee_id===emp.id&&parseFloat(e.amount||0)!==0));
     if(!activeMatEmps.length){matEl.innerHTML='<div style="text-align:center;color:var(--txtm);padding:16px;font-size:12px;">No expense data for '+year+'</div>';return;}
@@ -3770,7 +3846,7 @@ function renderDashboard(){
   const scopeAvgH=workedDaysToDate>0?scopeMonthHrs/workedDaysToDate:0;
   const topAttender=scopeEmps.map(e=>({name:e.name,d:scopeMRecs.filter(r=>r.employee_id===e.id&&isP(r.status)).length})).sort((a,b)=>b.d-a.d)[0];
   const insightSub=document.getElementById('insightsSub');
-  if(insightSub)insightSub.textContent=isSingle?(scopeEmp?.name||''):'All staff · '+MONTHS[month]+' '+year;
+  if(insightSub)insightSub.textContent=isSingle?(scopeEmp?.name||''):(_dashStaffSel?scopeEmps.length+' selected · ':'All staff · ')+MONTHS[month]+' '+year;
   // Fixed 6 slots — same position always, value swaps between all-staff and individual
   const _attPctSingle=scopeWDSingle>0?Math.round(scopeMRecs.filter(r=>r.employee_id===staffF&&isP(r.status)).length/scopeWDSingle*100):0;
   const _presentDaysSingle=scopeMRecs.filter(r=>r.employee_id===staffF&&isP(r.status)).length;
@@ -3800,7 +3876,7 @@ function renderDashboard(){
   const docEl=document.getElementById('docExpiryTimeline');
   if(docEl){
     const urgentAll=renderDocReminders();
-    const urgent=isSingle?urgentAll.filter(d=>d.employee_id===staffF):urgentAll;
+    const urgent=urgentAll.filter(d=>_dashInc(d.employee_id));
     if(!urgent.length){docEl.innerHTML='<div style="text-align:center;color:var(--txtm);padding:18px;font-size:13px;"><i class="fa-solid fa-shield-check" style="font-size:24px;color:var(--grn);display:block;margin-bottom:8px;"></i>All documents valid</div>';}
     else{
       const now2=new Date();
