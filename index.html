@@ -9377,15 +9377,29 @@ async function scanLedReceiptWithAI(expId){
     if(!fileResp.ok)throw new Error('Could not load the attached receipt file');
     const blob=await fileResp.blob();
     const mimeType=blob.type||'image/jpeg';
-    if(!mimeType.startsWith('image/')){toast('AI scan only works on image receipts, not PDFs','e');return;}
-    const b64=await new Promise((res,rej)=>{
-      const r=new FileReader();
-      r.onload=()=>res(r.result.split(',')[1]);
-      r.onerror=rej;
-      r.readAsDataURL(blob);
-    });
+    const isPdf=mimeType==='application/pdf'||/\.pdf(\?|$)/i.test(exp.receipt_url);
+    // Build the image parts for Gemini. PDFs are converted to page JPEGs (up to 4)
+    // in memory here — the stored file stays the original untouched PDF. Multi-page
+    // invoices often put the total on a later page, so all pages go in one request.
+    let imageParts;
+    if(isPdf){
+      if(btn)btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i>';
+      toast('Converting PDF pages...','i',4000);
+      const conv=await pdfToJpegParts(blob,4);
+      imageParts=conv.parts.map(p=>({inline_data:{mime_type:p.mime,data:p.b64}}));
+    }else if(mimeType.startsWith('image/')){
+      const b64=await new Promise((res,rej)=>{
+        const r=new FileReader();
+        r.onload=()=>res(r.result.split(',')[1]);
+        r.onerror=rej;
+        r.readAsDataURL(blob);
+      });
+      imageParts=[{inline_data:{mime_type:mimeType,data:b64}}];
+    }else{
+      toast('AI scan works on image or PDF receipts only','e');return;
+    }
     const yr=new Date().getFullYear();
-    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {"merchant":"store name","amount":0.00,"date":"YYYY-MM-DD","category":"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other","vat_amount":0.00,"items":"item list"}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=the individual line items on the receipt, ONE PER LINE separated by \\n (like a real itemized receipt), each formatted as "QTYx Item name" with quantities where shown, e.g. "2x cable ties\\n1x 10mm drill bit\\n1x junction box" — null if the receipt doesn't show itemized lines (e.g. fuel, parking).`;
+    const prompt=`You are a receipt scanner for a UK electrical business. ${imageParts.length>1?`You are given ${imageParts.length} images which are consecutive PAGES OF THE SAME receipt/invoice — read them together as one document (the total is often on the last page). `:''}Return ONLY a JSON object, no markdown: {"merchant":"store name","amount":0.00,"date":"YYYY-MM-DD","category":"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other","vat_amount":0.00,"items":"item list"}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=the individual line items on the receipt, ONE PER LINE separated by \\n (like a real itemized receipt), each formatted as "QTYx Item name" with quantities where shown, e.g. "2x cable ties\\n1x 10mm drill bit\\n1x junction box" — null if the receipt doesn't show itemized lines (e.g. fuel, parking).`;
     // Same retry/fallback pattern as the employee app: a few quick retries on the
     // high-quota free model, then one try on a separate model (its own quota and
     // server capacity) if that's still down. Bail immediately on 429 — quota
@@ -9396,7 +9410,7 @@ async function scanLedReceiptWithAI(expId){
         resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cfg.gemini_key}`,{
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mimeType,data:b64}},{text:prompt}]}]})
+          body:JSON.stringify({contents:[{parts:[...imageParts,{text:prompt}]}]})
         }).catch(networkErr=>{lastErrBody=String(networkErr);return null;});
         if(resp&&resp.ok)return{resp,lastErrBody:null};
         if(resp){lastErrBody=await resp.text().catch(()=>'');console.warn(`Gemini (${model}) attempt ${attempt}/${maxAttempts} failed (${resp.status}):`,lastErrBody);}
@@ -9466,43 +9480,36 @@ async function scanLedReceiptWithAI(expId){
     if(btn){btn.disabled=false;btn.innerHTML=btnOrigHtml||'<i class="fa-solid fa-wand-magic-sparkles"></i>';}
   }
 }
-// ══ PDF → JPEG CONVERTER (PDF.js — client-side, same approach as the employee app) ══
-// A PDF receipt is converted to a JPEG of its first page before upload, so it previews
-// properly here AND so the AI scan above (which only reads images) can read it too.
-async function pdfToJpegBase64(pdfFile){
+// ══ PDF → JPEG PAGES (PDF.js — in-memory only, for AI scanning) ══
+// Converts up to maxPages pages of a PDF to JPEGs so Gemini can read them. The
+// ORIGINAL PDF is always what's stored — nothing is converted before upload any
+// more. (An earlier version converted page 1 to JPEG and uploaded THAT instead,
+// which silently threw away pages 2+ of multi-page invoices — same "destroy the
+// original" mistake as the old receipt auto-crop.)
+async function pdfToJpegParts(pdfBlob,maxPages){
+  maxPages=maxPages||4;
   if(typeof pdfjsLib==='undefined')throw new Error('PDF.js not loaded');
   pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
   const arrayBuffer=await new Promise((res,rej)=>{
     const r=new FileReader();
     r.onload=()=>res(r.result);
     r.onerror=rej;
-    r.readAsArrayBuffer(pdfFile);
+    r.readAsArrayBuffer(pdfBlob);
   });
   const pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
-  const page=await pdf.getPage(1);
-  const viewport=page.getViewport({scale:2.0});
-  const canvas=document.createElement('canvas');
-  canvas.width=viewport.width;canvas.height=viewport.height;
-  const ctx=canvas.getContext('2d');
-  await page.render({canvasContext:ctx,viewport}).promise;
-  const blob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.92));
-  return{blob};
-}
-// Given any attached file, converts PDFs to JPEG first (so previews and AI scan both
-// work). Returns the original file untouched for images, or if conversion fails —
-// never blocks the upload itself.
-async function convertPdfIfNeeded(file){
-  const isPdf=/\.pdf$/i.test(file.name)||file.type==='application/pdf';
-  if(!isPdf)return file;
-  toast('Converting PDF to image...','i',4000);
-  try{
-    const{blob}=await pdfToJpegBase64(file);
-    return new File([blob],(file.name||'receipt').replace(/\.pdf$/i,'.jpg'),{type:'image/jpeg'});
-  }catch(err){
-    console.error('PDF convert error:',err);
-    toast('Could not convert PDF — attaching as-is (AI scan won\'t work on a PDF)','i');
-    return file;
+  const pageCount=pdf.numPages;
+  const renderCount=Math.min(pageCount,maxPages);
+  const parts=[];
+  for(let p=1;p<=renderCount;p++){
+    const page=await pdf.getPage(p);
+    const viewport=page.getViewport({scale:2.0});
+    const canvas=document.createElement('canvas');
+    canvas.width=viewport.width;canvas.height=viewport.height;
+    const ctx=canvas.getContext('2d');
+    await page.render({canvasContext:ctx,viewport}).promise;
+    parts.push({b64:canvas.toDataURL('image/jpeg',0.92).split(',')[1],mime:'image/jpeg'});
   }
+  return{parts,pageCount,renderedCount:renderCount};
 }
 // Drag-and-drop a receipt file straight onto a ledger row — wired to ondrop on the <tr>
 // in buildLedRow(). Same validation and upload path as the paperclip picker.
@@ -9533,7 +9540,7 @@ async function pasteAdminReceipt(expId){
 }
 async function _uploadFileAsReceipt(expId,file){
   if(!file)return;
-  file=await convertPdfIfNeeded(file);
+  // Original file uploads untouched — PDFs keep all their pages (conversion happens only at scan time)
   if(file.size>CONFIG_APP.MAX_FILE_BYTES){toast('File must be under 5MB','e');return;}
   const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
   const path=`ledger-receipts/${expId}/${Date.now()}.${ext}`;
@@ -9555,7 +9562,7 @@ async function uploadLedReceipt(expId, input){
     toast('File type not allowed. Use JPG, PNG or PDF.','e');return;
   }
   if(file.size>10*1024*1024){toast('File too large. Max 10MB.','e');return;}
-  file=await convertPdfIfNeeded(file);
+  // Original file uploads untouched — PDFs keep all their pages (conversion happens only at scan time)
   toast('Uploading receipt...','i',3000);
   const ext=file.name.split('.').pop()||'jpg';
   const path='receipts/office/'+expId+'_'+Date.now()+'.'+ext;
