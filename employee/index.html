@@ -2306,14 +2306,26 @@ async function scanReceiptWithAI(target){
   if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Scanning...';}
   if(st){st.style.display='block';st.textContent='Reading receipt...';}
   try{
-    // Convert image file to base64
-    const b64=await new Promise((res,rej)=>{
-      const r=new FileReader();
-      r.onload=()=>res(r.result.split(',')[1]);
-      r.onerror=rej;
-      r.readAsDataURL(fileVar);
-    });
-    const mimeType=fileVar.type||'image/jpeg';
+    // Build the image parts for Gemini. For a PDF, convert up to 4 pages in memory —
+    // the ORIGINAL PDF is untouched and is still what gets uploaded; these JPEGs
+    // exist only for this scan request. Multi-page invoices often put the total on
+    // a later page, so sending all pages reads noticeably better than page 1 alone.
+    let imageParts;
+    const _isPdfScan=/\.pdf$/i.test(fileVar.name||'')||fileVar.type==='application/pdf';
+    if(_isPdfScan){
+      if(st){st.textContent='Converting PDF pages...';st.style.color='var(--acc)';}
+      const conv=await pdfToJpegParts(fileVar,4);
+      imageParts=conv.parts.map(p=>({inline_data:{mime_type:p.mime,data:p.b64}}));
+      if(conv.pageCount>conv.renderedCount&&st){st.textContent=`Reading first ${conv.renderedCount} of ${conv.pageCount} pages...`;st.style.color='var(--acc)';}
+    }else{
+      const b64=await new Promise((res,rej)=>{
+        const r=new FileReader();
+        r.onload=()=>res(r.result.split(',')[1]);
+        r.onerror=rej;
+        r.readAsDataURL(fileVar);
+      });
+      imageParts=[{inline_data:{mime_type:fileVar.type||'image/jpeg',data:b64}}];
+    }
     // Key loaded from Supabase settings on login — never hardcoded in this file
     if(!_geminiKey){
       toast('AI scanner not set up — contact admin','e');
@@ -2322,7 +2334,7 @@ async function scanReceiptWithAI(target){
       return;
     }
     const yr=new Date().getFullYear();
-    const prompt=`You are a receipt scanner for a UK electrical business. Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"items\":\"item list\",\"bbox\":{\"x\":0,\"y\":0,\"w\":100,\"h\":100},\"is_bent\":false,\"rotation\":0}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=the individual line items on the receipt, ONE PER LINE separated by \\n (like a real itemized receipt), each formatted as \"QTYx Item name\" with quantities where shown, e.g. \"2x cable ties\\n1x 10mm drill bit\\n1x junction box\" — null if the receipt doesn't show itemized lines (e.g. fuel, parking). bbox=bounding box of the receipt as percentages of image (x=left%, y=top%, w=width%, h=height%), set null if receipt fills whole image with no background. is_bent=true if receipt is curved/bent/folded, false if flat. rotation=degrees you'd need to rotate the whole image CLOCKWISE so the receipt text reads upright, left-to-right — must be exactly 0, 90, 180, or 270 (0 if already upright).`;
+    const prompt=`You are a receipt scanner for a UK electrical business. ${imageParts.length>1?`You are given ${imageParts.length} images which are consecutive PAGES OF THE SAME receipt/invoice — read them together as one document (the total is often on the last page). `:''}Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"items\":\"item list\",\"bbox\":{\"x\":0,\"y\":0,\"w\":100,\"h\":100},\"is_bent\":false,\"rotation\":0}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=the individual line items on the receipt, ONE PER LINE separated by \\n (like a real itemized receipt), each formatted as \"QTYx Item name\" with quantities where shown, e.g. \"2x cable ties\\n1x 10mm drill bit\\n1x junction box\" — null if the receipt doesn't show itemized lines (e.g. fuel, parking). bbox=bounding box of the receipt as percentages of image (x=left%, y=top%, w=width%, h=height%), set null if receipt fills whole image with no background. is_bent=true if receipt is curved/bent/folded, false if flat. rotation=degrees you'd need to rotate the whole image CLOCKWISE so the receipt text reads upright, left-to-right — must be exactly 0, 90, 180, or 270 (0 if already upright).`;
     // Try the high-quota free model first; each attempt retries on transient
     // failures but bails immediately on 429 (daily quota — retrying won't help).
     // If it's still down after that, fall back to gemini-2.5-flash once — a
@@ -2335,7 +2347,7 @@ async function scanReceiptWithAI(target){
         resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${_geminiKey}`,{
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mimeType,data:b64}},{text:prompt}]}]})
+          body:JSON.stringify({contents:[{parts:[...imageParts,{text:prompt}]}]})
         }).catch(networkErr=>{lastErrBody=String(networkErr);return null;});
         if(resp&&resp.ok)return{resp,lastErrBody:null};
         if(resp){lastErrBody=await resp.text().catch(()=>'');console.warn(`Gemini (${model}) attempt ${attempt}/${maxAttempts} failed (${resp.status}):`,lastErrBody);}
@@ -2583,45 +2595,38 @@ function removeEdReceipt(){
 // ══════════════════════════════════════════════════════════════
 let _convertedJpegBlob = null; // stores the converted JPEG for upload
 
-async function pdfToJpegBase64(pdfFile) {
-  // Set worker src for PDF.js
+// Convert a PDF to JPEG page images — up to maxPages pages (default 4) — entirely
+// in the browser. Used ONLY for preview and for feeding the AI scan; the ORIGINAL
+// PDF is what gets uploaded, so multi-page invoices never lose pages in storage.
+async function pdfToJpegParts(pdfFile, maxPages) {
+  maxPages = maxPages || 4;
   if(typeof pdfjsLib === 'undefined') throw new Error('PDF.js not loaded');
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-
-  // Read PDF as ArrayBuffer
   const arrayBuffer = await new Promise((res, rej) => {
     const r = new FileReader();
     r.onload = () => res(r.result);
     r.onerror = rej;
     r.readAsArrayBuffer(pdfFile);
   });
-
-  // Load PDF document
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  
-  // Render first page (receipts are always 1 page)
-  const page = await pdf.getPage(1);
-  
-  // Scale up for better Gemini read accuracy (2x = good quality)
-  const viewport = page.getViewport({ scale: 2.0 });
-  
-  // Draw to canvas
-  const canvas = document.createElement('canvas');
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  const ctx = canvas.getContext('2d');
-  await page.render({ canvasContext: ctx, viewport }).promise;
-  
-  // Convert canvas → JPEG blob (0.92 quality = good balance)
-  const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
-  const base64 = await new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result.split(',')[1]);
-    r.onerror = rej;
-    r.readAsDataURL(blob);
-  });
-  
-  return { base64, blob, dataUrl: canvas.toDataURL('image/jpeg', 0.92) };
+  const pageCount = pdf.numPages;
+  const renderCount = Math.min(pageCount, maxPages);
+  const parts = [];
+  let firstDataUrl = null;
+  for (let p = 1; p <= renderCount; p++) {
+    const page = await pdf.getPage(p);
+    // Scale up for better Gemini read accuracy (2x = good quality)
+    const viewport = page.getViewport({ scale: 2.0 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    if (p === 1) firstDataUrl = dataUrl;
+    parts.push({ b64: dataUrl.split(',')[1], mime: 'image/jpeg' });
+  }
+  return { parts, pageCount, renderedCount: renderCount, firstDataUrl };
 }
 // Downscale a photo before upload/scan. Phone cameras produce 3-5MB images;
 // at 20 employees × dozens of receipts/month that fills the Supabase free
@@ -2692,30 +2697,31 @@ function _setRcptFileReady(file,isEd){
     if(scanBtn)scanBtn.style.display='block';
     toast('Receipt attached','s');
   }else{
-    // PDF — convert to JPEG automatically
+    // PDF — the ORIGINAL PDF stays as the file that will be uploaded (all pages kept).
+    // We only render page 1 here as an on-screen preview; the AI scan converts pages
+    // in memory at scan time. (Previously the page-1 JPEG *replaced* the file being
+    // uploaded, so pages 2+ of a multi-page invoice were permanently lost — same
+    // "silently destroy the original" mistake as the old receipt auto-crop.)
     if(pdfWrap)pdfWrap.style.display='none';
     if(wrap)wrap.style.display='none';
-    if(scanBtn){scanBtn.style.display='block';scanBtn.disabled=true;scanBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Converting PDF...';}
-    if(scanSt){scanSt.style.display='block';scanSt.textContent='Converting PDF to image...';scanSt.style.color='var(--acc)';}
-    pdfToJpegBase64(file).then(({blob,dataUrl})=>{
-      // Replace receipt file with the JPEG blob — Supabase gets a clean JPEG
-      const jpegFile=new File([blob], file.name.replace(/\.pdf$/i,'.jpg'), {type:'image/jpeg'});
-      if(isEd){_edRcptFile=jpegFile;}else{_rcptFile=jpegFile;}
-      // Show JPEG preview (employee can see what Gemini will read)
-      if(img){img.src=dataUrl;}
+    if(scanBtn){scanBtn.style.display='block';scanBtn.disabled=true;scanBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Preparing preview...';}
+    if(scanSt){scanSt.style.display='block';scanSt.textContent='Preparing PDF preview...';scanSt.style.color='var(--acc)';}
+    pdfToJpegParts(file,1).then(({firstDataUrl,pageCount})=>{
+      // Preview only — _rcptFile/_edRcptFile still hold the original PDF
+      if(img&&firstDataUrl){img.src=firstDataUrl;}
       if(wrap)wrap.style.display='block';
       if(scanBtn){scanBtn.disabled=false;scanBtn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt';}
-      if(scanSt){scanSt.textContent='PDF converted ✅ — tap Auto-fill or Save';scanSt.style.color='var(--grn)';}
-      toast('PDF converted to image — ready to scan','s');
+      if(scanSt){scanSt.textContent=pageCount>1?`PDF ready (${pageCount} pages — all will be kept) — tap Auto-fill or Save`:'PDF ready ✅ — tap Auto-fill or Save';scanSt.style.color='var(--grn)';}
+      toast('PDF attached — ready to scan','s');
     }).catch(err=>{
-      console.error('PDF convert error:',err);
-      // Fallback: keep original PDF file, hide scan button
-      if(scanBtn){scanBtn.style.display='none';}
+      console.error('PDF preview error:',err);
+      // No preview, but the original PDF still uploads fine and can still be scanned
       const fn=document.getElementById(isEd?'edReceiptFileName':'rcptFileName');
       if(fn)fn.textContent=file.name;
       if(pdfWrap)pdfWrap.style.display='flex';
-      if(scanSt){scanSt.textContent='Could not convert PDF — will upload as PDF';scanSt.style.color='var(--amb)';}
-      toast('PDF attached (could not preview)','i');
+      if(scanBtn){scanBtn.disabled=false;scanBtn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt';}
+      if(scanSt){scanSt.textContent='No preview available — PDF will upload as-is';scanSt.style.color='var(--amb)';}
+      toast('PDF attached (no preview)','i');
     });
   }
 }
