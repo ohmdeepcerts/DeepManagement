@@ -1093,6 +1093,8 @@ function openNotifSettings(){
   };
 }
 async function checkForUpdateAndReload(isFirstCheck){
+  // Can't self-fetch from a file:// URL — skip during local testing (see office app)
+  if(location.protocol==='file:')return;
   try{
     const url=location.pathname+'?_v='+Date.now();
     const res=await fetch(url,{cache:'no-store'});
