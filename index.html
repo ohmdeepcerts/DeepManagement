@@ -2655,6 +2655,10 @@ function goToExpenseInLedger(expenseId,employeeId,date){
 // than force-reloading (the admin may be mid-edit in the ledger).
 let _updateCheckIv=null,_updateNotified=false;
 async function checkOfficeUpdate(){
+  // Self-fetching to detect a new deployed version can only work on a real host —
+  // from a file:// URL every attempt is blocked by the browser and just spams the
+  // console with CORS errors during local testing, so skip entirely.
+  if(location.protocol==='file:')return;
   try{
     const res=await fetch(location.pathname+'?_v='+Date.now(),{cache:'no-store'});
     if(!res.ok)return;
@@ -4402,7 +4406,14 @@ function _doRenderLedger(){
   if(sp){sp.innerHTML='';if(!ledgerStaff&&employees.length>0)ledgerStaff=employees[0].id;employees.forEach(e=>{const isEx=e.status==='ex';const pendCount=expenses.filter(x=>x.employee_id===e.id&&x.status==='pending').length;const pill=document.createElement('div');pill.className=`pill${e.id===ledgerStaff?' on':''}${isEx?' ex':''}`;pill.style.cssText+='display:inline-flex;align-items:center;gap:6px;';pill.innerHTML=escapeHtml(e.name)+(pendCount>0?`<span style="background:#dc2626;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;line-height:1.4;">${pendCount}</span>`:'');pill.onclick=()=>{ledgerStaff=e.id;renderLedger();};sp.appendChild(pill);});}
   // Month pills
   const mp=document.getElementById('monthPills');
-  if(mp){mp.innerHTML='';MONTHS.forEach((m,i)=>{const ms=String(i+1).padStart(2,'0');const pill=document.createElement('div');pill.className=`pill${ms===ledgerMonth?' on':''}`;pill.textContent=m.slice(0,3);pill.onclick=()=>{ledgerMonth=ms;renderLedger();};mp.appendChild(pill);});
+  if(mp){mp.innerHTML='';MONTHS.forEach((m,i)=>{const ms=String(i+1).padStart(2,'0');const pill=document.createElement('div');pill.className=`pill${ms===ledgerMonth?' on':''}`;
+    // Same "new expenses" badge as the staff pills (status==='pending'), but per
+    // month — for the currently selected person and viewed year — so the office
+    // can see WHICH months hold new requests without clicking through each one.
+    const mPend=ledgerStaff?expenses.filter(x=>x.employee_id===ledgerStaff&&x.status==='pending'&&(()=>{const d=new Date(x.date+'T00:00:00');return d.getFullYear()===ledgerYear&&d.getMonth()===i;})()).length:0;
+    pill.style.cssText+='display:inline-flex;align-items:center;gap:5px;';
+    pill.innerHTML=m.slice(0,3)+(mPend>0?`<span style="background:#dc2626;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;line-height:1.4;">${mPend}</span>`:'');
+    pill.onclick=()=>{ledgerMonth=ms;renderLedger();};mp.appendChild(pill);});
     // Bring the selected month into view — centered — instead of leaving the
     // user to scroll/hunt for it (e.g. July sitting off-screen after June).
     setTimeout(()=>{mp.querySelector('.pill.on')?.scrollIntoView({inline:'center',block:'nearest'});},0);
@@ -4596,6 +4607,14 @@ function editLedItems(id,current){
 var _officeMonthPending=null;
 function closeMonthCheckPopup(){
   document.getElementById('monthCheckPopup').style.display='none';
+  // Cancel = keep the saved date. The row's date input was already showing the
+  // proposed (unsaved) date at this point — put it back to what's actually stored
+  // so the screen never disagrees with the database.
+  if(_officeMonthPending){
+    var exp=expenses.find(e=>e.id===_officeMonthPending.expId);
+    var dInp=document.getElementById('ledrow-'+_officeMonthPending.expId)?.querySelector('input[type="date"]');
+    if(dInp)dInp.value=exp?.date||'';
+  }
   _officeMonthPending=null;
 }
 function confirmOfficeMonthCheck(){
@@ -4603,7 +4622,14 @@ function confirmOfficeMonthCheck(){
   if(_officeMonthPending){
     var p=_officeMonthPending;
     _officeMonthPending=null;
-    updateExp(p.expId,'date',p.date);
+    // The date field in the popup lets the office correct a wrong scanned/typed
+    // date right here (e.g. Gemini misread the year) instead of having to accept
+    // it or start over — whatever's in that field is what gets saved.
+    var edited=document.getElementById('monthCheckDateInp')?.value;
+    var finalDate=edited||p.date;
+    var dInp=document.getElementById('ledrow-'+p.expId)?.querySelector('input[type="date"]');
+    if(dInp)dInp.value=finalDate;
+    updateExp(p.expId,'date',finalDate);
   }
 }
 // Warn when editing an expense's date into a different month than the current real-world
@@ -4618,7 +4644,9 @@ function checkExpDateChange(expId,newDate){
     _officeMonthPending={expId:expId,date:newDate};
     const mName=d.toLocaleString('en-GB',{month:'long',year:'numeric'});
     const cName=now.toLocaleString('en-GB',{month:'long',year:'numeric'});
-    document.getElementById('monthCheckMsg').innerHTML='You\'re changing this expense to <strong style="color:var(--acc);">'+mName+'</strong>, but the current month is <strong>'+cName+'</strong>.<br><br>Are you sure this is correct?';
+    document.getElementById('monthCheckMsg').innerHTML='You\'re changing this expense to <strong style="color:var(--acc);">'+mName+'</strong>, but the current month is <strong>'+cName+'</strong>.';
+    const dtInp=document.getElementById('monthCheckDateInp');
+    if(dtInp)dtInp.value=newDate;
     document.getElementById('monthCheckPopup').style.display='flex';
     return;
   }
@@ -9682,10 +9710,14 @@ window.addEventListener('unhandledrejection',function(e){
   <div style="background:var(--card);border:1px solid var(--bdr);border-radius:16px;padding:24px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
     <div style="font-size:42px;margin-bottom:12px;">📅</div>
     <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:var(--txt);">Different Month Detected</div>
-    <div id="monthCheckMsg" style="font-size:13px;color:var(--txtm);margin-bottom:20px;line-height:1.5;"></div>
+    <div id="monthCheckMsg" style="font-size:13px;color:var(--txtm);margin-bottom:14px;line-height:1.5;"></div>
+    <div style="text-align:left;margin-bottom:18px;">
+      <label style="font-size:11px;font-weight:700;color:var(--txtm);text-transform:uppercase;display:block;margin-bottom:5px;">Date to save (edit if the scan got it wrong)</label>
+      <input type="date" id="monthCheckDateInp" style="width:100%;padding:8px 10px;border:1.5px solid var(--bdr);border-radius:8px;font-size:13px;font-family:inherit;background:var(--card);color:var(--txt);outline:none;">
+    </div>
     <div style="display:flex;gap:10px;">
       <button onclick="closeMonthCheckPopup()" class="btn btn-o" style="flex:1;font-size:12px;">Cancel</button>
-      <button onclick="confirmOfficeMonthCheck()" class="btn btn-p" style="flex:1;font-size:12px;">Yes, Change It</button>
+      <button onclick="confirmOfficeMonthCheck()" class="btn btn-p" style="flex:1;font-size:12px;">Save This Date</button>
     </div>
   </div>
 </div>
