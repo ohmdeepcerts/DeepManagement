@@ -957,8 +957,17 @@ const CONFIG_APP = {
 
 const sb=supabase.createClient('https://pajpoerteyjrprcaisom.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhanBvZXJ0ZXlqcnByY2Fpc29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI4NDEsImV4cCI6MjA5NjQ4ODg0MX0.zUzCg-bq_9ZxYWSmk-Y9a_QqAe0t-45tjHP5Eiyxjcc',{auth:{persistSession:true,autoRefreshToken:true}});
 // Portal credentials — shared auth account for employee app
+// SECURITY: rotate PORTAL_PASS to a strong random string in Supabase Auth dashboard
 const PORTAL_EMAIL='employee@app.com';
 const PORTAL_PASS='888888';
+
+// PIN hashing — SHA-256 via Web Crypto API (no library needed)
+// Stored PINs that are 64-char hex are treated as hashed; shorter ones are legacy plain-text
+async function hashPin(pin){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(pin)));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function isPinHashed(pin){return typeof pin==='string'&&pin.length===64&&/^[0-9a-f]+$/.test(pin);}
 
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const AVCOLS=['#2563eb','#16a34a','#dc2626','#7c3aed','#d97706','#0891b2','#be185d','#0f766e','#9333ea','#c2410c'];
@@ -1416,8 +1425,17 @@ let _pinAttempts=0;let _pinDelay=0;
 async function checkPin(){
   const e=allEmps.find(x=>x.id===selEmpId);
   if(!e?.pin){document.getElementById('pinErr').textContent='No PIN set. Contact admin.';pinEntry='';renderPinDots();return;}
-  if(pinEntry===e.pin){_pinAttempts=0;_pinDelay=0;await enterApp(e);}
-  else{_pinAttempts++;_pinDelay=[0,1000,2000,4000,8000][Math.min(_pinAttempts,4)];
+  const hashedEntry=await hashPin(pinEntry);
+  // Hashed DB pins are 64-char hex; shorter = legacy plain-text (auto-upgrades on success)
+  const storedIsHashed=isPinHashed(e.pin);
+  const match=storedIsHashed?(hashedEntry===e.pin):(pinEntry===e.pin);
+  if(match){
+    _pinAttempts=0;_pinDelay=0;
+    // Silently upgrade legacy plain-text PIN to hashed on successful login
+    if(!storedIsHashed){sb.from('employees').update({pin:hashedEntry}).eq('id',e.id).then(()=>{});}
+    await enterApp(e);
+  } else {
+    _pinAttempts++;_pinDelay=[0,1000,2000,4000,8000][Math.min(_pinAttempts,4)];
     const errEl=document.getElementById('pinErr');
     errEl.textContent='Incorrect PIN'+(_pinAttempts>=2?` — ${_pinDelay/1000}s delay`:'');
     pinEntry='';renderPinDots();
@@ -3739,7 +3757,7 @@ async function tryAutoLogin(){
   // Check for saved employee session (7-day auto-login)
   const savedId=localStorage.getItem('dam_emp_id');
   const savedTs=parseInt(localStorage.getItem('dam_emp_ts')||'0');
-  const sevenDays=7*24*60*60*1000;
+  const sevenDays=24*60*60*1000; // 24-hour session (was 7 days)
   if(savedId&&Date.now()-savedTs<sevenDays){
     const r=await sb.from('employees').select('*').eq('id',savedId).single();
     const cfgR=await fetchSettingsWithRetry();
@@ -3769,7 +3787,7 @@ async function submitPhone(){
   const errEl=document.getElementById('phoneErr');
   errEl.textContent='';
   if(norm.length<10){errEl.textContent='Enter a valid mobile number';return;}
-  const r=await sb.from('employees').select('*').eq('status','Active');
+  const r=await sb.from('employees').select('*').eq('status','Active').like('phone','%'+norm);
   if(r.error){errEl.textContent='Could not connect. Check internet.';return;}
   const matches=(r.data||[]).filter(function(e){return normPhone(e.phone)===norm;});
   if(!matches.length){errEl.textContent='Phone number not recognized. Contact your office.';return;}
@@ -3802,7 +3820,8 @@ async function submitNewPin(){
   if(p1.length<4||p1.length>6||!/^\d+$/.test(p1)){errEl.textContent='PIN must be 4-6 digits';return;}
   if(p1!==p2){errEl.textContent='PINs do not match';return;}
   const e=allEmps.find(function(x){return x.id===selEmpId;});
-  const r=await sb.from('employees').update({pin:p1}).eq('id',selEmpId).select().single();
+  const hashed=await hashPin(p1);
+  const r=await sb.from('employees').update({pin:hashed}).eq('id',selEmpId).select().single();
   if(r.error){errEl.textContent='Could not save PIN. Try again.';return;}
   allEmps=[r.data];
   await enterApp(r.data);

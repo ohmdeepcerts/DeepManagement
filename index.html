@@ -1759,6 +1759,14 @@ const sb=supabase.createClient(SUPA_URL,SUPA_KEY,{
   auth:{persistSession:true,autoRefreshToken:true}
 });
 
+// ── PIN HASHING — SHA-256 via Web Crypto API ──
+// Stored PINs that are 64-char hex are treated as hashed; shorter = legacy plain-text
+async function hashPin(pin){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(pin)));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function isPinHashed(pin){return typeof pin==='string'&&pin.length===64&&/^[0-9a-f]+$/.test(pin);}
+
 // ── AUTO SESSION RESTORE ──
 (async function(){
   const {data:{session}}=await sb.auth.getSession();
@@ -6651,8 +6659,9 @@ async function editEmpModal(id){
   document.getElementById('eSat').value=emp.sat_mult||'';
   document.getElementById('eSun').value=emp.sun_mult||'';
   document.getElementById('eBankAmt').value=emp.bank_amt||'';
-  document.getElementById('ePin').value=emp.pin||'';
-  document.getElementById('ePinConfirm').value=emp.pin||'';
+  // Don't display stored PIN (may be a SHA-256 hash); leave blank — saving blank = no PIN change
+  document.getElementById('ePin').value='';
+  document.getElementById('ePinConfirm').value='';
   refreshBankSel();
   const stored=emp.bank_name||'';
   const accounts=cfg.bank_accounts||[];
@@ -6762,6 +6771,8 @@ async function saveEmployee(){
   const pinC=document.getElementById('ePinConfirm').value;
   if(pin&&pin!==pinC){toast('PINs do not match','e');return;}
   if(pin&&pin.length<4){toast('PIN must be at least 4 digits','e');return;}
+  // Hash the PIN if one was entered; if left blank, omit from data (preserve existing PIN)
+  const pinHashed=pin?await hashPin(pin):undefined;
   const payType2=document.querySelector('.ptc.sel')?.id?.replace('pt-','')||'fixed';
   const bkSel=document.getElementById('eBankName').value;
   const bkName=bkSel==='custom'?document.getElementById('eBankCustom').value:bkSel;
@@ -6789,7 +6800,7 @@ async function saveEmployee(){
     sun_mult:document.getElementById('eSun').value?parseFloat(document.getElementById('eSun').value):null,
     bank_amt:document.getElementById('eBankAmt').value?parseFloat(document.getElementById('eBankAmt').value):null,
     bank_name:bkName||null,
-    pin:pin||null,
+    pin:pinHashed,  // undefined = not sent (existing PIN preserved); hashed value = new/changed PIN
     show_pay_tab:document.getElementById('eShowPayTab').checked,
     show_running_pay:document.getElementById('eShowRunningPay').checked,
     work_days:(function(){var cbs=document.querySelectorAll('.eWorkDay:checked');return cbs.length?Array.from(cbs).map(function(c){return parseInt(c.value);}):null;})(),
