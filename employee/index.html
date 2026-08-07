@@ -2,6 +2,7 @@
 <html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src https://pajpoerteyjrprcaisom.supabase.co https://generativelanguage.googleapis.com wss://realtime.supabase.co; img-src 'self' data: blob: https://pajpoerteyjrprcaisom.supabase.co; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2686,6 +2687,8 @@ function _setRcptFile(file,target){
   if(!file)return;
   target=target||'add';
   const isEd=target==='edit';
+  const ALLOWED_RCPT=['image/jpeg','image/png','image/webp','image/heic','image/heif','application/pdf'];
+  if(!ALLOWED_RCPT.includes(file.type)&&!file.name.match(/\.(jpg|jpeg|png|webp|pdf|heic|heif)$/i)){toast('Only JPG, PNG, WebP, PDF, or HEIC files are accepted','e');return;}
   if(file.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');return;}
   // Show scan button immediately so user knows AI is available
   const scanBtn=document.getElementById(isEd?'edGeminiScanBtn':'geminiScanBtn');

@@ -2,6 +2,7 @@
 <html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src https://pajpoerteyjrprcaisom.supabase.co https://generativelanguage.googleapis.com https://api.resend.com wss://realtime.supabase.co; img-src 'self' data: blob: https://pajpoerteyjrprcaisom.supabase.co; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <!-- PWA / Home Screen -->
@@ -1772,6 +1773,7 @@ function isPinHashed(pin){return typeof pin==='string'&&pin.length===64&&/^[0-9a
   const {data:{session}}=await sb.auth.getSession();
   if(session){
     isLoggedIn=true;
+    _resetIdleTimer();
     document.getElementById('auth-overlay').style.display='none';
     document.getElementById('mainContent')?.scrollTo(0,0);
     if(session.user?.email)updateAdminPill(session.user.email);
@@ -2543,12 +2545,24 @@ async function doAdminLogin(){
     return;
   }
   isLoggedIn=true;
+  _resetIdleTimer();
   document.getElementById('auth-overlay').style.display='none';
   document.getElementById('mainContent')?.scrollTo(0,0);
   updateAdminPill(email);
   loadAllData();
 }
+// ── IDLE TIMEOUT — sign out after 30 minutes of no interaction ──
+let _idleTimer=null;
+const IDLE_TIMEOUT_MS=30*60*1000;
+function _resetIdleTimer(){
+  if(!isLoggedIn)return;
+  clearTimeout(_idleTimer);
+  _idleTimer=setTimeout(()=>{if(isLoggedIn){toast('Session timed out due to inactivity','w');doSignOut();}},IDLE_TIMEOUT_MS);
+}
+['click','keydown','scroll','mousemove','touchstart'].forEach(ev=>document.addEventListener(ev,_resetIdleTimer,{passive:true}));
+
 async function doSignOut(){
+  clearTimeout(_idleTimer);
   isLoggedIn=false;
   await sb.auth.signOut();
   document.getElementById('auth-overlay').style.display='flex';
