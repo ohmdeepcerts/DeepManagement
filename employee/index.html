@@ -950,7 +950,7 @@ const CONFIG_APP = {
   LATE_GRACE_MINS:     15,   // minutes after start = Late Arrival
   EARLY_LEAVE_MINS:   10,   // minutes before end = Left Early
   DEFAULT_HOURS:       8,   // fallback contracted hours
-  SYNC_INTERVAL_MS: 11000,  // background sync frequency
+  SYNC_INTERVAL_MS: 120000, // background sync frequency (2 min — 11 s was causing excessive egress)
   MAX_FILE_BYTES:  5242880, // 5MB upload limit
   PAST_DATE_WARN_DAYS: 30,  // warn if submitting old attendance
   PIN_LENGTH:          4,   // PIN digits
@@ -1584,13 +1584,17 @@ async function silentSync(){
     if(meCheck.data.show_running_pay!==undefined)emp.show_running_pay=meCheck.data.show_running_pay;
     if(emp.show_pay_tab!==prevShowPay||emp.show_running_pay!==prevShowRunning)applyPortalVisibility(emp);
   }
+  // Only sync the rolling 6-month window — the initial load at session start already has full history.
+  // This dramatically reduces per-sync egress without losing any UI functionality.
+  const _syncFrom=new Date();_syncFrom.setMonth(_syncFrom.getMonth()-6);
+  const syncCutoff=_syncFrom.toISOString().slice(0,10);
   const [attR,expR,msgR,batR,payStR,attReqR2,prSumR2]=await Promise.all([
-    sb.from('attendance').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
-    sb.from('expenses').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
+    sb.from('attendance').select('*').eq('employee_id',emp.id).gte('date',syncCutoff).order('date',{ascending:false}).limit(500),
+    sb.from('expenses').select('*').eq('employee_id',emp.id).gte('date',syncCutoff).order('date',{ascending:false}).limit(500),
     sb.from('messages').select('*').eq('employee_id',emp.id).order('created_at'),
-    sb.from('expense_batches').select('*').eq('employee_id',emp.id).order('submitted_at',{ascending:false}),
+    sb.from('expense_batches').select('*').eq('employee_id',emp.id).order('submitted_at',{ascending:false}).limit(200),
     sb.from('payment_status').select('*').eq('employee_id',emp.id),
-    sb.from('attendance_requests').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
+    sb.from('attendance_requests').select('*').eq('employee_id',emp.id).gte('date',syncCutoff).order('date',{ascending:false}).limit(200),
     sb.from('payroll_summary').select('*').eq('employee_id',emp.id)
   ]);
   const hadNewMsg=myMsgs.length<(msgR.data||[]).length;
