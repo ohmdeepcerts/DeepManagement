@@ -1584,9 +1584,8 @@ async function silentSync(){
     if(meCheck.data.show_running_pay!==undefined)emp.show_running_pay=meCheck.data.show_running_pay;
     if(emp.show_pay_tab!==prevShowPay||emp.show_running_pay!==prevShowRunning)applyPortalVisibility(emp);
   }
-  // Only sync the rolling 6-month window — the initial load at session start already has full history.
-  // This dramatically reduces per-sync egress without losing any UI functionality.
-  const _syncFrom=new Date();_syncFrom.setMonth(_syncFrom.getMonth()-6);
+  // Sync only current month + previous month — initial load at session start covers full history.
+  const _syncFrom=new Date();_syncFrom.setDate(1);_syncFrom.setMonth(_syncFrom.getMonth()-1);
   const syncCutoff=_syncFrom.toISOString().slice(0,10);
   const [attR,expR,msgR,batR,payStR,attReqR2,prSumR2]=await Promise.all([
     sb.from('attendance').select('*').eq('employee_id',emp.id).gte('date',syncCutoff).order('date',{ascending:false}).limit(500),
