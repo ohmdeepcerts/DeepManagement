@@ -624,6 +624,10 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       <input class="auth-input" type="password" id="adminPassword" placeholder="Password" onkeydown="if(event.key==='Enter')doAdminLogin()" autocomplete="current-password">
       <div class="auth-err" id="authErr"></div>
       <button class="auth-btn" id="authBtn" onclick="doAdminLogin()"><i class="fa-solid fa-right-to-bracket" style="margin-right:6px;"></i>Sign In</button>
+      <div style="text-align:center;margin-top:12px;">
+        <a href="#" onclick="sendForgotPassword(event)" style="font-size:13px;color:#60a5fa;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Forgot password?</a>
+      </div>
+      <div id="forgotMsg" style="font-size:12px;text-align:center;margin-top:8px;min-height:16px;"></div>
     </div>
   </div>
 </div>
@@ -2576,6 +2580,18 @@ async function submitPasswordReset(){
   const {data:{session:s}}=await sb.auth.getSession();
   if(s?.user?.email)updateAdminPill(s.user.email);
   loadAllData();
+}
+async function sendForgotPassword(e){
+  e.preventDefault();
+  const email=document.getElementById('adminEmail').value.trim();
+  const msg=document.getElementById('forgotMsg');
+  if(!email){msg.style.color='#f87171';msg.textContent='Enter your email address above first';return;}
+  msg.style.color='#94a3b8';msg.textContent='Sending…';
+  const {error}=await sb.auth.resetPasswordForEmail(email,{
+    redirectTo:'https://ohmdeepcerts.github.io/DeepManagement'
+  });
+  if(error){msg.style.color='#f87171';msg.textContent='Error: '+error.message;return;}
+  msg.style.color='#4ade80';msg.textContent='Reset link sent — check your email';
 }
 let _adminLoginAttempts=0;
 let _adminLoginDelay=0;
