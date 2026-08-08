@@ -1785,8 +1785,17 @@ function isPinHashed(pin){return typeof pin==='string'&&pin.length===64&&/^[0-9a
 
 // ── AUTO SESSION RESTORE ──
 (async function(){
+  // If recovery link was expired/invalid, show friendly message on the login screen
+  const _hashParams=new URLSearchParams(window.location.hash.replace('#',''));
+  if(_hashParams.get('error_code')==='otp_expired'||_hashParams.get('error')==='access_denied'){
+    const errEl=document.getElementById('authErr');
+    if(errEl){errEl.textContent='Reset link expired — request a new one from Supabase dashboard.';errEl.style.display='block';}
+    history.replaceState(null,'',window.location.pathname);
+  }
+  // If this is a recovery session, let PASSWORD_RECOVERY event handle it — don't auto-load app
+  const _isRecovery=window.location.hash.includes('type=recovery');
   const {data:{session}}=await sb.auth.getSession();
-  if(session){
+  if(session&&!_isRecovery){
     isLoggedIn=true;
     _resetIdleTimer();
     document.getElementById('auth-overlay').style.display='none';
