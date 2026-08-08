@@ -1368,15 +1368,16 @@ async function submitChangePin(){
   const n2=document.getElementById('cpConfirm').value;
   const errEl=document.getElementById('cpErr');
   errEl.textContent='';
-  const curHashed=await hashPin(cur);
   const storedPin=emp.pin||'';
-  const match=isPinHashed(storedPin)?curHashed===storedPin:cur===storedPin;
+  const storedIsHashed=isPinHashed(storedPin);
+  let match;
+  if(storedIsHashed){const h=await hashPin(cur);match=h===storedPin;}
+  else{match=cur===storedPin;}
   if(!match){errEl.textContent='Current PIN is incorrect';return;}
   if(n1.length<4||n1.length>6||!/^\d+$/.test(n1)){errEl.textContent='New PIN must be 4-6 digits';return;}
   if(n1!==n2){errEl.textContent='New PINs do not match';return;}
   if(n1===cur){errEl.textContent='New PIN must be different from current PIN';return;}
-  const newHashed=await hashPin(n1);
-  const r=await sb.from('employees').update({pin:newHashed}).eq('id',emp.id).select().single();
+  const r=await sb.from('employees').update({pin:n1}).eq('id',emp.id).select().single();
   if(r.error){errEl.textContent='Could not save. Check connection.';return;}
   emp=r.data;
   closeChangePin();
@@ -1428,14 +1429,13 @@ let _pinAttempts=0;let _pinDelay=0;
 async function checkPin(){
   const e=allEmps.find(x=>x.id===selEmpId);
   if(!e?.pin){document.getElementById('pinErr').textContent='No PIN set. Contact admin.';pinEntry='';renderPinDots();return;}
-  const hashedEntry=await hashPin(pinEntry);
-  // Hashed DB pins are 64-char hex; shorter = legacy plain-text (auto-upgrades on success)
+  // Plain-text comparison; existing hashed PINs (64-char hex) still work during transition
   const storedIsHashed=isPinHashed(e.pin);
-  const match=storedIsHashed?(hashedEntry===e.pin):(pinEntry===e.pin);
+  let match;
+  if(storedIsHashed){const h=await hashPin(pinEntry);match=h===e.pin;}
+  else{match=pinEntry===e.pin;}
   if(match){
     _pinAttempts=0;_pinDelay=0;
-    // Silently upgrade legacy plain-text PIN to hashed on successful login
-    if(!storedIsHashed){sb.from('employees').update({pin:hashedEntry}).eq('id',e.id).then(()=>{});}
     await enterApp(e);
   } else {
     _pinAttempts++;_pinDelay=[0,1000,2000,4000,8000][Math.min(_pinAttempts,4)];
@@ -3828,8 +3828,7 @@ async function submitNewPin(){
   if(p1.length<4||p1.length>6||!/^\d+$/.test(p1)){errEl.textContent='PIN must be 4-6 digits';return;}
   if(p1!==p2){errEl.textContent='PINs do not match';return;}
   const e=allEmps.find(function(x){return x.id===selEmpId;});
-  const hashed=await hashPin(p1);
-  const r=await sb.from('employees').update({pin:hashed}).eq('id',selEmpId).select().single();
+  const r=await sb.from('employees').update({pin:p1}).eq('id',selEmpId).select().single();
   if(r.error){errEl.textContent='Could not save PIN. Try again.';return;}
   allEmps=[r.data];
   await enterApp(r.data);

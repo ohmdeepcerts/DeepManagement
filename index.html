@@ -627,6 +627,18 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     </div>
   </div>
 </div>
+<!-- PASSWORD RESET (recovery email link lands here) -->
+<div id="pwResetOverlay" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f172a,#1e3a5f);align-items:center;justify-content:center;z-index:10000;">
+  <div class="auth-box">
+    <div class="auth-logo"><div class="auth-name">Set New Password</div><div class="auth-sub">Choose a new password for your admin account</div></div>
+    <div class="auth-form">
+      <input class="auth-input" type="password" id="pwResetNew" placeholder="New password" style="margin-bottom:10px;" autocomplete="new-password">
+      <input class="auth-input" type="password" id="pwResetConfirm" placeholder="Confirm new password" onkeydown="if(event.key==='Enter')submitPasswordReset()" autocomplete="new-password">
+      <div class="auth-err" id="pwResetErr"></div>
+      <button class="auth-btn" onclick="submitPasswordReset()"><i class="fa-solid fa-key" style="margin-right:6px;"></i>Save New Password</button>
+    </div>
+  </div>
+</div>
 
 <!-- SIDEBAR -->
 <nav class="sidebar" id="sidebar">
@@ -1787,6 +1799,10 @@ function isPinHashed(pin){return typeof pin==='string'&&pin.length===64&&/^[0-9a
       isLoggedIn=false;
       document.getElementById('auth-overlay').style.display='flex';
     }
+    if(event==='PASSWORD_RECOVERY'){
+      document.getElementById('auth-overlay').style.display='none';
+      showPasswordResetModal();
+    }
   });
 })();
 
@@ -2522,6 +2538,27 @@ async function safeWrite(fn, successMsg, silentFail=false){
   }
 }
 
+function showPasswordResetModal(){
+  document.getElementById('pwResetOverlay').style.display='flex';
+  document.getElementById('pwResetNew').value='';
+  document.getElementById('pwResetConfirm').value='';
+  document.getElementById('pwResetErr').textContent='';
+  setTimeout(()=>document.getElementById('pwResetNew').focus(),100);
+}
+async function submitPasswordReset(){
+  const p1=document.getElementById('pwResetNew').value;
+  const p2=document.getElementById('pwResetConfirm').value;
+  const err=document.getElementById('pwResetErr');
+  err.textContent='';
+  if(p1.length<6){err.textContent='Password must be at least 6 characters';return;}
+  if(p1!==p2){err.textContent='Passwords do not match';return;}
+  const {error}=await sb.auth.updateUser({password:p1});
+  if(error){err.textContent='Could not update: '+error.message;return;}
+  document.getElementById('pwResetOverlay').style.display='none';
+  toast('Password updated — you are now signed in','s');
+  isLoggedIn=true;
+  loadAllData();
+}
 let _adminLoginAttempts=0;
 let _adminLoginDelay=0;
 async function doAdminLogin(){
@@ -6678,9 +6715,14 @@ async function editEmpModal(id){
   document.getElementById('eBankAmt').value=emp.bank_amt||'';
   // Show PIN status; fields left blank = no PIN change
   const _hasPinSet=!!(emp.pin);
+  const _isHashed=isPinHashed(emp.pin||'');
   const _pinBadge=document.getElementById('pinStatusBadge');
   const _clearBtn=document.getElementById('clearPinBtn');
-  if(_pinBadge){_pinBadge.textContent=_hasPinSet?'✓ PIN set':'✗ No PIN — employee sets on first login';_pinBadge.style.color=_hasPinSet?'var(--grn,#22c55e)':'var(--txtm)';}
+  if(_pinBadge){
+    if(!_hasPinSet){_pinBadge.textContent='✗ No PIN — employee sets on first login';_pinBadge.style.color='var(--txtm)';}
+    else if(_isHashed){_pinBadge.textContent='PIN: (old encrypted — type a new one above to reset)';_pinBadge.style.color='var(--amb,#f59e0b)';}
+    else{_pinBadge.textContent='PIN: '+emp.pin;_pinBadge.style.color='var(--grn,#22c55e)';}
+  }
   if(_clearBtn){_clearBtn.style.display=_hasPinSet?'inline-block':'none';}
   document.getElementById('ePin').value='';
   document.getElementById('ePinConfirm').value='';
@@ -6807,8 +6849,8 @@ async function saveEmployee(){
   const pinC=document.getElementById('ePinConfirm').value;
   if(pin&&pin!==pinC){toast('PINs do not match','e');return;}
   if(pin&&pin.length<4){toast('PIN must be at least 4 digits','e');return;}
-  // Hash the PIN if one was entered; if left blank, omit from data (preserve existing PIN)
-  const pinHashed=pin?await hashPin(pin):undefined;
+  // Store PIN as plain text; if blank, omit from data (preserve existing PIN)
+  const pinHashed=pin||undefined;
   const payType2=document.querySelector('.ptc.sel')?.id?.replace('pt-','')||'fixed';
   const bkSel=document.getElementById('eBankName').value;
   const bkName=bkSel==='custom'?document.getElementById('eBankCustom').value:bkSel;
