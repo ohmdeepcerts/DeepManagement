@@ -1368,11 +1368,15 @@ async function submitChangePin(){
   const n2=document.getElementById('cpConfirm').value;
   const errEl=document.getElementById('cpErr');
   errEl.textContent='';
-  if(cur!==emp.pin){errEl.textContent='Current PIN is incorrect';return;}
+  const curHashed=await hashPin(cur);
+  const storedPin=emp.pin||'';
+  const match=isPinHashed(storedPin)?curHashed===storedPin:cur===storedPin;
+  if(!match){errEl.textContent='Current PIN is incorrect';return;}
   if(n1.length<4||n1.length>6||!/^\d+$/.test(n1)){errEl.textContent='New PIN must be 4-6 digits';return;}
   if(n1!==n2){errEl.textContent='New PINs do not match';return;}
   if(n1===cur){errEl.textContent='New PIN must be different from current PIN';return;}
-  const r=await sb.from('employees').update({pin:n1}).eq('id',emp.id).select().single();
+  const newHashed=await hashPin(n1);
+  const r=await sb.from('employees').update({pin:newHashed}).eq('id',emp.id).select().single();
   if(r.error){errEl.textContent='Could not save. Check connection.';return;}
   emp=r.data;
   closeChangePin();

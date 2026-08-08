@@ -1487,9 +1487,12 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       <div class="fg fg2"><div class="fgl"><label>Default Work Start</label><input type="time" id="eWStart" value="08:00"></div><div class="fgl"><label>Default Work End</label><input type="time" id="eWEnd" value="17:00"></div></div>
       <div style="border-top:1px solid var(--bdr);padding-top:13px;margin-top:13px;">
         <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-key" style="color:var(--amb);margin-right:5px;"></i>Employee PIN (for mobile portal)</div>
-        <div class="fg fg2"><div class="fgl"><label>PIN (4-6 digits)</label><input type="text" inputmode="numeric" id="ePin" maxlength="6" placeholder="e.g. 1234"></div><div class="fgl"><label>Confirm PIN</label><input type="text" inputmode="numeric" id="ePinConfirm" maxlength="6" placeholder="Confirm PIN"></div></div>
-        <p style="font-size:11px;color:var(--txtm);margin-top:4px;"><i class="fa-solid fa-eye" style="margin-right:4px;"></i>Visible here for admin reference only — employee enters this PIN to log into the mobile app.</p>
-        <p style="font-size:12px;color:var(--txtm);margin-top:7px;">Employee uses this PIN to log into the mobile portal and see their own data.</p>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:11px;">
+          <span id="pinStatusBadge" style="font-size:12px;font-weight:700;"></span>
+          <button type="button" id="clearPinBtn" onclick="clearEmpPin()" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--red,#ef4444);background:rgba(239,68,68,0.08);color:var(--red,#ef4444);cursor:pointer;display:none;">Clear PIN</button>
+        </div>
+        <div class="fg fg2"><div class="fgl"><label>Set new PIN (4-6 digits)</label><input type="text" inputmode="numeric" id="ePin" maxlength="6" placeholder="Leave blank to keep current"></div><div class="fgl"><label>Confirm new PIN</label><input type="text" inputmode="numeric" id="ePinConfirm" maxlength="6" placeholder="Confirm PIN"></div></div>
+        <p style="font-size:12px;color:var(--txtm);margin-top:7px;">Leave fields blank to keep existing PIN. Click <strong>Clear PIN</strong> so the employee can set their own on next login.</p>
       </div>
     </div>
     <!-- SALARY HISTORY TAB -->
@@ -6673,7 +6676,12 @@ async function editEmpModal(id){
   document.getElementById('eSat').value=emp.sat_mult||'';
   document.getElementById('eSun').value=emp.sun_mult||'';
   document.getElementById('eBankAmt').value=emp.bank_amt||'';
-  // Don't display stored PIN (may be a SHA-256 hash); leave blank — saving blank = no PIN change
+  // Show PIN status; fields left blank = no PIN change
+  const _hasPinSet=!!(emp.pin);
+  const _pinBadge=document.getElementById('pinStatusBadge');
+  const _clearBtn=document.getElementById('clearPinBtn');
+  if(_pinBadge){_pinBadge.textContent=_hasPinSet?'✓ PIN set':'✗ No PIN — employee sets on first login';_pinBadge.style.color=_hasPinSet?'var(--grn,#22c55e)':'var(--txtm)';}
+  if(_clearBtn){_clearBtn.style.display=_hasPinSet?'inline-block':'none';}
   document.getElementById('ePin').value='';
   document.getElementById('ePinConfirm').value='';
   refreshBankSel();
@@ -6703,6 +6711,20 @@ async function editEmpModal(id){
   setTimeout(()=>{loadEmpDocs(id);loadSalaryHistory(id);},100);
 }
 function closeEmpModal(){document.getElementById('empModal').classList.remove('open');}
+async function clearEmpPin(){
+  const id=document.getElementById('empId').value;
+  if(!id)return;
+  if(!confirm('Clear this employee\'s PIN? They will be prompted to set a new one on next login.'))return;
+  const r=await sb.from('employees').update({pin:null}).eq('id',id);
+  if(r.error){toast('Could not clear PIN: '+r.error.message,'e');return;}
+  const cached=employeeMap?.get(id);
+  if(cached)cached.pin=null;
+  const badge=document.getElementById('pinStatusBadge');
+  const btn=document.getElementById('clearPinBtn');
+  if(badge){badge.textContent='✗ No PIN — employee sets on first login';badge.style.color='var(--txtm)';}
+  if(btn)btn.style.display='none';
+  toast('PIN cleared — employee will set a new one on next login','s');
+}
 async function deleteEmployee(){
   const id=document.getElementById('empId').value;
   const emp=employeeMap?.get(id);if(!emp)return;
