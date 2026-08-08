@@ -1414,13 +1414,11 @@ function selEmp(id){
   renderPinDots();
 }
 function goBack(){document.getElementById('step2').style.display='none';document.getElementById('step1').style.display='block';document.getElementById('phoneInput').value='';pinEntry='';selEmpId='';allEmps=[];renderPinDots();}
-function pk(k){if(pinEntry.length>=6)return;pinEntry+=k;renderPinDots();const e=allEmps.find(x=>x.id===selEmpId);if(e?.pin&&pinEntry.length>=4&&pinEntry.length===e.pin.length)checkPin();}
+function pk(k){if(pinEntry.length>=4)return;pinEntry+=k;renderPinDots();if(pinEntry.length===4)checkPin();}
 function pdel(){pinEntry=pinEntry.slice(0,-1);renderPinDots();document.getElementById('pinErr').textContent='';}
 function renderPinDots(){
-  const e=allEmps.find(x=>x.id===selEmpId);
-  const maxL=e?.pin?.length||4;
   const dots=document.getElementById('pinDots');
-  dots.innerHTML=Array.from({length:maxL},(_,i)=>`<div class="pin-dot${i<pinEntry.length?' on':''}"></div>`).join('');
+  dots.innerHTML=Array.from({length:4},(_,i)=>`<div class="pin-dot${i<pinEntry.length?' on':''}"></div>`).join('');
 }
 let _pinAttempts=0;let _pinDelay=0;
 async function checkPin(){
