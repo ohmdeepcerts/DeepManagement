@@ -2625,15 +2625,8 @@ async function doAdminLogin(){
   updateAdminPill(email);
   loadAllData();
 }
-// ── IDLE TIMEOUT — sign out after 8 hours of no interaction ──
 let _idleTimer=null;
-const IDLE_TIMEOUT_MS=8*60*60*1000;
-function _resetIdleTimer(){
-  if(!isLoggedIn)return;
-  clearTimeout(_idleTimer);
-  _idleTimer=setTimeout(()=>{if(isLoggedIn){toast('Session timed out due to inactivity','w');doSignOut();}},IDLE_TIMEOUT_MS);
-}
-['click','keydown','scroll','mousemove','touchstart'].forEach(ev=>document.addEventListener(ev,_resetIdleTimer,{passive:true}));
+function _resetIdleTimer(){}
 
 async function doSignOut(){
   clearTimeout(_idleTimer);
