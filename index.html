@@ -3465,8 +3465,9 @@ function renderDashboard(){
   const prevOTH=scopePrevMRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
 
   // Expenses
-  const scopeExpenses=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===month&&d.getFullYear()===year&&_dashInc(e.employee_id)&&e.status!=='rejected';});
-  const prevScopeExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===pm&&d.getFullYear()===py&&_dashInc(e.employee_id)&&e.status!=='rejected';});
+  const _expOk=e=>e.status!=='rejected'&&e.status!=='draft';
+  const scopeExpenses=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===month&&d.getFullYear()===year&&_dashInc(e.employee_id)&&_expOk(e);});
+  const prevScopeExp=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getMonth()===pm&&d.getFullYear()===py&&_dashInc(e.employee_id)&&_expOk(e);});
   const totalExp=scopeExpenses.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   const prevTotalExp=prevScopeExp.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   const vatTotal=scopeExpenses.filter(r=>r.tags?.includes('VAT')).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
@@ -3771,7 +3772,7 @@ function renderDashboard(){
     if(!matEl)return;
     const matSub=document.getElementById('matrixSub');
     // Show months Jan-Dec of selected year
-    const yearExps=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getFullYear()===year&&_dashInc(e.employee_id)&&e.status!=='rejected';});
+    const yearExps=expenses.filter(e=>{const d=new Date(e.date+'T00:00:00');return d.getFullYear()===year&&_dashInc(e.employee_id)&&_expOk(e);});
     const matEmps=scopeEmps;
     // Filter to employees who have any expense this year
     const activeMatEmps=matEmps.filter(emp=>yearExps.some(e=>e.employee_id===emp.id&&parseFloat(e.amount||0)!==0));
