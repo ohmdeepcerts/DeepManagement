@@ -958,7 +958,6 @@ const CONFIG_APP = {
 
 const sb=supabase.createClient('https://pajpoerteyjrprcaisom.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhanBvZXJ0ZXlqcnByY2Fpc29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI4NDEsImV4cCI6MjA5NjQ4ODg0MX0.zUzCg-bq_9ZxYWSmk-Y9a_QqAe0t-45tjHP5Eiyxjcc',{auth:{persistSession:true,autoRefreshToken:true}});
 // Portal credentials — shared auth account for employee app
-// SECURITY: rotate PORTAL_PASS to a strong random string in Supabase Auth dashboard
 const PORTAL_EMAIL='employee@app.com';
 const PORTAL_PASS='888888';
 
@@ -3765,8 +3764,8 @@ async function tryAutoLogin(){
   // Check for saved employee session (7-day auto-login)
   const savedId=localStorage.getItem('dam_emp_id');
   const savedTs=parseInt(localStorage.getItem('dam_emp_ts')||'0');
-  const sevenDays=24*60*60*1000; // 24-hour session (was 7 days)
-  if(savedId&&Date.now()-savedTs<sevenDays){
+  const thirtyDays=30*24*60*60*1000;
+  if(savedId&&Date.now()-savedTs<thirtyDays){
     const r=await sb.from('employees').select('*').eq('id',savedId).single();
     const cfgR=await fetchSettingsWithRetry();
     if(cfgR.data){cfg=cfgR.data;_geminiKey=cfgR.data.gemini_key||'';}
@@ -3795,7 +3794,7 @@ async function submitPhone(){
   const errEl=document.getElementById('phoneErr');
   errEl.textContent='';
   if(norm.length<10){errEl.textContent='Enter a valid mobile number';return;}
-  const r=await sb.from('employees').select('*').eq('status','Active').like('phone','%'+norm);
+  const r=await sb.from('employees').select('*').eq('status','Active');
   if(r.error){errEl.textContent='Could not connect. Check internet.';return;}
   const matches=(r.data||[]).filter(function(e){return normPhone(e.phone)===norm;});
   if(!matches.length){errEl.textContent='Phone number not recognized. Contact your office.';return;}
