@@ -2625,9 +2625,9 @@ async function doAdminLogin(){
   updateAdminPill(email);
   loadAllData();
 }
-// ── IDLE TIMEOUT — sign out after 30 minutes of no interaction ──
+// ── IDLE TIMEOUT — sign out after 8 hours of no interaction ──
 let _idleTimer=null;
-const IDLE_TIMEOUT_MS=30*60*1000;
+const IDLE_TIMEOUT_MS=8*60*60*1000;
 function _resetIdleTimer(){
   if(!isLoggedIn)return;
   clearTimeout(_idleTimer);
