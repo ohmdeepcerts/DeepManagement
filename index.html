@@ -958,6 +958,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
             <span style="font-weight:700;font-size:14px;" id="ledTitle">Select staff &amp; month</span>
             <div style="display:flex;gap:7px;">
               <button class="btn btn-o btn-sm" onclick="toggleQE()"><i class="fa-solid fa-bolt" style="color:var(--amb);"></i>Quick</button>
+              <button class="btn btn-o btn-sm" onclick="openBulkUpload()" title="Upload multiple receipts — AI fills each expense automatically"><i class="fa-solid fa-images" style="color:var(--pur);"></i>Bulk</button>
               <button class="btn btn-p btn-sm" onclick="addLedRow()"><i class="fa-solid fa-plus"></i>Add Row</button>
               <button class="btn btn-s btn-sm" onclick="approveAllExp()" title="Approve all expenses this month"><i class="fa-solid fa-check-double"></i>Approve All</button>
               <button class="btn btn-o btn-sm no-print" onclick="printExpenseReport()" title="Print/export this person's expenses for the month as a report"><i class="fa-solid fa-file-invoice"></i>Report</button>
@@ -2678,6 +2679,7 @@ async function hardRefresh(){
 // ═══════════════════════════════════════════════════
 let _officeRTChannel=null;
 let _rtRefreshTimer=null;
+let _ledAiScanRunning=false; // true while AI is scanning a ledger receipt — suppresses realtime re-renders
 // opts can be a plain string (old behavior — simple toast + generic OS
 // notification) or an object {toastMsg, notifTitle, notifBody, onClick} for
 // a richer notification that lands the office on the exact record.
@@ -2702,6 +2704,7 @@ function _rtRefresh(opts){
   // Debounce: several changes can land at once (batch submit); refresh once.
   clearTimeout(_rtRefreshTimer);
   _rtRefreshTimer=setTimeout(async()=>{
+    if(_ledAiScanRunning)return; // AI scan in progress — skip re-render, will refresh when done
     try{
       await loadAllDataSilent();
       updateBadges();
@@ -9594,6 +9597,7 @@ async function scanLedReceiptWithAI(expId){
   const btnOrigHtml=btn?btn.innerHTML:null;
   if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i>';}
   toast('Reading receipt...','i',4000);
+  _ledAiScanRunning=true;
   try{
     const fileResp=await fetch(exp.receipt_url);
     if(!fileResp.ok)throw new Error('Could not load the attached receipt file');
@@ -9692,6 +9696,8 @@ async function scanLedReceiptWithAI(expId){
     }
     if(filled.length>0)toast(`Receipt scanned — filled: ${filled.join(', ')}`,'s');
     else toast('Could not read receipt clearly — fill in manually','e');
+    // Keep the row in view after fields are filled (date change may reorder the ledger)
+    setTimeout(()=>{const r=document.getElementById('ledrow-'+expId);if(r)r.scrollIntoView({block:'nearest',behavior:'smooth'});},120);
   }catch(err){
     console.error('Gemini scan error:',err);
     const msg=err.message||'';
@@ -9699,6 +9705,8 @@ async function scanLedReceiptWithAI(expId){
     else if(msg.includes('503'))toast('AI scanner is busy right now — try again shortly, or fill in manually','e');
     else toast('Could not scan receipt — fill in manually','e');
   }finally{
+    _ledAiScanRunning=false;
+    renderLedger(); // pick up any realtime changes that were suppressed during the scan
     if(btn){btn.disabled=false;btn.innerHTML=btnOrigHtml||'<i class="fa-solid fa-wand-magic-sparkles"></i>';}
   }
 }
@@ -9773,6 +9781,8 @@ async function _uploadFileAsReceipt(expId,file){
   await safeWrite(()=>sb.from('expenses').update({receipt_url:url}).eq('id',expId),'Receipt saved');
   const idx=expenses.findIndex(e=>e.id===expId);if(idx>=0)expenses[idx].receipt_url=url;
   renderLedger();
+  // Row may have moved from blank-last to sorted-by-date position; scroll it back into view
+  setTimeout(()=>{const r=document.getElementById('ledrow-'+expId);if(r)r.scrollIntoView({block:'nearest',behavior:'smooth'});},200);
   toast('Receipt saved ✓','s');
 }
 // ══ LEDGER RECEIPT UPLOAD ══
@@ -9812,6 +9822,76 @@ async function uploadLedReceipt(expId, input){
   toast('Receipt attached','s');
 }
 
+// ══ BULK RECEIPT UPLOAD ══
+let _bulkFiles=[],_bulkRunning=false;
+function openBulkUpload(){
+  if(!ledgerStaff){toast('Select a staff member first','e');return;}
+  const emp=employeeMap?.get(ledgerStaff);
+  document.getElementById('bulkModal').style.display='flex';
+  document.getElementById('bulkEmpName').textContent=emp?'Adding expenses for: '+emp.name:'';
+  document.getElementById('bulkList').innerHTML='<div style="font-size:13px;color:var(--txtm);padding:20px;text-align:center;">Select files above to get started</div>';
+  document.getElementById('bulkProg').textContent='';
+  document.getElementById('bulkStartBtn').disabled=true;
+  document.getElementById('bulkStartBtn').style.display='';
+  document.getElementById('bulkCloseBtn').textContent='Cancel';document.getElementById('bulkCloseBtn').disabled=false;
+  document.getElementById('bulkDrop').style.display='block';
+  _bulkFiles=[];_bulkRunning=false;
+}
+function closeBulkUpload(){if(_bulkRunning)return;document.getElementById('bulkModal').style.display='none';renderLedger();}
+function handleBulkDrop(ev){const f=[...ev.dataTransfer.files].filter(f=>f.type.startsWith('image/')||f.type==='application/pdf');if(f.length)_setBulkFiles(f);}
+function handleBulkFileInput(inp){if(inp.files.length)_setBulkFiles([...inp.files]);}
+function _setBulkFiles(files){
+  _bulkFiles=files;
+  document.getElementById('bulkList').innerHTML=files.map((f,i)=>`<div id="brow-${i}" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);"><i class="fa-solid fa-file-image" style="color:var(--txtm);font-size:14px;flex-shrink:0;"></i><div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(f.name)}</div><div id="bsub-${i}" style="font-size:11px;color:var(--txtm);">Ready</div></div><span id="bico-${i}" style="font-size:16px;">⏳</span></div>`).join('');
+  document.getElementById('bulkProg').textContent=files.length+' file'+(files.length!==1?'s':'')+' selected';
+  document.getElementById('bulkStartBtn').disabled=false;
+}
+async function startBulkProcess(){
+  if(!_bulkFiles.length||_bulkRunning)return;
+  if(!cfg.gemini_key){toast('AI scanner not set up — add a Gemini key in Settings → AI','e');return;}
+  _bulkRunning=true;_ledAiScanRunning=true;
+  document.getElementById('bulkStartBtn').disabled=true;document.getElementById('bulkCloseBtn').disabled=true;
+  document.getElementById('bulkDrop').style.display='none';
+  let done=0,errs=0;
+  for(let i=0;i<_bulkFiles.length;i++){
+    document.getElementById('bulkProg').textContent=`Scanning ${i+1} of ${_bulkFiles.length}...`;
+    document.getElementById('bsub-'+i).textContent='Scanning...';document.getElementById('bico-'+i).textContent='🔄';
+    try{
+      const r=await _bulkScanAndInsert(_bulkFiles[i],i);
+      done++;document.getElementById('bico-'+i).textContent='✅';
+      document.getElementById('bsub-'+i).textContent=[r.merchant,r.amount?'£'+parseFloat(r.amount).toFixed(2):null,r.date].filter(Boolean).join(' · ')||'Added';
+    }catch(err){errs++;document.getElementById('bico-'+i).textContent='❌';document.getElementById('bsub-'+i).textContent='Failed — add manually';console.error('Bulk err',i,err);}
+  }
+  _bulkRunning=false;_ledAiScanRunning=false;
+  document.getElementById('bulkProg').textContent=`Done: ${done} added${errs?', '+errs+' failed':''}`;
+  document.getElementById('bulkCloseBtn').disabled=false;document.getElementById('bulkCloseBtn').textContent='Close & Refresh';
+  document.getElementById('bulkStartBtn').style.display='none';
+  renderLedger();
+}
+async function _bulkScanAndInsert(file,idx){
+  const mt=file.type||'image/jpeg',isPdf=mt==='application/pdf'||/\.pdf$/i.test(file.name||'');
+  let imageParts;
+  if(isPdf){const cv=await pdfToJpegParts(file,4);imageParts=cv.parts.map(p=>({inline_data:{mime_type:p.mime,data:p.b64}}));}
+  else{const b64=await new Promise((res,rej)=>{const rd=new FileReader();rd.onload=()=>res(rd.result.split(',')[1]);rd.onerror=rej;rd.readAsDataURL(file);});imageParts=[{inline_data:{mime_type:mt,data:b64}}];}
+  const yr=new Date().getFullYear();
+  const prompt=`You are a receipt scanner for a UK electrical business.${imageParts.length>1?` You are given ${imageParts.length} images which are consecutive PAGES OF THE SAME receipt/invoice — read them together as one document (the total is often on the last page). `:''}Return ONLY a JSON object, no markdown: {"merchant":"store name","amount":0.00,"date":"YYYY-MM-DD","category":"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other","vat_amount":0.00,"items":"item list"}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=the individual line items ONE PER LINE separated by \\n, formatted as "QTYx Item name", null if not itemized.`;
+  let result={};
+  try{
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${cfg.gemini_key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[...imageParts,{text:prompt}]}]})});
+    if(resp.ok){const d=await resp.json();const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||'';try{result=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch(e){}}
+    else if(resp.status===429)throw new Error('429');
+  }catch(e){if(e.message==='429')throw e;/* use empty result on scan failure — still uploads */}
+  const ext=(file.name||'').split('.').pop().toLowerCase()||'jpg';
+  const path=`ledger-receipts/${ledgerStaff}/bulk_${Date.now()}_${idx}.${ext}`;
+  const{error:upErr}=await sb.storage.from('employee-docs').upload(path,file,{upsert:true});
+  let receiptUrl=null;
+  if(!upErr){const{data:ud}=sb.storage.from('employee-docs').getPublicUrl(path);receiptUrl=ud?.publicUrl||null;}
+  const today=dateKey(new Date());
+  const{data:exp,error:expErr}=await sb.from('expenses').insert({employee_id:ledgerStaff,date:result.date||today,merchant:result.merchant||'',amount:parseFloat(result.amount)||0,category:result.category||'',items:result.items||null,receipt_url:receiptUrl,status:'approved',tags:(result.vat_amount>0)?['VAT']:[],flagged:false}).select().single();
+  if(expErr)throw new Error(expErr.message);
+  expenses.push(exp);
+  return result;
+}
 window.onerror=function(msg,url,line,col,err){
   console.error('DAM Error:',msg,'at',url,line);
   if(msg&&!msg.includes('Script error'))
@@ -9836,6 +9916,26 @@ window.addEventListener('unhandledrejection',function(e){
     <div style="display:flex;gap:10px;">
       <button onclick="closeMonthCheckPopup()" class="btn btn-o" style="flex:1;font-size:12px;">Cancel</button>
       <button onclick="confirmOfficeMonthCheck()" class="btn btn-p" style="flex:1;font-size:12px;">Save This Date</button>
+    </div>
+  </div>
+</div>
+<div id="bulkModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:600;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--card);border-radius:16px;width:100%;max-width:500px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow:hidden;">
+    <div style="padding:15px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div><div style="font-weight:700;font-size:15px;"><i class="fa-solid fa-images" style="color:var(--pur);margin-right:7px;"></i>Bulk Receipt Upload</div><div id="bulkEmpName" style="font-size:11px;color:var(--txtm);margin-top:2px;"></div></div>
+      <button onclick="closeBulkUpload()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--txtm);padding:4px;line-height:1;"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="bulkDrop" style="margin:14px;border:2px dashed var(--bdr);border-radius:10px;padding:22px;text-align:center;cursor:pointer;background:var(--card2);flex-shrink:0;" onclick="document.getElementById('bulkFileInp').click()" ondragover="event.preventDefault();this.style.borderColor='var(--acc)'" ondragleave="this.style.borderColor='var(--bdr)'" ondrop="event.preventDefault();this.style.borderColor='var(--bdr)';handleBulkDrop(event)">
+      <i class="fa-solid fa-cloud-arrow-up" style="font-size:26px;color:var(--txtm);margin-bottom:7px;display:block;"></i>
+      <div style="font-size:13px;font-weight:700;margin-bottom:3px;">Drop receipt photos / PDFs here</div>
+      <div style="font-size:11px;color:var(--txtm);">or click to select · multiple files allowed · JPG PNG PDF</div>
+      <input type="file" id="bulkFileInp" accept="image/*,.pdf" multiple style="display:none;" onchange="handleBulkFileInput(this)">
+    </div>
+    <div id="bulkList" style="flex:1;overflow-y:auto;padding:0 14px 14px;min-height:0;"></div>
+    <div style="padding:11px 14px;border-top:1px solid var(--bdr);display:flex;gap:8px;align-items:center;flex-shrink:0;">
+      <span id="bulkProg" style="font-size:12px;color:var(--txtm);flex:1;"></span>
+      <button class="btn btn-o btn-sm" id="bulkCloseBtn" onclick="closeBulkUpload()">Cancel</button>
+      <button class="btn btn-p btn-sm" id="bulkStartBtn" onclick="startBulkProcess()" disabled><i class="fa-solid fa-wand-magic-sparkles"></i>Scan &amp; Add All</button>
     </div>
   </div>
 </div>
