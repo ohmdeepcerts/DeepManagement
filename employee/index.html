@@ -1562,6 +1562,7 @@ function setSyncUI(state){
 
 async function silentSync(){
   if(!emp)return;
+  if(_aiScanRunning)return; // don't re-render while receipt is being scanned
   if(!navigator.onLine){setSyncUI('offline');return;}
   setSyncUI('syncing');
   try{
@@ -2313,6 +2314,7 @@ function hideExpAC(){
   if(ac)ac.style.display='none';
 }
 let _rcptFile=null;
+let _aiScanRunning=false; // true while Gemini scan is in progress — blocks silent sync re-renders
 
 // ── RECEIPT PASTE (clipboard) ──────────────────────────────────
 
@@ -2330,6 +2332,7 @@ async function scanReceiptWithAI(target){
   const st=document.getElementById(isEd?'edGeminiScanStatus':'geminiScanStatus');
   if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Scanning...';}
   if(st){st.style.display='block';st.textContent='Reading receipt...';}
+  _aiScanRunning=true;
   try{
     // Build the image parts for Gemini. For a PDF, convert up to 4 pages in memory —
     // the ORIGINAL PDF is untouched and is still what gets uploaded; these JPEGs
@@ -2486,6 +2489,7 @@ async function scanReceiptWithAI(target){
       toast('Scan failed — check your connection and try again, or fill in manually','e');
     }
   } finally {
+    _aiScanRunning=false;
     if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt';}
   }
 }
@@ -2863,7 +2867,13 @@ async function _doSubmitExpense(merchant,amt,date){
     const vcb=document.getElementById('expVAT');if(vcb)vcb.checked=false;
     const vvis=document.getElementById('vatToggleVis');if(vvis)vvis.style.background='var(--bdr)';
     const vknob=document.getElementById('vatToggleKnob');if(vknob)vknob.style.transform='translateX(0)';
-    toast('Expense added!','s');renderExpenses();
+    // Navigate the expense list to show the month of the submitted expense,
+    // so the new entry is always visible regardless of what date AI filled in.
+    const _subD=new Date(date+'T00:00:00');
+    expM=_subD.getMonth();expY=_subD.getFullYear();
+    const _mn=MONTHS[expM].slice(0,3)+' '+expY;
+    document.querySelectorAll('#expTabs .mtab').forEach(t=>{t.classList.toggle('on',t.textContent===_mn);});
+    toast('Expense added!','s');renderExpenses();scrollMonthTabIntoView('expTabs');
     // Save merchant→category mapping for future auto-fill (shared across all employees)
     if(merchant && _submittedCat){
       const cat=_submittedCat;
