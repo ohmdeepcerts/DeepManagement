@@ -10160,7 +10160,7 @@ async function vehSaveModal(){
     tax_expiry:document.getElementById('vTax').value||null,
     insurance_expiry:document.getElementById('vIns').value||null,
     insured_persons:(document.getElementById('vInsPersons').value||'').trim()||null,
-    assigned_employee_ids:Array.from(document.querySelectorAll('#vAssignedEmpList input[type="checkbox"]:checked')).map(c=>parseInt(c.value)).filter(Boolean),
+    assigned_employee_ids:Array.from(document.querySelectorAll('#vAssignedEmpList input[type="checkbox"]:checked')).map(c=>c.value).filter(Boolean),
     notes:(document.getElementById('vNotes').value||'').trim()||null,
   };
   const btn=document.querySelector('#vehModal .btn-p');
