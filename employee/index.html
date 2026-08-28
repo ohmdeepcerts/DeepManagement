@@ -627,6 +627,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
       <div onclick="openChangePhoto();togglePillMenu()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-image" style="width:16px;color:var(--txtm);"></i>Change Photo</div>
       <div onclick="openChangePin()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-key" style="width:16px;color:var(--txtm);"></i>Change PIN</div>
       <div onclick="sessionStorage.removeItem('dam_page_sig');location.reload();" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-arrows-rotate" style="width:16px;color:var(--txtm);"></i>Reload App</div>
+      <div onclick="showPg('msg');togglePillMenu()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-comments" style="width:16px;color:var(--txtm);"></i>Messages<span id="msgDropBadge" style="display:none;margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--red)"></span></div>
       <div onclick="openNotifSettings();togglePillMenu()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-bell" style="width:16px;color:var(--txtm);"></i>Notifications<span id="notifStatusDot" style="margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--txtm);"></span></div>
       <div onclick="toggleTheme()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;border-bottom:0.5px solid var(--bdr);" onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''"><i class="fa-solid fa-circle-half-stroke" style="width:16px;color:var(--txtm);"></i>Toggle Theme</div>
       <div onclick="confirmLogout()" style="display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--red);cursor:pointer;" onmouseover="this.style.background='var(--redl)'" onmouseout="this.style.background=''"><i class="fa-solid fa-right-from-bracket" style="width:16px;"></i>Sign Out</div>
@@ -922,6 +923,12 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
       </div>
     </div>
 
+    <!-- MY VEHICLE -->
+    <div class="pg" id="pg-veh">
+      <div class="sec">My Assigned Vehicle</div>
+      <div id="myVehContent"></div>
+    </div>
+
   </div><!-- end content -->
 
   <!-- BOTTOM NAV -->
@@ -933,10 +940,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
       <span class="badge" id="expBadge" style="display:none;"></span>
     </button>
     <button class="nb" id="nb-pay" onclick="showPg('pay')"><i class="fa-solid fa-sterling-sign"></i>Pay</button>
-    <button class="nb" id="nb-msg" onclick="showPg('msg')">
-      <i class="fa-solid fa-comments"></i>Messages
-      <span class="badge" id="msgBadge" style="display:none;"></span>
-    </button>
+    <button class="nb" id="nb-veh" onclick="showPg('veh')" style="display:none"><i class="fa-solid fa-car-side"></i>My Vehicle</button>
   </div>
 </div>
 
@@ -1461,6 +1465,7 @@ async function enterApp(e){
   buildTabs();
   populateCats();
   renderHome();
+  loadMyVehicle();
   startRealtime();
   loadAnnouncements();
   setSyncUI('live');
@@ -1589,21 +1594,28 @@ async function silentSync(){
   // Sync only current month + previous month — initial load at session start covers full history.
   const _syncFrom=new Date();_syncFrom.setDate(1);_syncFrom.setMonth(_syncFrom.getMonth()-1);
   const syncCutoff=_syncFrom.toISOString().slice(0,10);
-  const [attR,expR,msgR,batR,payStR,attReqR2,prSumR2]=await Promise.all([
+  const [attR,expR,msgR,batR,payStR,attReqR2,prSumR2,vehR]=await Promise.all([
     sb.from('attendance').select('*').eq('employee_id',emp.id).gte('date',syncCutoff).order('date',{ascending:false}).limit(500),
     sb.from('expenses').select('*').eq('employee_id',emp.id).gte('date',syncCutoff).order('date',{ascending:false}).limit(500),
     sb.from('messages').select('*').eq('employee_id',emp.id).order('created_at'),
     sb.from('expense_batches').select('*').eq('employee_id',emp.id).order('submitted_at',{ascending:false}).limit(200),
     sb.from('payment_status').select('*').eq('employee_id',emp.id),
     sb.from('attendance_requests').select('*').eq('employee_id',emp.id).gte('date',syncCutoff).order('date',{ascending:false}).limit(200),
-    sb.from('payroll_summary').select('*').eq('employee_id',emp.id)
+    sb.from('payroll_summary').select('*').eq('employee_id',emp.id),
+    sb.from('vehicles').select('*').contains('assigned_employee_ids',[emp.id])
   ]);
   const hadNewMsg=myMsgs.length<(msgR.data||[]).length;
+  const prevBatches=[...myBatches];
+  const prevPaySt=[...myPaySt];
   myAtt=attR.data||[];myExp=expR.data||[];myMsgs=msgR.data||[];
   myBatches=batR.error?myBatches:batR.data||[];
   myPaySt=payStR.error?myPaySt:payStR.data||[];
   myAttReqs=attReqR2.error?myAttReqs:attReqR2.data||[];
   myPayroll=prSumR2.error?myPayroll:prSumR2.data||[];
+  if(!vehR.error){_myVehicles=vehR.data||[];const btn=document.getElementById('nb-veh');if(btn)btn.style.display=_myVehicles.length?'':'none';}
+  // Missed-event recovery: detect state changes realtime may have missed
+  myBatches.forEach(nb=>{const ob=prevBatches.find(b=>b.id===nb.id);if(ob&&ob.status!==nb.status){if(nb.status==='approved')sysNotify('Expenses approved ✅','Your expense submission has been approved');else if(nb.status==='rejected')sysNotify('Expenses rejected','Contact the office for details');}});
+  myPaySt.forEach(np=>{const op=prevPaySt.find(p=>p.id===np.id);if(op&&((!op.bank_paid&&np.bank_paid)||(!op.cash_paid&&np.cash_paid)))sysNotify('Payment confirmed 💷',np.bank_paid?'Payment sent to your bank':'Cash payment recorded');});
   updateBadges();
   setSyncUI('live');
   // Refresh current page silently
@@ -1622,6 +1634,7 @@ async function silentSync(){
     else if(cur==='pay')renderPay();
     else if(cur==='exp')renderExpenses();
     else if(cur==='msg'&&hadNewMsg)renderMsgs();
+    else if(cur==='veh')renderMyVehicle();
     // Restore scroll position after render
     if(contentEl&&savedScroll>0)requestAnimationFrame(()=>{contentEl.scrollTop=savedScroll;});
   }
@@ -1668,7 +1681,7 @@ function sysNotify(title,body){
     if(Notification.permission!=='granted')return;
     if(!document.hidden)return; // app visible — the in-app popup covers it
     new Notification(title,{body:body||'',icon:'icon-192.png',badge:'icon-192.png',tag:'ohm-'+title});
-  }catch(e){/* some webviews lack Notification — fine, popups still work */}
+  }catch(e){console.warn('sysNotify failed:',e?.message||e);}
 }
 function requestNotifPermission(){
   try{
@@ -1788,10 +1801,15 @@ function startRealtime(){
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'payment_status',filter:`employee_id=eq.${emp.id}`},payload=>{
       const idx=myPaySt.findIndex(p=>p.id===payload.new.id);
+      const old=idx>=0?myPaySt[idx]:null;
       if(idx>=0)myPaySt[idx]=payload.new;else myPaySt.push(payload.new);
       updateBadges();
       const n=payload.new;
-      if(n.bank_paid||n.cash_paid){showPopupNotif(`<i class="fa-solid fa-sterling-sign" style="margin-right:5px;"></i>${n.bank_paid?'Bank transfer':''} ${n.cash_paid?'Cash payment':''} confirmed`);}
+      const newlyPaid=(!old?.bank_paid&&n.bank_paid)||(!old?.cash_paid&&n.cash_paid);
+      if(newlyPaid){
+        sysNotify('Payment confirmed 💷',n.bank_paid?'Payment sent to your bank':'Cash payment recorded');
+        showPopupNotif(`<i class="fa-solid fa-sterling-sign" style="margin-right:5px;"></i>${n.bank_paid?'Bank transfer':n.cash_paid?'Cash payment':''} confirmed`,'payment');
+      }
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'attendance_requests',filter:`employee_id=eq.${emp.id}`},payload=>{
       const idx=myAttReqs.findIndex(r=>r.id===payload.new.id);
@@ -1821,6 +1839,18 @@ function startRealtime(){
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'announcements'},payload=>{
       const idx=myAnns.findIndex(a=>a.id===payload.new.id);
+      const wasActive=idx>=0?myAnns[idx].active:false;
+      if(idx>=0)myAnns[idx]=payload.new;
+      renderAnnBanners();
+      if(!wasActive&&payload.new.active){
+        if(idx<0)myAnns.unshift(payload.new);
+        sysNotify(payload.new.important?'⚠️ '+payload.new.title:'📢 '+payload.new.title,(payload.new.body||'').slice(0,80));
+        showPopupNotif('<i class="fa-solid fa-bullhorn" style="margin-right:5px;"></i>New announcement: '+eH(payload.new.title));
+        if(payload.new.important)showImportantAnnPopup();
+      }
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'announcements'},payload=>{
+      const idx=myAnns.findIndex(a=>a.id===payload.new.id);
       if(payload.new.active){if(idx>=0)myAnns[idx]=payload.new;else myAnns.unshift(payload.new);}
       else if(idx>=0)myAnns.splice(idx,1);
       renderAnnBanners();
@@ -1841,12 +1871,69 @@ function showPopupNotif(msg){
 
 function updateBadges(){
   const unreadMsgs=myMsgs.filter(m=>!m.read&&m.sender==='office').length;
-  const mb=document.getElementById('msgBadge');if(mb){mb.textContent=unreadMsgs;mb.style.display=unreadMsgs>0?'':'none';}
+  const mb=document.getElementById('msgDropBadge');if(mb)mb.style.display=unreadMsgs>0?'':'none';
   const pendingExp=myExp.filter(e=>e.status==='pending').length;
   const eb=document.getElementById('expBadge');if(eb){eb.textContent=pendingExp>0?pendingExp:'';eb.style.display=pendingExp>0?'':'none';}
 }
 
 // ── NAVIGATION ──
+let _myVehicles=[];
+async function loadMyVehicle(){
+  if(!emp)return;
+  const{data}=await sb.from('vehicles').select('*').contains('assigned_employee_ids',[emp.id]);
+  _myVehicles=data||[];
+  const btn=document.getElementById('nb-veh');
+  if(btn)btn.style.display=_myVehicles.length?'':'none';
+}
+function renderMyVehicle(){
+  const el=document.getElementById('myVehContent');
+  if(!el)return;
+  if(!_myVehicles.length){el.innerHTML='<div style="text-align:center;padding:40px 20px;color:var(--txtm)"><i class="fa-solid fa-car-side" style="font-size:32px;display:block;margin-bottom:12px;opacity:.4"></i>No vehicle assigned</div>';return;}
+  const today=new Date();today.setHours(0,0,0,0);
+  function days(ds){if(!ds)return null;const d=new Date(ds);d.setHours(0,0,0,0);return Math.floor((d-today)/86400000);}
+  function complianceBadge(ds,label,icon){
+    const d=days(ds);
+    let col,bg,txt;
+    if(d===null){col='#64748b';bg='rgba(100,116,139,0.1)';txt='Not set';}
+    else if(d<0){col='#dc2626';bg='rgba(220,38,38,0.1)';txt=`Expired`;}
+    else if(d<=30){col='#d97706';bg='rgba(217,119,6,0.1)';txt=`${d}d`;}
+    else{col='#16a34a';bg='rgba(22,163,74,0.1)';txt=`${d}d`;}
+    const expStr=ds?new Date(ds).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}):'—';
+    return`<div style="flex:1;min-width:0;background:${bg};border:1px solid ${col}33;border-radius:10px;padding:10px 12px;text-align:center">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:${col};letter-spacing:.05em;margin-bottom:2px"><i class="fa-solid ${icon}" style="margin-right:3px"></i>${label}</div>
+      <div style="font-size:11px;font-weight:700;color:${col}">${txt}</div>
+      <div style="font-size:10px;color:${col};opacity:.8;margin-top:1px">${expStr}</div>
+    </div>`;
+  }
+  el.innerHTML=_myVehicles.map(v=>`
+    <div class="card" style="margin-bottom:14px;overflow:hidden">
+      <div style="background:var(--card2);border-bottom:1px solid var(--bdr);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div>
+          <div style="font-size:19px;font-weight:900;letter-spacing:2.5px;font-family:monospace;color:var(--txt)">${v.reg}</div>
+          <div style="font-size:13px;color:var(--txtm);margin-top:3px">${[v.year,v.make,v.model,v.colour].filter(Boolean).join(' ')||'—'}</div>
+        </div>
+      </div>
+      <div style="padding:12px 14px">
+        <div style="display:flex;gap:8px;margin-bottom:${v.insured_persons||v.notes?'12px':'0'}">
+          ${complianceBadge(v.mot_expiry,'MOT','screwdriver-wrench')}
+          ${complianceBadge(v.tax_expiry,'Road Tax','road')}
+          ${complianceBadge(v.insurance_expiry,'Insurance','shield-halved')}
+        </div>
+        ${v.insured_persons?`<div style="font-size:12px;color:var(--txtm);padding-top:10px;border-top:1px solid var(--bdr)"><i class="fa-solid fa-user" style="margin-right:5px;font-size:10px"></i><strong style="color:var(--txt)">Insured:</strong> ${v.insured_persons}</div>`:''}
+        ${v.notes?`<div style="font-size:12px;color:var(--txtm);margin-top:7px;${!v.insured_persons?'padding-top:10px;border-top:1px solid var(--bdr)':''}"><i class="fa-solid fa-note-sticky" style="margin-right:5px;font-size:10px"></i>${v.notes}</div>`:''}
+      </div>
+    </div>`).join('');
+}
+function msgDisabled(){
+  const existing=document.getElementById('msgDisabledBanner');
+  if(existing){existing.remove();return;}
+  const el=document.createElement('div');
+  el.id='msgDisabledBanner';
+  el.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;padding:14px 18px;border-radius:12px;font-size:13px;line-height:1.5;max-width:300px;text-align:center;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1)';
+  el.innerHTML='<div style="font-size:15px;margin-bottom:4px">🔧 Something is cooking!</div><div style="color:#94a3b8">Messages are temporarily off. Please message the office directly on <strong style="color:#f1f5f9">WhatsApp</strong> for now.</div>';
+  document.body.appendChild(el);
+  setTimeout(()=>{if(el.parentNode){el.style.opacity='0';el.style.transition='opacity .4s';setTimeout(()=>el.remove(),400);}},5000);
+}
 function showPg(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
@@ -1857,6 +1944,7 @@ function showPg(id){
   else if(id==='exp'){renderExpenses();scrollMonthTabIntoView('expTabs');}
   else if(id==='pay'){renderPay();scrollMonthTabIntoView('payTabs');}
   else if(id==='msg')renderMsgs();
+  else if(id==='veh')renderMyVehicle();
 }
 // buildTabs() runs once at login, while these pages are still display:none —
 // scrollIntoView is a no-op on a hidden element, so that scroll never actually
