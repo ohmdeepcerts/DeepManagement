@@ -10165,13 +10165,14 @@ async function vehSaveModal(){
   };
   const btn=document.querySelector('#vehModal .btn-p');
   if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Saving…';}
-  let error;
-  if(_vehEditId){({error}=await sb.from('vehicles').update(payload).eq('id',_vehEditId));}
-  else{({error}=await sb.from('vehicles').insert(payload));}
+  let error,saved;
+  if(_vehEditId){({error,data:saved}=await sb.from('vehicles').update(payload).eq('id',_vehEditId).select().single());}
+  else{({error,data:saved}=await sb.from('vehicles').insert(payload).select().single());}
   if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-floppy-disk"></i> Save';}
   if(error){toast('Save failed: '+error.message,'e');return;}
   closeVehModal();
-  toast(_vehEditId?'Vehicle updated':'Vehicle added','s');
+  const assignedCount=(saved?.assigned_employee_ids||[]).length;
+  toast((_vehEditId?'Vehicle updated':'Vehicle added')+(assignedCount?' — '+assignedCount+' assigned':''),'s');
   renderVehicles();
 }
 async function vehDeleteConfirm(){
