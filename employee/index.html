@@ -961,7 +961,34 @@ const CONFIG_APP = {
   PIN_LENGTH:          4,   // PIN digits
 };
 
-const sb=supabase.createClient('https://pajpoerteyjrprcaisom.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhanBvZXJ0ZXlqcnByY2Fpc29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI4NDEsImV4cCI6MjA5NjQ4ODg0MX0.zUzCg-bq_9ZxYWSmk-Y9a_QqAe0t-45tjHP5Eiyxjcc',{auth:{persistSession:true,autoRefreshToken:true}});
+const _SB_URL='https://pajpoerteyjrprcaisom.supabase.co';
+const _SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhanBvZXJ0ZXlqcnByY2Fpc29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI4NDEsImV4cCI6MjA5NjQ4ODg0MX0.zUzCg-bq_9ZxYWSmk-Y9a_QqAe0t-45tjHP5Eiyxjcc';
+const sb=supabase.createClient(_SB_URL,_SB_ANON,{auth:{persistSession:true,autoRefreshToken:true}});
+// Web Push — VAPID public key (private key lives in Supabase Edge Function secrets only)
+const _VAPID_PUB='BOljcP9J1CV8sjWGJ8C8QJ8E-GbgtBwy8wWGjm-DyePQSWamoCf4PdJlQz1ZIQ3hLU79FpjeKs-HL2IgWbQ2h3o';
+async function _swGetSub(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return null;
+  try{
+    const reg=await navigator.serviceWorker.register('./sw.js');
+    await reg.update();
+    const ex=await reg.pushManager.getSubscription();
+    if(ex)return ex;
+    return await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:_VAPID_PUB});
+  }catch(e){console.warn('SW subscribe:',e);return null;}
+}
+async function _savePushSub(sub,empId){
+  if(!sub||!empId)return;
+  const j=sub.toJSON();
+  await sb.from('push_subscriptions').upsert({employee_id:empId,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth},{onConflict:'employee_id,endpoint'});
+}
+async function subscribeToPush(){
+  if(!('Notification' in window))return;
+  const perm=await Notification.requestPermission();
+  if(perm!=='granted')return;
+  const sub=await _swGetSub();
+  if(sub&&emp?.id)await _savePushSub(sub,emp.id);
+  updateNotifStatusDot();
+}
 // Portal credentials — shared auth account for employee app
 const PORTAL_EMAIL='employee@app.com';
 const PORTAL_PASS='888888';
@@ -1094,16 +1121,19 @@ function openNotifSettings(){
   overlay.querySelector('#notifCloseBtn').onclick=()=>overlay.remove();
   const enableBtn=overlay.querySelector('#notifEnableBtn');
   if(enableBtn)enableBtn.onclick=async()=>{
-    const result=await Notification.requestPermission();
     overlay.remove();
-    updateNotifStatusDot();
+    await subscribeToPush();
+    openNotifSettings();
     if(result==='granted'){toast('Notifications turned on ✅','s');try{new Notification('OHM Attendance',{body:'Notifications are working! 🎉'});}catch(e){}}
     else if(result==='denied')openNotifSettings(); // show the unblock steps straight away
   };
   const testBtn=overlay.querySelector('#notifTestBtn');
-  if(testBtn)testBtn.onclick=()=>{
-    try{new Notification('OHM Attendance',{body:'Test notification — everything\'s working! 🎉'});toast('Test sent — check your notification tray','s');}
-    catch(e){toast('Could not send — try reloading the app','e');}
+  if(testBtn)testBtn.onclick=async()=>{
+    try{
+      const reg=await navigator.serviceWorker.ready;
+      await reg.showNotification('OHM Employee Portal',{body:"Test notification — everything's working! 🎉",icon:'./logo-192.png',badge:'./logo-192.png',tag:'test',vibrate:[200,100,200]});
+      toast('Test notification sent — check your tray','s');
+    }catch(e){toast('Could not send — try reloading the app','e');}
   };
 }
 async function checkForUpdateAndReload(isFirstCheck){
@@ -1685,12 +1715,10 @@ function sysNotify(title,body){
   }catch(e){console.warn('sysNotify failed:',e?.message||e);}
 }
 function requestNotifPermission(){
-  try{
-    if(!('Notification' in window))return;
-    if(Notification.permission!=='default')return; // already granted or denied
-    // Ask gently, a few seconds after login rather than the instant they land
-    setTimeout(()=>{Notification.requestPermission();},4000);
-  }catch(e){}
+  // SW registered silently here so it's ready before permission is granted.
+  // Actual permission + push subscription happens only from the explicit
+  // "Turn on notifications" button — never auto-requested.
+  if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
 // ═══════════════════════════════════════════════════
 // ANNOUNCEMENTS — office notices on Home. Normal ones show as a slim
