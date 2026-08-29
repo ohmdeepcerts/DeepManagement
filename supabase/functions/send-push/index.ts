@@ -2,9 +2,9 @@
 // Called by Supabase Database Webhooks when records change in:
 //   messages, expense_batches, payment_status, attendance_requests, announcements
 //
-// Required Supabase secrets (set via Dashboard → Settings → Edge Functions → Secrets):
-//   VAPID_PRIVATE_KEY = K4Kl7gDx7Eepz5sEFLGTpsk7jgksygdFEd-sWKvQhkg
-//   (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically)
+// Required Supabase secrets (set via Dashboard → Project Settings → Edge Functions → Secrets):
+//   VAPID_PRIVATE_KEY  — the private VAPID key (keep this secret, never commit the value)
+//   SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase
 
 import webpush from 'npm:web-push';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
