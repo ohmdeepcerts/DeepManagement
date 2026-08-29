@@ -10031,8 +10031,8 @@ function vehType(make,model){
 }
 // ─── Vehicle artwork (Wikipedia thumbnails, cached 7 days) ───
 const _vehArtCache={};
-const _VEH_COLOR_TINT={red:'rgba(180,20,20,.3)',orange:'rgba(200,90,0,.26)',yellow:'rgba(200,160,0,.24)',green:'rgba(10,120,40,.3)',blue:'rgba(10,50,180,.3)',purple:'rgba(90,20,150,.26)',pink:'rgba(190,50,110,.24)',brown:'rgba(80,45,10,.26)',black:'rgba(0,0,0,.48)',white:'rgba(230,230,230,.28)',silver:'rgba(150,160,170,.22)',grey:'rgba(110,110,120,.24)',gray:'rgba(110,110,120,.24)',navy:'rgba(10,20,100,.32)',champagne:'rgba(200,175,120,.22)',gold:'rgba(200,160,30,.26)',burgundy:'rgba(120,20,40,.32)',maroon:'rgba(100,15,30,.32)',bronze:'rgba(160,90,40,.26)',cream:'rgba(220,200,150,.22)',beige:'rgba(200,180,140,.22)'};
-function _vehColorTint(col){if(!col)return null;const c=col.toLowerCase().trim();for(const[k,v] of Object.entries(_VEH_COLOR_TINT))if(c.includes(k))return v;return null;}
+const _VEH_COLOR_FILTER={red:'sepia(.6) hue-rotate(-10deg) saturate(3.5) brightness(.85)',orange:'sepia(.5) hue-rotate(18deg) saturate(3) brightness(.9)',yellow:'sepia(.5) hue-rotate(28deg) saturate(2.5) brightness(1.05)',green:'sepia(.5) hue-rotate(92deg) saturate(3) brightness(.85)',blue:'sepia(.55) hue-rotate(195deg) saturate(3.5) brightness(.82)',purple:'sepia(.5) hue-rotate(242deg) saturate(2.5) brightness(.78)',pink:'sepia(.4) hue-rotate(302deg) saturate(2) brightness(.95)',brown:'sepia(.75) hue-rotate(5deg) saturate(1.5) brightness(.78)',black:'brightness(.18) contrast(1.4)',white:'brightness(2.2) saturate(.1)',silver:'brightness(1.15) saturate(.22)',grey:'brightness(.82) saturate(.2)',gray:'brightness(.82) saturate(.2)',navy:'sepia(.5) hue-rotate(212deg) saturate(3.5) brightness(.68)',champagne:'sepia(.55) hue-rotate(8deg) saturate(1.2) brightness(1.1)',gold:'sepia(.6) hue-rotate(12deg) saturate(2.8) brightness(.95)',burgundy:'sepia(.65) hue-rotate(-18deg) saturate(2.8) brightness(.72)',maroon:'sepia(.65) hue-rotate(-18deg) saturate(2.5) brightness(.68)',bronze:'sepia(.7) hue-rotate(8deg) saturate(2) brightness(.82)',cream:'sepia(.35) hue-rotate(5deg) saturate(1) brightness(1.15)',beige:'sepia(.4) hue-rotate(5deg) saturate(1.1) brightness(1.08)'};
+function _vehColorFilter(col){if(!col)return null;const c=col.toLowerCase().trim();for(const[k,v] of Object.entries(_VEH_COLOR_FILTER))if(c.includes(k))return v;return null;}
 const _VEH_MAKE_NORM={'vw':'Volkswagen','volkswagen':'Volkswagen','mercedes':'Mercedes-Benz','mercedes-benz':'Mercedes-Benz','bmw':'BMW','land rover':'Land_Rover','range rover':'Range_Rover','vauxhall':'Vauxhall','peugeot':'Peugeot','renault':'Renault','citroen':'Citroën','nissan':'Nissan','honda':'Honda','toyota':'Toyota','ford':'Ford','mitsubishi':'Mitsubishi','hyundai':'Hyundai','kia':'Kia','audi':'Audi','skoda':'Škoda','seat':'SEAT','volvo':'Volvo','tesla':'Tesla'};
 async function _fetchVehArt(make,model){
   const raw=(make+'_'+model).toLowerCase();
@@ -10048,7 +10048,8 @@ async function _fetchVehArt(make,model){
       const d=await r.json();
       const pg=Object.values(d?.query?.pages||{})[0];
       const url=pg?.thumbnail?.source||null;
-      if(url&&!url.includes('question_mark')&&!url.includes('commons-logo')){
+      const bad=/question_mark|commons-logo|interior|dashboard|cabin|cockpit|seat|steering|engine|tyre|wheel_arch/i;
+      if(url&&!bad.test(url)){
         _vehArtCache[key]=url;
         try{localStorage.setItem('vart_'+key,JSON.stringify({u:url,t:Date.now()}));}catch(e){}
         return url;
@@ -10064,8 +10065,9 @@ async function _loadVehArtwork(cars){
     if(!url)continue;
     const el=document.querySelector(`[data-veh-art="${c.id}"]`);
     if(el){
-      const tint=_vehColorTint(c.colour);
-      el.style.backgroundImage=tint?`linear-gradient(${tint},${tint}),url('${url}')`:`url('${url}')`;
+      el.style.backgroundImage=`url('${url}')`;
+      const cf=_vehColorFilter(c.colour);
+      el.style.filter=cf||'';
       el.style.opacity='1';
     }
   }
