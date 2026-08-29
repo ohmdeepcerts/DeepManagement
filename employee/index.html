@@ -1881,13 +1881,15 @@ async function loadMyVehicle(){
   if(btn)btn.style.display=_myVehicles.length?'':'none';
 }
 const _empVehArtCache={};
+const _EMP_COLOR_TINT={red:'rgba(180,20,20,.3)',orange:'rgba(200,90,0,.26)',yellow:'rgba(200,160,0,.24)',green:'rgba(10,120,40,.3)',blue:'rgba(10,50,180,.3)',purple:'rgba(90,20,150,.26)',pink:'rgba(190,50,110,.24)',brown:'rgba(80,45,10,.26)',black:'rgba(0,0,0,.48)',white:'rgba(230,230,230,.28)',silver:'rgba(150,160,170,.22)',grey:'rgba(110,110,120,.24)',gray:'rgba(110,110,120,.24)',navy:'rgba(10,20,100,.32)',champagne:'rgba(200,175,120,.22)',gold:'rgba(200,160,30,.26)',burgundy:'rgba(120,20,40,.32)',maroon:'rgba(100,15,30,.32)',bronze:'rgba(160,90,40,.26)',cream:'rgba(220,200,150,.22)',beige:'rgba(200,180,140,.22)'};
+function _empColorTint(col){if(!col)return null;const c=col.toLowerCase().trim();for(const[k,v] of Object.entries(_EMP_COLOR_TINT))if(c.includes(k))return v;return null;}
 async function _loadEmpVehArtwork(vehicles){
   for(const v of vehicles){
     if(!v.make||!v.model)continue;
     const key=(v.make+'_'+v.model).toLowerCase().replace(/[^a-z0-9]+/g,'_');
     let url=_empVehArtCache[key];
     if(url===undefined){
-      try{const s=JSON.parse(localStorage.getItem('vart_'+key)||'null');if(s&&Date.now()-s.t<86400000*7){url=s.u;}}catch(e){}
+      try{const s=JSON.parse(localStorage.getItem('vart_'+key)||'null');if(s&&s.u&&Date.now()-s.t<86400000*7){url=s.u;}}catch(e){}
       if(url===undefined){
         try{
           const normMake=v.make.replace(/\s+/g,'_');const normModel=v.model.replace(/\s+/g,'_');
@@ -1896,14 +1898,18 @@ async function _loadEmpVehArtwork(vehicles){
           const pg=Object.values(d?.query?.pages||{})[0];
           url=pg?.thumbnail?.source||null;
           if(url&&(url.includes('question_mark')||url.includes('commons-logo')))url=null;
-          try{localStorage.setItem('vart_'+key,JSON.stringify({u:url,t:Date.now()}));}catch(e){}
+          if(url)try{localStorage.setItem('vart_'+key,JSON.stringify({u:url,t:Date.now()}));}catch(e){}
         }catch(e){url=null;}
       }
-      _empVehArtCache[key]=url;
+      if(url)_empVehArtCache[key]=url;
     }
     if(!url)continue;
     const el=document.querySelector(`[data-emp-veh-art="${v.id}"]`);
-    if(el){el.style.backgroundImage=`url('${url}')`;el.style.opacity='1';}
+    if(el){
+      const tint=_empColorTint(v.colour);
+      el.style.backgroundImage=tint?`linear-gradient(${tint},${tint}),url('${url}')`:`url('${url}')`;
+      el.style.opacity='1';
+    }
   }
 }
 function renderMyVehicle(){
