@@ -10255,12 +10255,12 @@ async function vehLoadDocs(vehicleId){
     const icon=isPdf?'fa-file-pdf':isImg?'fa-file-image':['doc','docx'].includes(ext)?'fa-file-word':['xls','xlsx'].includes(ext)?'fa-file-excel':'fa-file';
     const iconCol=isPdf?'#e53e3e':isImg?'#3182ce':['doc','docx'].includes(ext)?'#2b6cb0':['xls','xlsx'].includes(ext)?'#276749':'var(--acc)';
     const sz=f.metadata?.size?(f.metadata.size>1048576?(f.metadata.size/1048576).toFixed(1)+'MB':(f.metadata.size/1024).toFixed(0)+'KB'):'';
-    // Parse new filename format: type~expiry~timestamp~originalname
-    const parts=f.name.split('~');
+    // Parse filename format: type--expiry--timestamp--originalname
+    const parts=f.name.split('--');
     const hasPrefix=parts.length>=4&&Object.keys(VDT_LABELS).includes(parts[0]);
     const docType=hasPrefix?(VDT_LABELS[parts[0]]||parts[0]):'';
     const expiry=hasPrefix&&parts[1]!=='none'?parts[1]:'';
-    const rawName=hasPrefix?parts.slice(3).join('~'):f.name;
+    const rawName=hasPrefix?parts.slice(3).join('--'):f.name;
     const displayName=rawName.replace(/^\d+_/,'');
     const canPreview=isPdf||isImg;
     return`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bdr)">
@@ -10300,8 +10300,8 @@ async function vehDocFormSubmit(){
   if(uplBtn){uplBtn.style.pointerEvents='none';uplBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Uploading…';}
   let ok=0,fail=0,failMsg='';
   for(const file of _vehPendingFiles){
-    const safeName=file.name.replace(/[~\s]/g,'_');
-    const path=`vehicles/${_vehEditId}/${type}~${expiry}~${Date.now()}~${safeName}`;
+    const safeName=file.name.replace(/[^a-zA-Z0-9.\-_]/g,'_');
+    const path=`vehicles/${_vehEditId}/${type}--${expiry}--${Date.now()}--${safeName}`;
     const{error}=await sb.storage.from('vehicle-docs').upload(path,file,{upsert:false,contentType:file.type||'application/octet-stream'});
     if(error){fail++;failMsg=error.message;}else ok++;
   }
