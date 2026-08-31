@@ -1976,7 +1976,6 @@ function renderMyVehicle(){
   }
   el.innerHTML=_myVehicles.map(v=>`
     <div class="card" style="margin-bottom:16px;overflow:hidden;position:relative">
-      <div data-emp-veh-art="${v.id}" style="position:absolute;top:0;right:0;bottom:0;left:0;background-size:auto 92%;background-position:right center;background-repeat:no-repeat;opacity:0;transition:opacity .7s ease;pointer-events:none;-webkit-mask-image:linear-gradient(to right,transparent 0%,rgba(0,0,0,.2) 28%,rgba(0,0,0,.65) 58%,rgba(0,0,0,.82) 100%);mask-image:linear-gradient(to right,transparent 0%,rgba(0,0,0,.2) 28%,rgba(0,0,0,.65) 58%,rgba(0,0,0,.82) 100%)"></div>
       <div style="background:linear-gradient(135deg,rgba(30,58,95,0.92) 0%,rgba(15,23,42,0.92) 100%);padding:16px;display:flex;align-items:center;gap:12px;position:relative">
         <div style="background:#fff;border-radius:5px;display:inline-flex;align-items:stretch;box-shadow:0 2px 10px rgba(0,0,0,.35);overflow:hidden;flex-shrink:0;position:relative">
           <div style="background:#003399;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3px 2px;gap:1px;overflow:hidden">
@@ -2000,7 +1999,6 @@ function renderMyVehicle(){
         ${v.notes?`<div style="font-size:12px;color:var(--txtm);padding:8px 10px;background:var(--card2);border-radius:8px;border:1px solid var(--bdr)"><i class="fa-solid fa-note-sticky" style="margin-right:6px;font-size:10px"></i>${v.notes}</div>`:''}
       </div>`:''}
     </div>`).join('');
-  setTimeout(()=>_loadEmpVehArtwork(_myVehicles),50);
 }
 function msgDisabled(){
   const existing=document.getElementById('msgDisabledBanner');
