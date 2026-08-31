@@ -979,7 +979,8 @@ async function _swGetSub(){
 async function _savePushSub(sub,empId){
   if(!sub||!empId)return;
   const j=sub.toJSON();
-  await sb.from('push_subscriptions').upsert({employee_id:empId,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth},{onConflict:'employee_id,endpoint'});
+  const{error}=await sb.from('push_subscriptions').upsert({employee_id:empId,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth},{onConflict:'employee_id,endpoint'});
+  if(error)console.error('push_subscriptions upsert failed:',JSON.stringify(error));
 }
 async function subscribeToPush(){
   if(!('Notification' in window))return;
@@ -1507,6 +1508,10 @@ async function enterApp(e){
   setInterval(checkForUpdateAndReload, 5*60000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkForUpdateAndReload();});
   checkForUpdateAndReload(true);
+  // Re-save push subscription on every login so the DB stays populated
+  if(typeof Notification!=='undefined'&&Notification.permission==='granted'){
+    _swGetSub().then(sub=>{if(sub)_savePushSub(sub,e.id);}).catch(()=>{});
+  }
 }
 function confirmLogout(){
   if(confirm('Sign out? You will need your PIN to sign back in.'))doLogout();
