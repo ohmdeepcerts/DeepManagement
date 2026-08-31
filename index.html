@@ -1391,6 +1391,17 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
           </div></div>
         </div>
         <div class="card" style="margin-bottom:14px;">
+          <div class="ch"><div><div class="ct"><i class="fa-solid fa-bell" style="color:var(--acc);margin-right:6px;"></i>Push Notification Reminder Days</div><div class="cs">Employees assigned to a vehicle get a push notification this many days before MOT, Road Tax &amp; Insurance expire</div></div></div>
+          <div class="cb">
+            <div class="fgl" style="margin-bottom:11px;">
+              <label>Days before expiry (comma-separated)</label>
+              <input type="text" id="sVehAlertDays" placeholder="30, 15, 5, 4, 2, 1" style="width:100%;padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;color:var(--txt);background:var(--card);font-family:inherit;outline:none;">
+            </div>
+            <button class="btn btn-p btn-sm" onclick="saveVehicleAlertDays()"><i class="fa-solid fa-floppy-disk"></i> Save Reminder Days</button>
+            <p style="font-size:12px;color:var(--txtm);margin-top:9px;line-height:1.6;">Default: <strong>30, 15, 5, 4, 2, 1</strong> — reminders at 5 days or fewer are marked urgent (⚠️). The <strong>vehicle-reminders</strong> Edge Function must be scheduled daily in Supabase Dashboard → Edge Functions.</p>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
           <div class="ch"><div><div class="ct"><i class="fa-solid fa-magnifying-glass" style="color:var(--grn);margin-right:6px;"></i>DVSA MOT History API</div><div class="cs">Auto-fill vehicle details (make, model, year, colour, MOT) by registration plate</div></div></div>
           <div class="cb">
             <div class="fg fg2">
@@ -7504,6 +7515,8 @@ function loadSettings(){
   document.getElementById('sDvsaClientId').value=cfg.dvsa_client_id||'';
   if(cfg.dvsa_client_secret)document.getElementById('sDvsaClientSecret').value='••••••••••••••••';
   if(cfg.dvsa_api_key)document.getElementById('sDvsaApiKey').value='••••••••••••••••';
+  const vad=document.getElementById('sVehAlertDays');
+  if(vad)vad.value=(cfg.vehicle_alert_days||[30,15,5,4,2,1]).join(', ');
   renderBankList();renderCatList();
 }
 async function saveResendSettings(){
@@ -7675,6 +7688,19 @@ function renderBankList(){
   const el=document.getElementById('bankList');if(!el)return;
   el.innerHTML=accounts.map((n,i)=>`<div style="display:flex;align-items:center;gap:7px;padding:6px 9px;background:var(--card2);border:1px solid var(--bdr);border-radius:var(--rs);"><i class="fa-solid fa-building-columns" style="color:var(--tel);font-size:12px;"></i><span style="flex:1;font-size:13px;font-weight:600;">${n}</span><button onclick="removeBank(${i})" style="background:none;border:none;color:var(--txtm);cursor:pointer;font-size:13px;"><i class="fa-solid fa-xmark"></i></button></div>`).join('');
   refreshBankSel();
+}
+async function saveVehicleAlertDays(){
+  const raw=document.getElementById('sVehAlertDays').value;
+  const days=raw.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)&&n>0).sort((a,b)=>b-a);
+  if(!days.length){toast('Enter at least one day number','e');return;}
+  const r=await sb.from('settings').upsert({id:1,vehicle_alert_days:days});
+  if(r.error){
+    if(/column|schema cache/i.test(r.error.message)){toast('Run the vehicle_alert_days SQL migration first (see below)','e');}
+    else toast(r.error.message,'e');
+    return;
+  }
+  cfg={...cfg,vehicle_alert_days:days};
+  toast('Vehicle reminder days saved','s');
 }
 async function addBank(){const inp=document.getElementById('newBank');const name=inp.value.trim();if(!name){toast('Enter a name','e');return;}const accounts=[...(cfg.bank_accounts||[])];if(accounts.includes(name)){toast('Already exists','e');return;}accounts.push(name);await sbUpsertSettings({bank_accounts:accounts});inp.value='';renderBankList();toast(`${name} added`,'s');}
 async function removeBank(idx){if(!await confirmAsync('Remove this bank account?'))return;const accounts=[...(cfg.bank_accounts||[])];accounts.splice(idx,1);await sbUpsertSettings({bank_accounts:accounts});renderBankList();}

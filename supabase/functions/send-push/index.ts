@@ -1,6 +1,6 @@
 // Supabase Edge Function: send-push
 // Called by Supabase Database Webhooks when records change in:
-//   messages, expense_batches, payment_status, attendance_requests, announcements
+//   messages, attendance, expense_batches, payment_status, attendance_requests, announcements
 //
 // Required Supabase secrets (set via Dashboard → Project Settings → Edge Functions → Secrets):
 //   VAPID_PRIVATE_KEY  — the private VAPID key (keep this secret, never commit the value)
@@ -23,10 +23,20 @@ function buildNotif(table: string, type: string, record: Record<string, unknown>
   let title = '', body = '', tag = 'ohm', important = false;
 
   if (table === 'messages' && type === 'INSERT') {
+    // Only push to employee when office sends — employee→office is handled by office realtime
+    if (record.sender !== 'office') return null;
     empId = record.employee_id as string;
     title = '💬 New message from Office';
     body = ((record.body as string) || '').slice(0, 100);
     tag = 'message';
+  } else if (table === 'attendance' && type === 'INSERT') {
+    empId = record.employee_id as string;
+    const dateStr = (record.date as string) || '';
+    const status = (record.status as string) || '';
+    const overtime = record.overtime as number | null;
+    title = '📅 Attendance recorded';
+    body = `${dateStr} — ${status}${overtime ? ` · Overtime: ${overtime}h` : ''}`;
+    tag = 'att-' + dateStr;
   } else if (table === 'expense_batches' && type === 'UPDATE') {
     empId = record.employee_id as string;
     if (record.status === 'approved') { title = '✅ Expenses approved'; body = 'Your expense submission has been approved'; }
@@ -44,22 +54,39 @@ function buildNotif(table: string, type: string, record: Record<string, unknown>
     } else return null;
   } else if (table === 'attendance_requests' && type === 'UPDATE') {
     empId = record.employee_id as string;
-    if (record.status === 'approved') { title = '✅ Attendance approved'; body = (record.date as string) || ''; }
+    if (record.status === 'approved') { title = '✅ Attendance request approved'; body = (record.date as string) || ''; }
     else if (record.status === 'rejected') { title = '❌ Attendance request rejected'; body = (record.office_note as string) || 'Contact the office'; }
     else return null;
-    tag = 'attendance';
+    tag = 'att-req';
   } else if (table === 'announcements' && (type === 'INSERT' || type === 'UPDATE')) {
     if (!record.active) return null;
     important = !!(record.important);
     title = (important ? '⚠️ ' : '📢 ') + ((record.title as string) || 'New announcement');
     body = ((record.body as string) || '').slice(0, 100);
     tag = 'announcement';
-    // empId null → broadcast to all
+    // empId stays null → broadcast to all employees
   } else {
     return null;
   }
 
   return { empId, title, body, tag, important };
+}
+
+async function sendToSubs(subs: Array<{id: number; endpoint: string; p256dh: string; auth: string}>, pushPayload: string) {
+  const staleIds: number[] = [];
+  await Promise.allSettled(subs.map(async (sub) => {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        pushPayload
+      );
+    } catch (err: unknown) {
+      const status = (err as { statusCode?: number }).statusCode;
+      if (status === 410 || status === 404) staleIds.push(sub.id);
+    }
+  }));
+  if (staleIds.length) await sb.from('push_subscriptions').delete().in('id', staleIds);
+  return subs.length - staleIds.length;
 }
 
 Deno.serve(async (req) => {
@@ -85,25 +112,6 @@ Deno.serve(async (req) => {
   if (error || !subs?.length) return new Response('no subs', { status: 200 });
 
   const pushPayload = JSON.stringify({ title, body, tag, important });
-  const staleIds: number[] = [];
-
-  await Promise.allSettled(subs.map(async (sub) => {
-    try {
-      await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        pushPayload
-      );
-    } catch (err: unknown) {
-      const status = (err as { statusCode?: number }).statusCode;
-      if (status === 410 || status === 404) staleIds.push(sub.id);
-    }
-  }));
-
-  if (staleIds.length) {
-    await sb.from('push_subscriptions').delete().in('id', staleIds);
-  }
-
-  return new Response(JSON.stringify({ sent: subs.length - staleIds.length }), {
-    headers: { 'Content-Type': 'application/json' }
-  });
+  const sent = await sendToSubs(subs, pushPayload);
+  return new Response(JSON.stringify({ sent }), { headers: { 'Content-Type': 'application/json' } });
 });
