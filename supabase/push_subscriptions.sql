@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id        bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  employee_id integer NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  employee_id uuid NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   endpoint  text NOT NULL,
   p256dh    text NOT NULL,
   auth      text NOT NULL,

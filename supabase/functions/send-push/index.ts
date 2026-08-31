@@ -19,22 +19,22 @@ const sb = createClient(
 );
 
 function buildNotif(table: string, type: string, record: Record<string, unknown>, oldRecord: Record<string, unknown> | null) {
-  let empId: number | null = null;
+  let empId: string | null = null;
   let title = '', body = '', tag = 'ohm', important = false;
 
   if (table === 'messages' && type === 'INSERT') {
-    empId = record.employee_id as number;
+    empId = record.employee_id as string;
     title = '💬 New message from Office';
     body = ((record.body as string) || '').slice(0, 100);
     tag = 'message';
   } else if (table === 'expense_batches' && type === 'UPDATE') {
-    empId = record.employee_id as number;
+    empId = record.employee_id as string;
     if (record.status === 'approved') { title = '✅ Expenses approved'; body = 'Your expense submission has been approved'; }
     else if (record.status === 'rejected') { title = '❌ Expenses rejected'; body = 'Contact the office for details'; }
     else return null;
     tag = 'expense';
   } else if (table === 'payment_status') {
-    empId = record.employee_id as number;
+    empId = record.employee_id as string;
     const newlyBank = !oldRecord?.bank_paid && record.bank_paid;
     const newlyCash = !oldRecord?.cash_paid && record.cash_paid;
     if (type === 'INSERT' || newlyBank || newlyCash) {
@@ -43,7 +43,7 @@ function buildNotif(table: string, type: string, record: Record<string, unknown>
       tag = 'payment';
     } else return null;
   } else if (table === 'attendance_requests' && type === 'UPDATE') {
-    empId = record.employee_id as number;
+    empId = record.employee_id as string;
     if (record.status === 'approved') { title = '✅ Attendance approved'; body = (record.date as string) || ''; }
     else if (record.status === 'rejected') { title = '❌ Attendance request rejected'; body = (record.office_note as string) || 'Contact the office'; }
     else return null;
