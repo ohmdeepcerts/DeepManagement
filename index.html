@@ -615,8 +615,8 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 .veh-card{position:relative;overflow:hidden;cursor:pointer}
 .veh-reg{background:#fef9c3;color:#0d0d14;font-size:12px;font-weight:700;letter-spacing:2.5px;padding:3px 9px 3px 22px;border-radius:4px;border:1.5px solid #ca8a04;position:relative;display:inline-block;font-family:monospace}
 .veh-reg::before{content:'GB';position:absolute;left:0;top:0;bottom:0;width:18px;background:#1d4ed8;color:#fff;font-size:5.5px;font-weight:900;display:flex;align-items:center;justify-content:center;border-radius:3px 0 0 3px}
-.veh-silhouette{position:absolute;bottom:0;right:-4px;width:130px;opacity:.07;color:var(--txt);pointer-events:none;user-select:none}
-.veh-art-photo{position:absolute;top:0;right:0;bottom:0;left:0;background-size:auto 92%;background-position:right center;background-repeat:no-repeat;opacity:0;transition:opacity .7s ease;pointer-events:none;-webkit-mask-image:linear-gradient(to right,transparent 0%,rgba(0,0,0,.18) 28%,rgba(0,0,0,.62) 58%,rgba(0,0,0,.78) 100%);mask-image:linear-gradient(to right,transparent 0%,rgba(0,0,0,.18) 28%,rgba(0,0,0,.62) 58%,rgba(0,0,0,.78) 100%)}
+.veh-silhouette{display:none}
+.veh-art-photo{display:none}
 .veh-add{display:flex;align-items:center;justify-content:center;min-height:120px;cursor:pointer;border:1.5px dashed var(--bdr);background:none;box-shadow:none;border-radius:var(--r)}
 .veh-add:hover{border-color:var(--acc);background:var(--accl)}
 </style>
@@ -10134,11 +10134,8 @@ async function renderVehicles(){
     const ov=vehOverall(car);
     const mc={red:'var(--red)',amber:'var(--amb)',green:'var(--grn)',gray:'var(--bdr)'}[ov];
     const mot=vehDays(car.mot_expiry),tax=vehDays(car.tax_expiry),ins=vehDays(car.insurance_expiry);
-    const svg=VEH_SVGS[vehType(car.make,car.model)];
     const driverNames=(car.assigned_employee_ids||[]).map(id=>{const e=employees.find(x=>x.id===id);return e?e.name:'?';}).filter(Boolean);
     return`<div class="card veh-card" style="border-top:3px solid ${mc};animation:pageIn .3s ease ${i*40}ms both" onclick="vehOpenModal(${car.id})">
-  <div class="veh-silhouette">${svg}</div>
-  <div class="veh-art-photo" data-veh-art="${car.id}"></div>
   <div style="padding:12px 13px 8px;display:flex;justify-content:space-between;align-items:flex-start;position:relative">
     <div style="max-width:75%">
       <div class="veh-reg">${car.reg}</div>
@@ -10155,8 +10152,6 @@ async function renderVehicles(){
 </div>`;
   }).join(''))+`<div class="veh-add" onclick="vehOpenModal(null)"><div style="text-align:center;color:var(--txt2)"><i class="fa-solid fa-plus" style="font-size:18px;margin-bottom:5px;display:block"></i><div style="font-size:12px;font-weight:600">Add Vehicle</div></div></div>`;
 
-  // Load Wikipedia vehicle artwork asynchronously after DOM is ready
-  if(cars.length)setTimeout(()=>_loadVehArtwork(cars),50);
 
   if(health)health.innerHTML=`<div class="ch"><div class="ct"><i class="fa-solid fa-heart-pulse" style="color:var(--acc);margin-right:6px"></i>Fleet Health</div></div>
 <div class="cb" style="display:flex;align-items:center;gap:16px">
