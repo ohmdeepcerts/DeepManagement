@@ -2989,17 +2989,20 @@ async function loadAllDataSilent(){
   batches=batR.data||[];
   messages=msgR.data||[];
 
-  const [docR,salR,payR,attReqR,prSumR]=await Promise.all([
+  const [docR,salR,payR,attReqR,prSumR,loginR]=await Promise.all([
     sb.from('employee_documents').select('*').order('uploaded_at',{ascending:false}),
     sb.from('salary_history').select('*').order('effective_from',{ascending:false}),
     sb.from('payment_status').select('*'),
     sb.from('attendance_requests').select('*').order('created_at',{ascending:false}),
-    sb.from('payroll_summary').select('*')
+    sb.from('payroll_summary').select('*'),
+    sb.rpc('get_employee_last_logins')
   ]);
   payrollSummaries=prSumR.error?[]:prSumR.data||[];
   employeeDocuments=docR.error?[]:docR.data||[];
   salaryHistory=salR.error?[]:salR.data||[];
   attRequests=attReqR.error?[]:attReqR.data||[];
+  window.empLastLogin={};
+  if(!loginR.error)(loginR.data||[]).forEach(r=>{window.empLastLogin[r.employee_id]=r.last_sign_in_at;});
   paymentStatuses={};
   if(!payR.error)(payR.data||[]).forEach(row=>{
     paymentStatuses[`${row.employee_id}_${row.month}_${row.year}`]={
@@ -3140,17 +3143,20 @@ async function loadAllData(){
     messages=msgR.data||[];
 
     // Optional tables - fail gracefully if not created yet
-    const [docR,salR,payR,attReqR,prSumR]=await Promise.all([
+    const [docR,salR,payR,attReqR,prSumR,loginR]=await Promise.all([
       sb.from('employee_documents').select('*').order('uploaded_at',{ascending:false}),
       sb.from('salary_history').select('*').order('effective_from',{ascending:false}),
       sb.from('payment_status').select('*'),
       sb.from('attendance_requests').select('*').gte('date',_dataFromDate).order('created_at',{ascending:false}),
-      sb.from('payroll_summary').select('*').gte('year',(()=>{const n=new Date();return n.getMonth()===0?n.getFullYear()-1:n.getFullYear();})())
+      sb.from('payroll_summary').select('*').gte('year',(()=>{const n=new Date();return n.getMonth()===0?n.getFullYear()-1:n.getFullYear();})()),
+      sb.rpc('get_employee_last_logins')
     ]);
     employeeDocuments=docR.error?[]:docR.data||[];
     salaryHistory=salR.error?[]:salR.data||[];
     attRequests=attReqR.error?[]:attReqR.data||[];
     payrollSummaries=prSumR.error?[]:prSumR.data||[];
+    window.empLastLogin={};
+    if(!loginR.error)(loginR.data||[]).forEach(r=>{window.empLastLogin[r.employee_id]=r.last_sign_in_at;});
     // Pre-load payment statuses into cache
     if(!payR.error)(payR.data||[]).forEach(row=>{
       paymentStatuses[`${row.employee_id}_${row.month}_${row.year}`]={
@@ -6658,6 +6664,20 @@ function renderEmployees(){
           ${hrEquivLabel&&hasRate?`<div class="ec-pay-sub">≈ ${hrEquivLabel}</div>`:''}
         </div>
         <span class="cp ${emp.contract_type==='PAYE'?'cp-p':'cp-s'}">${emp.contract_type||'—'}</span>
+      </div>
+      <div class="ec-divider"></div>
+      <div style="padding:5px 12px 8px;font-size:11px;color:var(--txtm);display:flex;align-items:center;gap:5px;">
+        <i class="fa-solid fa-mobile-screen-button" style="font-size:10px;"></i>
+        ${(function(){
+          const ts=window.empLastLogin&&window.empLastLogin[emp.id];
+          if(!ts)return'<span style="color:var(--red);">Never logged in</span>';
+          const d=new Date(ts),now=new Date(),diff=Math.floor((now-d)/1000);
+          if(diff<60)return'Just now';
+          if(diff<3600)return Math.floor(diff/60)+'m ago';
+          if(diff<86400)return Math.floor(diff/3600)+'h ago';
+          if(diff<172800)return'Yesterday';
+          return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:d.getFullYear()!==now.getFullYear()?'numeric':undefined});
+        })()}
       </div>
       ${isEx?`<button class="ec-reinstate" onclick="event.stopPropagation();markEmpActive('${emp.id}')"><i class="fa-solid fa-user-check" style="margin-right:4px;"></i>Reinstate Employee</button>`:''}
     </div>`;
