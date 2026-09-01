@@ -29,13 +29,16 @@ function buildNotif(table: string, type: string, record: Record<string, unknown>
     title = '💬 New message from Office';
     body = ((record.body as string) || '').slice(0, 100);
     tag = 'message';
-  } else if (table === 'attendance' && type === 'INSERT') {
+  } else if (table === 'attendance' && (type === 'INSERT' || type === 'UPDATE')) {
+    if (type === 'UPDATE' && oldRecord?.status === record.status) return null;
     empId = record.employee_id as string;
     const dateStr = (record.date as string) || '';
     const status = (record.status as string) || '';
     const overtime = record.overtime as number | null;
-    title = '📅 Attendance recorded';
-    body = `${dateStr} — ${status}${overtime ? ` · Overtime: ${overtime}h` : ''}`;
+    const d = dateStr ? new Date(dateStr + 'T12:00:00Z') : new Date();
+    const fmt = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    title = type === 'INSERT' ? '📅 Attendance marked' : '📅 Attendance updated';
+    body = `${fmt} — ${status}${overtime ? ` · OT: ${overtime}h` : ''}`;
     tag = 'att-' + dateStr;
   } else if (table === 'expense_batches' && type === 'UPDATE') {
     empId = record.employee_id as string;

@@ -953,12 +953,12 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
 // ═══════════════════════════════════════════════════════
 const CONFIG_APP = {
   LATE_GRACE_MINS:     15,   // minutes after start = Late Arrival
-  EARLY_LEAVE_MINS:   10,   // minutes before end = Left Early
+  EARLY_LEAVE_MINS:   15,   // minutes before end = Left Early
   DEFAULT_HOURS:       8,   // fallback contracted hours
   SYNC_INTERVAL_MS: 120000, // background sync frequency (2 min — 11 s was causing excessive egress)
   MAX_FILE_BYTES:  5242880, // 5MB upload limit
   PAST_DATE_WARN_DAYS: 30,  // warn if submitting old attendance
-  PIN_LENGTH:          4,   // PIN digits
+  PIN_LENGTH:          6,   // PIN digits
 };
 
 const _SB_URL='https://pajpoerteyjrprcaisom.supabase.co';
@@ -983,24 +983,17 @@ async function _savePushSub(sub,empId){
   if(error)console.error('push_subscriptions upsert failed:',JSON.stringify(error));
 }
 async function subscribeToPush(){
-  if(!('Notification' in window))return;
+  if(!('Notification' in window))return 'denied';
   const perm=await Notification.requestPermission();
-  if(perm!=='granted')return;
+  updateNotifStatusDot();
+  if(perm!=='granted')return perm;
   const sub=await _swGetSub();
   if(sub&&emp?.id)await _savePushSub(sub,emp.id);
-  updateNotifStatusDot();
+  return perm;
 }
-// Portal credentials — shared auth account for employee app
-const PORTAL_EMAIL='employee@app.com';
-const PORTAL_PASS='888888';
-
-// PIN hashing — SHA-256 via Web Crypto API (no library needed)
-// Stored PINs that are 64-char hex are treated as hashed; shorter ones are legacy plain-text
-async function hashPin(pin){
-  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(pin)));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-function isPinHashed(pin){return typeof pin==='string'&&pin.length===64&&/^[0-9a-f]+$/.test(pin);}
+// v2 auth: individual Supabase accounts per employee (phone@ohm.internal / PIN)
+const SUPABASE_URL='https://pajpoerteyjrprcaisom.supabase.co';
+const FIRST_LOGIN_FN=SUPABASE_URL+'/functions/v1/employee-first-login';
 
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const AVCOLS=['#2563eb','#16a34a','#dc2626','#7c3aed','#d97706','#0891b2','#be185d','#0f766e','#9333ea','#c2410c'];
@@ -1009,7 +1002,7 @@ const STATUSES={P:'Present',A:'Absent',L:'Annual Leave',S:'Sick Leave',H:'Bank H
 // ── STATE ──
 let emp=null, allEmps=[], cfg={};
 let myAtt=[], myExp=[], myMsgs=[], myBatches=[], mySalHist=[], myPaySt=[], myAttReqs=[], myPayroll=[];
-let pinEntry='', selEmpId='';
+let pinEntry='', selEmpId='', selPhone='', isFirstLogin=false;
 let attM=new Date().getMonth(), attY=new Date().getFullYear();
 let expM=new Date().getMonth(), expY=new Date().getFullYear();
 let payM=new Date().getMonth(), payY=new Date().getFullYear();
@@ -1065,8 +1058,18 @@ function togglePillMenu(){
 // ── NOTIFICATION SETTINGS (profile menu) ──
 function updateNotifStatusDot(){
   const dot=document.getElementById('notifStatusDot');if(!dot)return;
-  if(!('Notification' in window)){dot.style.background='var(--txtm)';return;}
-  dot.style.background=Notification.permission==='granted'?'var(--grn)':Notification.permission==='denied'?'var(--red)':'var(--amb,#d97706)';
+  if(!('Notification' in window)){dot.style.background='var(--txtm)';dot.title='Unsupported';return;}
+  if(Notification.permission!=='granted'){
+    dot.style.background=Notification.permission==='denied'?'var(--red)':'var(--amb,#d97706)';
+    dot.title=Notification.permission==='denied'?'Blocked':'Not enabled';
+    return;
+  }
+  // Permission granted — check push subscription is actually registered
+  _swGetSub().then(sub=>{
+    const ok=!!sub;
+    dot.style.background=ok?'var(--grn)':'var(--amb,#d97706)';
+    dot.title=ok?'Notifications active':'Permission granted but push not registered — tap to fix';
+  }).catch(()=>{dot.style.background='var(--amb,#d97706)';dot.title='Push status unknown';});
 }
 function openNotifSettings(){
   const perm=('Notification' in window)?Notification.permission:'unsupported';
@@ -1123,7 +1126,7 @@ function openNotifSettings(){
   const enableBtn=overlay.querySelector('#notifEnableBtn');
   if(enableBtn)enableBtn.onclick=async()=>{
     overlay.remove();
-    await subscribeToPush();
+    const result=await subscribeToPush();
     openNotifSettings();
     if(result==='granted'){toast('Notifications turned on ✅','s');try{new Notification('OHM Attendance',{body:'Notifications are working! 🎉'});}catch(e){}}
     else if(result==='denied')openNotifSettings(); // show the unblock steps straight away
@@ -1138,19 +1141,18 @@ function openNotifSettings(){
   };
 }
 async function checkForUpdateAndReload(isFirstCheck){
-  // Can't self-fetch from a file:// URL — skip during local testing (see office app)
+  // Can't self-fetch from a file:// URL — skip during local testing
   if(location.protocol==='file:')return;
   try{
-    const url=location.pathname+'?_v='+Date.now();
-    const res=await fetch(url,{cache:'no-store'});
+    // Fetch tiny version.json instead of the entire 1MB page (~1000x less traffic)
+    const base=location.origin+location.pathname.replace(/\/[^/]*$/,'/');
+    const res=await fetch(base+'version.json?_v='+Date.now(),{cache:'no-store'});
     if(!res.ok)return;
-    const text=await res.text();
-    const sig=text.length+':'+text.slice(0,300)+text.slice(-300);
-    const stored=sessionStorage.getItem('dam_page_sig');
-    if(!stored){
-      sessionStorage.setItem('dam_page_sig',sig);
-      return;
-    }
+    const data=await res.json();
+    const sig=data.v||data.version||'';
+    if(!sig)return;
+    const stored=sessionStorage.getItem('dam_app_version');
+    if(!stored){sessionStorage.setItem('dam_app_version',sig);return;}
     if(sig!==stored){
       // New version deployed — reload silently, but only if it's safe to do so
       const activeEl=document.activeElement;
@@ -1159,12 +1161,12 @@ async function checkForUpdateAndReload(isFirstCheck){
       const changePinOpen=document.getElementById('changePinModal')&&document.getElementById('changePinModal').style.display==='flex';
       const photoOpen=document.getElementById('photoModal')&&document.getElementById('photoModal').style.display==='flex';
       const expDetailOpen2=document.getElementById('expDetailModal')&&document.getElementById('expDetailModal').style.display==='flex';
-      if(userTyping||markOpen||changePinOpen||photoOpen||expDetailOpen2)return; // try again on the next check
-      sessionStorage.removeItem('dam_page_sig');
+      if(userTyping||markOpen||changePinOpen||photoOpen||expDetailOpen2)return;
+      sessionStorage.removeItem('dam_app_version');
       location.reload();
     }
   }catch(e){
-    // Silent — ignore (e.g. offline)
+    // Silent — ignore (e.g. offline or version.json not yet deployed)
   }
 }
 function openChangePin(){
@@ -1403,18 +1405,16 @@ async function submitChangePin(){
   const n2=document.getElementById('cpConfirm').value;
   const errEl=document.getElementById('cpErr');
   errEl.textContent='';
-  const storedPin=emp.pin||'';
-  const storedIsHashed=isPinHashed(storedPin);
-  let match;
-  if(storedIsHashed){const h=await hashPin(cur);match=h===storedPin;}
-  else{match=cur===storedPin;}
-  if(!match){errEl.textContent='Current PIN is incorrect';return;}
-  if(n1.length<4||n1.length>6||!/^\d+$/.test(n1)){errEl.textContent='New PIN must be 4-6 digits';return;}
+  if(!/^\d{6}$/.test(cur)){errEl.textContent='Enter your current 6-digit PIN';return;}
+  if(!/^\d{6}$/.test(n1)){errEl.textContent='New PIN must be exactly 6 digits';return;}
   if(n1!==n2){errEl.textContent='New PINs do not match';return;}
   if(n1===cur){errEl.textContent='New PIN must be different from current PIN';return;}
-  const r=await sb.from('employees').update({pin:n1}).eq('id',emp.id).select().single();
-  if(r.error){errEl.textContent='Could not save. Check connection.';return;}
-  emp=r.data;
+  // Re-authenticate to verify the current PIN is correct before allowing change
+  const email=normPhone(emp.phone)+'@ohm.internal';
+  const {error:reAuthErr}=await sb.auth.signInWithPassword({email,password:cur});
+  if(reAuthErr){errEl.textContent='Current PIN is incorrect';return;}
+  const {error}=await sb.auth.updateUser({password:n1});
+  if(error){errEl.textContent='Could not update PIN. Check connection.';return;}
   closeChangePin();
   toast('PIN updated','s');
 }
@@ -1428,6 +1428,7 @@ function toggleTheme(){
   const isDark=h.dataset.theme!=='light';
   h.dataset.theme=isDark?'light':'dark';
   localStorage.setItem('dam_emp_theme',h.dataset.theme);
+  localStorage.setItem('dam_emp_theme_manual',Date.now().toString());
   const btn=document.querySelector('.tb-theme');
   if(btn)btn.innerHTML=isDark?'<i class="fa-solid fa-sun"></i>':'<i class="fa-solid fa-moon"></i>';
   startElecCanvas();
@@ -1454,37 +1455,37 @@ function selEmp(id){
   renderPinDots();
 }
 function goBack(){document.getElementById('step2').style.display='none';document.getElementById('step1').style.display='block';document.getElementById('phoneInput').value='';pinEntry='';selEmpId='';allEmps=[];renderPinDots();}
-function pk(k){if(pinEntry.length>=4)return;pinEntry+=k;renderPinDots();if(pinEntry.length===4)checkPin();}
+function pk(k){if(pinEntry.length>=6)return;pinEntry+=k;renderPinDots();if(pinEntry.length===6)checkPin();}
 function pdel(){pinEntry=pinEntry.slice(0,-1);renderPinDots();document.getElementById('pinErr').textContent='';}
 function renderPinDots(){
   const dots=document.getElementById('pinDots');
-  dots.innerHTML=Array.from({length:4},(_,i)=>`<div class="pin-dot${i<pinEntry.length?' on':''}"></div>`).join('');
+  dots.innerHTML=Array.from({length:6},(_,i)=>`<div class="pin-dot${i<pinEntry.length?' on':''}"></div>`).join('');
 }
 let _pinAttempts=0;let _pinDelay=0;
 async function checkPin(){
-  const e=allEmps.find(x=>x.id===selEmpId);
-  if(!e?.pin){document.getElementById('pinErr').textContent='No PIN set. Contact admin.';pinEntry='';renderPinDots();return;}
-  // Plain-text comparison; existing hashed PINs (64-char hex) still work during transition
-  const storedIsHashed=isPinHashed(e.pin);
-  let match;
-  if(storedIsHashed){const h=await hashPin(pinEntry);match=h===e.pin;}
-  else{match=pinEntry===e.pin;}
-  if(match){
-    _pinAttempts=0;_pinDelay=0;
-    await enterApp(e);
-  } else {
+  const errEl=document.getElementById('pinErr');
+  if(pinEntry.length<6){errEl.textContent='Enter all 6 digits';return;}
+  const email=selPhone+'@ohm.internal';
+  document.querySelectorAll('.pk,.back').forEach(b=>b.style.pointerEvents='none');
+  const {data,error}=await sb.auth.signInWithPassword({email,password:pinEntry});
+  document.querySelectorAll('.pk,.back').forEach(b=>b.style.pointerEvents='');
+  if(error){
     _pinAttempts++;_pinDelay=[0,1000,2000,4000,8000][Math.min(_pinAttempts,4)];
-    const errEl=document.getElementById('pinErr');
     errEl.textContent='Incorrect PIN'+(_pinAttempts>=2?` — ${_pinDelay/1000}s delay`:'');
     pinEntry='';renderPinDots();
-    if(_pinDelay>0){document.querySelectorAll('.pk,.back').forEach(b=>b.style.pointerEvents='none');setTimeout(()=>{document.querySelectorAll('.pk,.back').forEach(b=>b.style.pointerEvents='');if(errEl)errEl.textContent='';},_pinDelay);}setTimeout(()=>{document.getElementById('pinErr').textContent='';},2000);}
+    if(_pinDelay>0){document.querySelectorAll('.pk,.back').forEach(b=>b.style.pointerEvents='none');setTimeout(()=>{document.querySelectorAll('.pk,.back').forEach(b=>b.style.pointerEvents='');if(errEl)errEl.textContent='';},_pinDelay);}
+    setTimeout(()=>{if(errEl)errEl.textContent='';},3000);
+    return;
+  }
+  _pinAttempts=0;_pinDelay=0;
+  const uid=data.session.user.id;
+  const {data:empRow}=await sb.from('employees').select('*').eq('auth_user_id',uid).single();
+  if(!empRow||empRow.status!=='Active'){errEl.textContent='Account inactive. Contact office.';await sb.auth.signOut();return;}
+  await enterApp(empRow);
 }
 async function enterApp(e){
   emp=e;
   syncEmpWorkHours();
-  // Persist session for 7 days
-  localStorage.setItem('dam_emp_id',e.id);
-  localStorage.setItem('dam_emp_ts',Date.now());
   document.getElementById('auth').style.display='none';
   document.getElementById('app').style.display='flex';
   setTopbarPhoto(e);
@@ -1502,11 +1503,15 @@ async function enterApp(e){
   loadAnnouncements();
   setSyncUI('live');
   applyAutoTheme();
-  setInterval(applyAutoTheme, 3600000);
+  if(window._themeIv)clearInterval(window._themeIv);
+  window._themeIv=setInterval(applyAutoTheme, 3600000);
   window._syncIv=setInterval(silentSync, CONFIG_APP.SYNC_INTERVAL_MS);
   // Silently reload if a newer version of the app has been deployed
-  setInterval(checkForUpdateAndReload, 5*60000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkForUpdateAndReload();});
+  if(window._updateIv)clearInterval(window._updateIv);
+  window._updateIv=setInterval(checkForUpdateAndReload, 5*60000);
+  if(window._visHandler)document.removeEventListener('visibilitychange',window._visHandler);
+  window._visHandler=()=>{if(!document.hidden)checkForUpdateAndReload();};
+  document.addEventListener('visibilitychange',window._visHandler);
   checkForUpdateAndReload(true);
   // Re-save push subscription on every login so the DB stays populated
   if(typeof Notification!=='undefined'&&Notification.permission==='granted'){
@@ -1533,12 +1538,13 @@ function updateEmpCharCount(el,max){
   counter.style.color=len>max*0.9?'var(--red)':'var(--txtm)';
 }
 function todayUK(){return new Date().toLocaleDateString('en-CA',{timeZone:'Europe/London'});}
-function doLogout(){
-  // Clear localStorage session
-  localStorage.removeItem('dam_emp_id');
-  localStorage.removeItem('dam_emp_ts');
+async function doLogout(){
+  await sb.auth.signOut();
   // Stop 11s sync interval
   if(window._syncIv){clearInterval(window._syncIv);window._syncIv=null;}
+  if(window._updateIv){clearInterval(window._updateIv);window._updateIv=null;}
+  if(window._themeIv){clearInterval(window._themeIv);window._themeIv=null;}
+  if(window._visHandler){document.removeEventListener('visibilitychange',window._visHandler);window._visHandler=null;}
   // Disconnect realtime
   if(realtimeChannel){sb.removeChannel(realtimeChannel);realtimeChannel=null;}
   // Clear ALL in-memory data — no stale data for next employee
@@ -1643,7 +1649,9 @@ async function silentSync(){
   const hadNewMsg=myMsgs.length<(msgR.data||[]).length;
   const prevBatches=[...myBatches];
   const prevPaySt=[...myPaySt];
-  myAtt=attR.data||[];myExp=expR.data||[];myMsgs=msgR.data||[];
+  if(!attR.error)myAtt=attR.data||[];
+  if(!expR.error)myExp=expR.data||[];
+  if(!msgR.error)myMsgs=msgR.data||[];
   myBatches=batR.error?myBatches:batR.data||[];
   myPaySt=payStR.error?myPaySt:payStR.data||[];
   myAttReqs=attReqR2.error?myAttReqs:attReqR2.data||[];
@@ -1696,9 +1704,9 @@ async function loadAll(){
     sb.from('attendance_requests').select('*').eq('employee_id',emp.id).order('date',{ascending:false}),
     sb.from('payroll_summary').select('*').eq('employee_id',emp.id)
   ]);
-  myAtt=attR.data||[];
-  myExp=expR.data||[];
-  myMsgs=msgR.data||[];
+  if(!attR.error)myAtt=attR.data||[];
+  if(!expR.error)myExp=expR.data||[];
+  if(!msgR.error)myMsgs=msgR.data||[];
   myBatches=batR.error?[]:batR.data||[];
   mySalHist=salR.error?[]:salR.data||[];
   myPayroll=prSumR.error?[]:prSumR.data||[];
@@ -1803,18 +1811,25 @@ function startRealtime(){
         if(document.getElementById('pg-msg').classList.contains('on'))renderMsgs();
       }
     })
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'expense_batches',filter:`employee_id=eq.${emp.id}`},async payload=>{
-      const idx=myBatches.findIndex(b=>b.id===payload.new.id);
-      if(idx>=0)myBatches[idx]=payload.new;else myBatches.push(payload.new);
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'expenses',filter:`employee_id=eq.${emp.id}`},payload=>{
+      const idx=myExp.findIndex(x=>x.id===payload.new.id);
+      if(idx>=0)myExp[idx]=payload.new;else myExp.unshift(payload.new);
       updateBadges();
       const st=payload.new.status;
-      if(st==='approved')sysNotify('Expenses approved ✅','Your expense submission has been approved');
-      else if(st==='rejected')sysNotify('Expenses rejected','Contact the office for details');
-      showPopupNotif(st==='approved'?'<i class="fa-solid fa-check-circle" style="color:#16a34a;margin-right:5px;"></i>Expenses Approved!':st==='rejected'?'<i class="fa-solid fa-times-circle" style="color:#dc2626;margin-right:5px;"></i>Expenses Rejected':'<i class="fa-solid fa-receipt" style="margin-right:5px;"></i>Expense batch updated');
+      const label=payload.new.merchant?`${payload.new.merchant} — £${payload.new.amount}`:'Expense';
+      if(st==='approved'){sysNotify('Expense approved ✅',label);showPopupNotif('✅ Expense approved: '+label);}
+      else if(st==='rejected'){sysNotify('Expense rejected',label+' — contact office');showPopupNotif('❌ Expense rejected: '+label);}
+      const curPg=document.querySelector('.pg.on')?.id?.replace('pg-','');
+      if(curPg==='exp')renderExp();
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'attendance',filter:`employee_id=eq.${emp.id}`},payload=>{
       const idx=myAtt.findIndex(a=>a.date===payload.new.date);
       if(idx>=0)myAtt[idx]=payload.new;else myAtt.unshift(payload.new);
+      const _as=payload.new.status||'Updated';
+      const _ad=payload.new.date?new Date(payload.new.date+'T00:00:00'):new Date();
+      const _adl=_ad.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+      sysNotify('Attendance marked',_as+' — '+_adl);
+      showPopupNotif('📋 '+_as+' — '+_adl);
       const curPg=document.querySelector('.pg.on')?.id?.replace('pg-','');
       if(curPg==='home')renderHome();
       else if(curPg==='att')renderAtt();
@@ -1822,7 +1837,11 @@ function startRealtime(){
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'attendance',filter:`employee_id=eq.${emp.id}`},payload=>{
       const idx=myAtt.findIndex(a=>a.id===payload.new.id);
       if(idx>=0)myAtt[idx]=payload.new;else myAtt.unshift(payload.new);
-      // Always refresh whichever page is visible
+      const _as=payload.new.status||'Updated';
+      const _ad=payload.new.date?new Date(payload.new.date+'T00:00:00'):new Date();
+      const _adl=_ad.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+      sysNotify('Attendance updated',_as+' — '+_adl);
+      showPopupNotif('📋 '+_as+' — '+_adl);
       const curPg=document.querySelector('.pg.on')?.id?.replace('pg-','');
       if(curPg==='home')renderHome();
       else if(curPg==='att')renderAtt();
@@ -1889,12 +1908,21 @@ function startRealtime(){
     })
     .subscribe(status=>{
       console.log('[realtime]',status);
-      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')console.warn('[realtime] not receiving live events — check Supabase: Database → Publications → supabase_realtime includes the tables, or the toggle on each table in Table Editor');
+      if(status==='SUBSCRIBED'){setSyncUI('live');}
+      else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        console.warn('[realtime] not receiving live events — check Supabase: Database → Publications → supabase_realtime includes the tables, or the toggle on each table in Table Editor');
+        setSyncUI('offline');
+      }
     });
 }
 
 function showPopupNotif(msg){
-  toast(msg,'s');
+  // Render as inline popup so emoji/text shows correctly (toast uses textContent)
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--card);color:var(--txt);padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.3);z-index:8000;white-space:nowrap;max-width:90vw;text-align:center;pointer-events:none;';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.transition='opacity .4s';t.style.opacity='0';setTimeout(()=>t.remove(),400);},3000);
 }
 
 function updateBadges(){
@@ -2518,33 +2546,19 @@ async function scanReceiptWithAI(target){
       });
       imageParts=[{inline_data:{mime_type:fileVar.type||'image/jpeg',data:b64}}];
     }
-    // Key loaded from Supabase settings on login — never hardcoded in this file
-    if(!_geminiKey){
-      toast('AI scanner not set up — contact admin','e');
-      if(st){st.textContent='Not configured — admin must add Gemini key in Settings → AI';st.style.color='var(--red)';}
-      if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-wand-magic-sparkles"></i> Auto-fill from Receipt';}
-      return;
-    }
-    const yr=new Date().getFullYear();
-    const prompt=`You are a receipt scanner for a UK electrical business. ${imageParts.length>1?`You are given ${imageParts.length} images which are consecutive PAGES OF THE SAME receipt/invoice — read them together as one document (the total is often on the last page). `:''}Return ONLY a JSON object, no markdown: {\"merchant\":\"store name\",\"amount\":0.00,\"date\":\"YYYY-MM-DD\",\"category\":\"Materials|Fuel|Food & Drink|Tools|Parking|Accommodation|Other\",\"vat_amount\":0.00,\"items\":\"item list\",\"bbox\":{\"x\":0,\"y\":0,\"w\":100,\"h\":100},\"is_bent\":false,\"rotation\":0}. amount=total paid. date in YYYY-MM-DD assume year ${yr} if not shown. merchant=shop name only. null if unclear. items=the individual line items on the receipt, ONE PER LINE separated by \\n (like a real itemized receipt), each formatted as \"QTYx Item name\" with quantities where shown, e.g. \"2x cable ties\\n1x 10mm drill bit\\n1x junction box\" — null if the receipt doesn't show itemized lines (e.g. fuel, parking). bbox=bounding box of the receipt as percentages of image (x=left%, y=top%, w=width%, h=height%), set null if receipt fills whole image with no background. is_bent=true if receipt is curved/bent/folded, false if flat. rotation=degrees you'd need to rotate the whole image CLOCKWISE so the receipt text reads upright, left-to-right — must be exactly 0, 90, 180, or 270 (0 if already upright).`;
-    // Try the high-quota free model first; each attempt retries on transient
-    // failures but bails immediately on 429 (daily quota — retrying won't help).
-    // If it's still down after that, fall back to gemini-2.5-flash once — a
-    // different model with its own separate quota AND separate server
-    // capacity, so a 503 "this model is overloaded" on one doesn't mean the
-    // other is too.
+    // Gemini key is server-side only (gemini-scan edge function) — never in the browser
     async function tryGeminiModel(model,maxAttempts){
       let resp,lastErrBody='';
       for(let attempt=1;attempt<=maxAttempts;attempt++){
-        resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${_geminiKey}`,{
+        resp=await fetch(SUPABASE_URL+'/functions/v1/gemini-scan',{
           method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({contents:[{parts:[...imageParts,{text:prompt}]}]})
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+_SB_ANON},
+          body:JSON.stringify({imageParts,model,pageCount:imageParts.length})
         }).catch(networkErr=>{lastErrBody=String(networkErr);return null;});
         if(resp&&resp.ok)return{resp,lastErrBody:null};
         if(resp){lastErrBody=await resp.text().catch(()=>'');console.warn(`Gemini (${model}) attempt ${attempt}/${maxAttempts} failed (${resp.status}):`,lastErrBody);}
         else console.warn(`Gemini (${model}) attempt ${attempt}/${maxAttempts} — network error:`,lastErrBody);
-        if(resp&&resp.status===429)break; // daily quota — no point retrying
+        if(resp&&resp.status===429)break;
         if(attempt<maxAttempts&&(!resp||resp.status!==429)){
           if(st){st.textContent=`Connection hiccup — retrying (${attempt}/${maxAttempts-1})...`;st.style.color='var(--amb)';}
           await new Promise(r=>setTimeout(r,700*attempt));
@@ -2970,7 +2984,7 @@ async function submitExp(){
   // Duplicate check: same merchant + same amount within 2 days = probably a
   // double entry (or two people splitting one receipt). Warn, don't block —
   // genuinely buying the same thing twice at the same shop does happen.
-  const _dupes=myExp.filter(x=>x.merchant&&x.merchant.trim().toLowerCase()===merchant.toLowerCase()&&Math.abs(parseFloat(x.amount)-amt)<0.01&&Math.abs(new Date(x.date)-_expD)<604800000);
+  const _dupes=myExp.filter(x=>x.merchant&&x.merchant.trim().toLowerCase()===merchant.toLowerCase()&&Math.abs(parseFloat(x.amount)-amt)<0.01&&Math.abs(new Date(x.date)-_expD)<172800000);
   if(_dupes.length&&!confirm(`Possible duplicate: you already have "${merchant}" for ${fmt(amt)} on ${fmtDS(_dupes[0].date)}. Submit anyway?`))return;
   if(_rcptFile&&_rcptFile.size>CONFIG_APP.MAX_FILE_BYTES){toast('Receipt must be under 5MB','e');return;}
   // Month check — if not current month, show confirmation popup
@@ -3004,8 +3018,14 @@ async function _doSubmitExpense(merchant,amt,date){
     if(_rcptFile){
       const ext=_rcptFile.name.split('.').pop()||'jpg';
       const path=`receipts/${emp.id}/${Date.now()}.${ext}`;
-      const {error}=await sb.storage.from('employee-docs').upload(path,_rcptFile,{upsert:true});
-      if(!error){const {data:ud}=sb.storage.from('employee-docs').getPublicUrl(path);fileUrl=ud?.publicUrl||null;}
+      const {error:uploadErr}=await sb.storage.from('employee-docs').upload(path,_rcptFile,{upsert:true});
+      if(uploadErr){
+        toast('Receipt upload failed — please try again','e');
+        if(subBtn){subBtn.disabled=false;subBtn.innerHTML=subBtnOrigLabel;}
+        return;
+      }
+      const {data:ud}=sb.storage.from('employee-docs').getPublicUrl(path);
+      fileUrl=ud?.publicUrl||null;
     }
     const r=await sb.from('expenses').insert({employee_id:emp.id,date,merchant,category:document.getElementById('expCat').value||null,amount:amt,notes:document.getElementById('expNotes').value||null,items:document.getElementById('expItems').value||null,receipt_url:fileUrl,status:'pending',tags:document.getElementById('expVAT')?.checked?['VAT']:[],flagged:false}).select().single();
     if(r.error){toast(r.error.message,'e');return;}
@@ -3925,42 +3945,28 @@ async function fetchSettingsWithRetry(retries){
   console.warn('Settings fetch failed after retries:',last.error);
   return last;
 }
+function normPhone(p){
+  var digits=(p||'').replace(/\D/g,'');
+  if(digits.length>10)digits=digits.slice(-10);
+  return digits;
+}
 async function tryAutoLogin(){
   const {data:{session}}=await sb.auth.getSession();
-  if(!session){
-    const {error:authErr}=await sb.auth.signInWithPassword({email:PORTAL_EMAIL,password:PORTAL_PASS});
-    if(authErr){
-      console.error('Portal login failed:',authErr.message);
-      document.getElementById('phoneErr').textContent='Could not connect. Check internet.';
-      return;
-    }
-  }
-  // Check for saved employee session (7-day auto-login)
-  const savedId=localStorage.getItem('dam_emp_id');
-  const savedTs=parseInt(localStorage.getItem('dam_emp_ts')||'0');
-  const thirtyDays=30*24*60*60*1000;
-  if(savedId&&Date.now()-savedTs<thirtyDays){
-    const r=await sb.from('employees').select('*').eq('id',savedId).single();
+  if(session){
+    const uid=session.user.id;
     const cfgR=await fetchSettingsWithRetry();
     if(cfgR.data){cfg=cfgR.data;_geminiKey=cfgR.data.gemini_key||'';}
-    if(!r.error&&r.data&&r.data.status==='Active'&&r.data.pin){
-      allEmps=[r.data];
-      try{await enterApp(r.data);}catch(e){console.error('enterApp error:',e);}
+    const {data:empRow}=await sb.from('employees').select('*').eq('auth_user_id',uid).single();
+    if(empRow&&empRow.status==='Active'){
+      allEmps=[empRow];
+      try{await enterApp(empRow);}catch(e){console.error('enterApp error:',e);}
       return;
     }
-    // PIN was cleared, employee deactivated, or record missing — force re-login
-    localStorage.removeItem('dam_emp_id');
-    localStorage.removeItem('dam_emp_ts');
+    await sb.auth.signOut();
   }
-  // Load settings only — employee list NOT shown until phone is entered
   const cfgR=await fetchSettingsWithRetry();
   if(cfgR.data){cfg=cfgR.data;_geminiKey=cfgR.data.gemini_key||'';}
   document.getElementById('step1').style.display='block';
-}
-function normPhone(p){
-  var digits=(p||'').replace(/\D/g,'');
-  if(digits.length>10)digits=digits.slice(-10); // last 10 digits (drop country code)
-  return digits;
 }
 async function submitPhone(){
   const raw=document.getElementById('phoneInput').value;
@@ -3968,51 +3974,92 @@ async function submitPhone(){
   const errEl=document.getElementById('phoneErr');
   errEl.textContent='';
   if(norm.length<10){errEl.textContent='Enter a valid mobile number';return;}
-  const r=await sb.from('employees').select('*').eq('status','Active');
-  if(r.error){errEl.textContent='Could not connect. Check internet.';return;}
-  const matches=(r.data||[]).filter(function(e){return normPhone(e.phone)===norm;});
-  if(!matches.length){errEl.textContent='Phone number not recognized. Contact your office.';return;}
-  if(matches.length>1){errEl.textContent='Multiple accounts found for this number. Contact your office.';return;}
-  allEmps=matches;
-  const e=matches[0];
-  selEmpId=e.id;
-  if(!e.pin){
-    // First login — set up PIN
-    document.getElementById('setPinWho').textContent='Welcome, '+e.name+'!';
+  errEl.textContent='Checking…';
+  let res;
+  try{
+    const r=await fetch(SUPABASE_URL+'/functions/v1/employee-phone-lookup',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+_SB_ANON},
+      body:JSON.stringify({phone:norm})
+    });
+    res=await r.json();
+  }catch(err){
+    errEl.textContent='Could not connect. Check internet.';return;
+  }
+  errEl.textContent='';
+  if(!res.found){errEl.textContent='Phone number not recognised. Contact your office.';return;}
+  selPhone=norm;
+  if(!res.has_account){
+    isFirstLogin=true;
+    document.getElementById('setPinWho').textContent='Welcome, '+res.name+'! Set your 6-digit PIN.';
+    if(!document.getElementById('tempPinInput')){
+      const lbl=document.createElement('p');
+      lbl.style.cssText='color:rgba(255,255,255,.7);font-size:13px;margin:0 0 6px;text-align:left';
+      lbl.textContent='Temporary PIN (from office):';
+      const inp=document.createElement('input');
+      inp.type='password';inp.id='tempPinInput';inp.inputMode='numeric';inp.pattern='[0-9]*';
+      inp.maxLength=6;inp.placeholder='••••••';inp.autocomplete='off';inp.autocapitalize='off';
+      inp.style.cssText='width:100%;text-align:center;font-size:22px;letter-spacing:10px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;margin:0 0 16px;box-sizing:border-box;';
+      const sep=document.getElementById('newPinInput').parentNode;
+      sep.insertBefore(inp,sep.firstChild);
+      sep.insertBefore(lbl,sep.firstChild);
+    }
+    document.getElementById('newPinInput').placeholder='New PIN ••••••';
+    document.getElementById('confirmPinInput').placeholder='Confirm PIN ••••••';
     document.getElementById('newPinInput').value='';
     document.getElementById('confirmPinInput').value='';
     document.getElementById('setPinErr').textContent='';
     document.getElementById('step1').style.display='none';
     document.getElementById('stepSetPin').style.display='block';
-    setTimeout(()=>document.getElementById('newPinInput').focus(),100);
+    setTimeout(()=>document.getElementById('tempPinInput')?.focus(),100);
   } else {
-    document.getElementById('pinWho').textContent='Welcome back, '+e.name;
+    isFirstLogin=false;
+    document.getElementById('pinWho').textContent='Welcome back, '+res.name.split(' ')[0];
     document.getElementById('step1').style.display='none';
     document.getElementById('step2').style.display='block';
-    pinEntry='';
-    renderPinDots();
+    pinEntry='';renderPinDots();
   }
 }
 async function submitNewPin(){
-  const p1=document.getElementById('newPinInput').value;
-  const p2=document.getElementById('confirmPinInput').value;
   const errEl=document.getElementById('setPinErr');
   errEl.textContent='';
-  if(p1.length<4||p1.length>6||!/^\d+$/.test(p1)){errEl.textContent='PIN must be 4-6 digits';return;}
+  const p1=document.getElementById('newPinInput').value.trim();
+  const p2=document.getElementById('confirmPinInput').value.trim();
+  if(!/^\d{6}$/.test(p1)){errEl.textContent='New PIN must be exactly 6 digits';return;}
   if(p1!==p2){errEl.textContent='PINs do not match';return;}
-  const e=allEmps.find(function(x){return x.id===selEmpId;});
-  const r=await sb.from('employees').update({pin:p1}).eq('id',selEmpId).select().single();
-  if(r.error){errEl.textContent='Could not save PIN. Try again.';return;}
-  allEmps=[r.data];
-  await enterApp(r.data);
+  if(isFirstLogin){
+    const tempPin=(document.getElementById('tempPinInput')?.value||'').trim();
+    if(!tempPin){errEl.textContent='Enter the temporary PIN from your office';return;}
+    errEl.textContent='Setting up account…';
+    try{
+      const res=await fetch(FIRST_LOGIN_FN,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+_SB_ANON},
+        body:JSON.stringify({phone:selPhone,temp_pin:tempPin,new_pin:p1})
+      });
+      const json=await res.json();
+      if(json.error){errEl.textContent=json.error;return;}
+      // Edge function created the account — sign in with the new PIN
+      const {data:siData,error:siErr}=await sb.auth.signInWithPassword({email:selPhone+'@ohm.internal',password:p1});
+      if(siErr){errEl.textContent='Account created but sign-in failed. Try logging in again.';return;}
+      const uid=siData.session.user.id;
+      const {data:empRow}=await sb.from('employees').select('*').eq('auth_user_id',uid).single();
+      if(!empRow){errEl.textContent='Account linked. Please log in.';return;}
+      await enterApp(empRow);
+    }catch(err){errEl.textContent='Connection error. Try again.';console.error(err);}
+  } else {
+    // Shouldn't reach here in v2 (only first-login uses stepSetPin)
+    errEl.textContent='Unexpected state. Please reload.';
+  }
 }
 function backToPhone(){
   document.getElementById('stepSetPin').style.display='none';
   document.getElementById('step1').style.display='block';
   document.getElementById('newPinInput').value='';
   document.getElementById('confirmPinInput').value='';
+  const ti=document.getElementById('tempPinInput');if(ti)ti.value='';
   document.getElementById('setPinErr').textContent='';
-  selEmpId='';
+  selEmpId='';selPhone='';isFirstLogin=false;
 }
 tryAutoLogin();
 
