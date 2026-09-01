@@ -8214,7 +8214,10 @@ function openDocViewer(docId){
     const isImg=/\.(jpg|jpeg|png|gif|webp)/i.test(doc.file_url)||/\.(jpg|jpeg|png|gif|webp)/i.test(doc.file_name||'');
     const isPdf=/\.pdf/i.test(doc.file_url)||/\.pdf/i.test(doc.file_name||'');
     if(isImg){img.src=doc.file_url;img.style.display='block';frame.style.display='none';}
-    else if(isPdf){frame.src=doc.file_url;frame.style.display='block';img.style.display='none';}
+    else if(isPdf){
+      frame.src='';frame.style.display='block';img.style.display='none';
+      fetch(doc.file_url).then(r=>r.blob()).then(blob=>{frame.src=URL.createObjectURL(blob);}).catch(()=>{frame.src=doc.file_url;});
+    }
     else{img.style.display='none';frame.style.display='none';dlBtn.innerHTML='<i class="fa-solid fa-download"></i>Download file';}
   }else{
     fileSection.style.display='none';
@@ -9323,9 +9326,23 @@ function openLightbox(url){
   // Content
   var content;
   if(isPdf){
-    content=document.createElement('iframe');
-    content.src=url;
-    content.style.cssText='width:88vw;height:82vh;border:none;border-radius:10px;background:#fff;';
+    // Fetch as blob — bypasses X-Frame-Options / CSP set by Supabase Storage on the direct URL
+    content=document.createElement('div');
+    content.style.cssText='width:88vw;height:82vh;border-radius:10px;background:#fff;overflow:hidden;display:flex;align-items:center;justify-content:center;';
+    content.innerHTML='<div style="color:#555;text-align:center;padding:24px;"><i class="fa-solid fa-spinner fa-spin" style="font-size:28px;margin-bottom:10px;display:block;"></i>Loading PDF…</div>';
+    fetch(url)
+      .then(function(r){return r.blob();})
+      .then(function(blob){
+        var blobUrl=URL.createObjectURL(blob);
+        var fr=document.createElement('iframe');
+        fr.src=blobUrl;
+        fr.style.cssText='width:100%;height:100%;border:none;';
+        content.innerHTML='';
+        content.appendChild(fr);
+      })
+      .catch(function(){
+        content.innerHTML='<div style="color:#333;padding:32px;text-align:center;"><i class="fa-solid fa-triangle-exclamation" style="font-size:28px;color:#f59e0b;margin-bottom:10px;display:block;"></i>Could not load PDF inline.<br><a href="'+url+'" target="_blank" style="color:#2563eb;margin-top:10px;display:inline-block;font-weight:600;">Open in new tab →</a></div>';
+      });
   } else {
     content=document.createElement('img');
     content.src=url;
