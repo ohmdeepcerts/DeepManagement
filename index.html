@@ -1567,15 +1567,6 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       <div class="ibox"><i class="fa-solid fa-circle-info"></i>Default times auto-fill on Mark Attendance page.</div>
       <div class="fg fg2"><div class="fgl"><label>Default Work Start</label><input type="time" id="eWStart" value="08:00"></div><div class="fgl"><label>Default Work End</label><input type="time" id="eWEnd" value="17:00"></div></div>
       <div style="border-top:1px solid var(--bdr);padding-top:13px;margin-top:13px;">
-        <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-key" style="color:var(--amb);margin-right:5px;"></i>Employee PIN (for mobile portal)</div>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:11px;">
-          <span id="pinStatusBadge" style="font-size:12px;font-weight:700;"></span>
-          <button type="button" id="clearPinBtn" onclick="clearEmpPin()" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--red,#ef4444);background:rgba(239,68,68,0.08);color:var(--red,#ef4444);cursor:pointer;display:none;">Clear PIN</button>
-        </div>
-        <div class="fg fg2"><div class="fgl"><label>Set new PIN (4-6 digits)</label><input type="text" inputmode="numeric" id="ePin" maxlength="6" placeholder="Leave blank to keep current"></div><div class="fgl"><label>Confirm new PIN</label><input type="text" inputmode="numeric" id="ePinConfirm" maxlength="6" placeholder="Confirm PIN"></div></div>
-        <p style="font-size:12px;color:var(--txtm);margin-top:7px;">Leave fields blank to keep existing PIN. Click <strong>Clear PIN</strong> so the employee can set their own on next login.</p>
-      </div>
-      <div style="border-top:1px solid var(--bdr);padding-top:13px;margin-top:13px;">
         <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-mobile-screen-button" style="color:var(--acc);margin-right:5px;"></i>v2 Portal Auth <span style="font-weight:400;color:var(--txtm)">(individual login)</span></div>
         <div id="v2AuthBadge" style="font-size:12px;margin-bottom:8px;"></div>
         <div id="v2ResetArea" style="display:none;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -6797,7 +6788,7 @@ async function confirmMarkEx(id){
 function openEmpModal(){
   document.getElementById('empMTitle').textContent='Add Employee';
   document.getElementById('empId').value='';
-  ['eName','eRole','ePhone','eNotes','eSalary','eContHrs','eContHrsD','eDailyRate','eHrRate','eOTThr','eOTMult','eOTFlat','eSat','eSun','eBankAmt','eBankCustom','ePin','ePinConfirm','eTempPin'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['eName','eRole','ePhone','eNotes','eSalary','eContHrs','eContHrsD','eDailyRate','eHrRate','eOTThr','eOTMult','eOTFlat','eSat','eSun','eBankAmt','eBankCustom','eTempPin'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('eStatus').value='Active';
   document.getElementById('eContract').value='PAYE';
   document.getElementById('eOTType').value='multiplier';
@@ -6875,17 +6866,6 @@ async function editEmpModal(id){
   document.getElementById('eSat').value=emp.sat_mult||'';
   document.getElementById('eSun').value=emp.sun_mult||'';
   document.getElementById('eBankAmt').value=emp.bank_amt||'';
-  // Show PIN status; fields left blank = no PIN change
-  const _hasPinSet=!!(emp.pin);
-  const _isHashed=isPinHashed(emp.pin||'');
-  const _pinBadge=document.getElementById('pinStatusBadge');
-  const _clearBtn=document.getElementById('clearPinBtn');
-  if(_pinBadge){
-    if(!_hasPinSet){_pinBadge.textContent='✗ No PIN — employee sets on first login';_pinBadge.style.color='var(--txtm)';}
-    else if(_isHashed){_pinBadge.textContent='PIN: (old encrypted — type a new one above to reset)';_pinBadge.style.color='var(--amb,#f59e0b)';}
-    else{_pinBadge.textContent='PIN: '+emp.pin;_pinBadge.style.color='var(--grn,#22c55e)';}
-  }
-  if(_clearBtn){_clearBtn.style.display=_hasPinSet?'inline-block':'none';}
   // v2 auth status
   const _v2Badge=document.getElementById('v2AuthBadge');
   if(_v2Badge){
@@ -6898,8 +6878,6 @@ async function editEmpModal(id){
   const _v2ResetArea=document.getElementById('v2ResetArea');
   if(_v2ResetArea){_v2ResetArea.style.display=emp.auth_user_id?'flex':'none';const _rm=document.getElementById('v2ResetMsg');if(_rm)_rm.textContent='';}
   const _eTempPin=document.getElementById('eTempPin');if(_eTempPin)_eTempPin.value='';
-  document.getElementById('ePin').value='';
-  document.getElementById('ePinConfirm').value='';
   refreshBankSel();
   const stored=emp.bank_name||'';
   const accounts=cfg.bank_accounts||[];
@@ -6927,20 +6905,6 @@ async function editEmpModal(id){
   setTimeout(()=>{loadEmpDocs(id);loadSalaryHistory(id);},100);
 }
 function closeEmpModal(){document.getElementById('empModal').classList.remove('open');}
-async function clearEmpPin(){
-  const id=document.getElementById('empId').value;
-  if(!id)return;
-  if(!confirm('Clear this employee\'s PIN? They will be prompted to set a new one on next login.'))return;
-  const r=await sb.from('employees').update({pin:null}).eq('id',id);
-  if(r.error){toast('Could not clear PIN: '+r.error.message,'e');return;}
-  const cached=employeeMap?.get(id);
-  if(cached)cached.pin=null;
-  const badge=document.getElementById('pinStatusBadge');
-  const btn=document.getElementById('clearPinBtn');
-  if(badge){badge.textContent='✗ No PIN — employee sets on first login';badge.style.color='var(--txtm)';}
-  if(btn)btn.style.display='none';
-  toast('PIN cleared — employee will set a new one on next login','s');
-}
 async function deleteEmployee(){
   const id=document.getElementById('empId').value;
   const emp=employeeMap?.get(id);if(!emp)return;
@@ -7019,12 +6983,6 @@ async function saveEmployee(){
   const _resetSaveBtn=()=>{if(_saveBtn){_saveBtn.disabled=false;_saveBtn.innerHTML='<i class="fa-solid fa-floppy-disk"></i>Save Employee';}};
   const name=document.getElementById('eName').value.trim().toUpperCase();
   if(!name){toast('Please enter a name','e');_resetSaveBtn();return;}
-  const pin=document.getElementById('ePin').value;
-  const pinC=document.getElementById('ePinConfirm').value;
-  if(pin&&pin!==pinC){toast('PINs do not match','e');return;}
-  if(pin&&pin.length<4){toast('PIN must be at least 4 digits','e');return;}
-  // Store PIN as plain text; if blank, omit from data (preserve existing PIN)
-  const pinHashed=pin||undefined;
   const payType2=document.querySelector('.ptc.sel')?.id?.replace('pt-','')||'fixed';
   const bkSel=document.getElementById('eBankName').value;
   const bkName=bkSel==='custom'?document.getElementById('eBankCustom').value:bkSel;
@@ -7052,7 +7010,6 @@ async function saveEmployee(){
     sun_mult:document.getElementById('eSun').value?parseFloat(document.getElementById('eSun').value):null,
     bank_amt:document.getElementById('eBankAmt').value?parseFloat(document.getElementById('eBankAmt').value):null,
     bank_name:bkName||null,
-    pin:pinHashed,  // undefined = not sent (existing PIN preserved); hashed value = new/changed PIN
     temp_pin:(function(){var v=(document.getElementById('eTempPin')?.value||'').trim();return v?v:undefined;})(),
     show_pay_tab:document.getElementById('eShowPayTab').checked,
     show_running_pay:document.getElementById('eShowRunningPay').checked,
