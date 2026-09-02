@@ -1634,8 +1634,8 @@ async function silentSync(){
   try{
   // Check if office has revoked access (PIN cleared or employee deactivated) — force logout if so
   sb.from('employees').update({last_active_at:new Date().toISOString()}).eq('id',emp.id).then(()=>{});
-  const meCheck=await sb.from('employees').select('pin,status,photo_url,show_pay_tab,show_running_pay').eq('id',emp.id).single();
-  if(!meCheck.error&&meCheck.data&&(!meCheck.data.pin||meCheck.data.status!=='Active')){
+  const meCheck=await sb.from('employees').select('status,photo_url,show_pay_tab,show_running_pay').eq('id',emp.id).single();
+  if(!meCheck.error&&meCheck.data&&(meCheck.data.status!=='Active')){
     toast('Your access was reset by the office. Please log in again.','e');
     doLogout();
     return;
