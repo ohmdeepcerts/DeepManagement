@@ -573,7 +573,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
   <div style="background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:20px 18px calc(40px + max(env(safe-area-inset-bottom),10px));max-height:88vh;overflow-y:auto;">
     <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr);margin:0 auto 18px;"></div>
     <div style="font-size:17px;font-weight:800;margin-bottom:4px;">Change PIN</div>
-    <div style="font-size:12px;color:var(--txtm);margin-bottom:14px;">Enter your current PIN, then choose a new one.</div>
+    <div id="cpSubtitle" style="font-size:12px;color:var(--txtm);margin-bottom:14px;">Enter your current PIN, then choose a new one.</div>
     <div style="margin-bottom:10px;">
       <label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:5px;">Current PIN</label>
       <input type="password" id="cpCurrent" inputmode="numeric" maxlength="6" placeholder="Current PIN" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bdr);background:var(--card2);color:var(--txt);font-size:16px;letter-spacing:4px;text-align:center;box-sizing:border-box;">
@@ -588,7 +588,7 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
     </div>
     <div id="cpErr" style="font-size:12px;color:var(--red);margin-bottom:10px;min-height:16px;"></div>
     <div style="display:flex;gap:8px;">
-      <button class="btn btn-o" style="flex:1;" onclick="closeChangePin()">Cancel</button>
+      <button id="cpCancelBtn" class="btn btn-o" style="flex:1;" onclick="closeChangePin()">Cancel</button>
       <button class="btn btn-p" style="flex:1;" onclick="submitChangePin()"><i class="fa-solid fa-check" style="margin-right:6px;"></i>Save</button>
     </div>
   </div>
@@ -1398,6 +1398,17 @@ async function empSavePhoto(){
 }
 function closeChangePin(){
   document.getElementById('changePinModal').style.display='none';
+  document.getElementById('cpSubtitle').textContent='Enter your current PIN, then choose a new one.';
+  document.getElementById('cpCancelBtn').style.display='';
+}
+function openChangePinForced(){
+  document.getElementById('cpCurrent').value='';
+  document.getElementById('cpNew').value='';
+  document.getElementById('cpConfirm').value='';
+  document.getElementById('cpErr').textContent='';
+  document.getElementById('cpSubtitle').textContent='Your PIN was reset by the office. Enter the PIN they gave you, then set your new one.';
+  document.getElementById('cpCancelBtn').style.display='none';
+  document.getElementById('changePinModal').style.display='flex';
 }
 async function submitChangePin(){
   const cur=document.getElementById('cpCurrent').value;
@@ -1415,6 +1426,9 @@ async function submitChangePin(){
   if(reAuthErr){errEl.textContent='Current PIN is incorrect';return;}
   const {error}=await sb.auth.updateUser({password:n1});
   if(error){errEl.textContent='Could not update PIN. Check connection.';return;}
+  // Sync new PIN to employees table so office always sees current PIN
+  await sb.from('employees').update({temp_pin:n1,force_pin_change:false}).eq('id',emp.id);
+  emp.temp_pin=n1;emp.force_pin_change=false;
   closeChangePin();
   toast('PIN updated','s');
 }
@@ -1517,6 +1531,7 @@ async function enterApp(e){
   if(typeof Notification!=='undefined'&&Notification.permission==='granted'){
     _swGetSub().then(sub=>{if(sub)_savePushSub(sub,e.id);}).catch(()=>{});
   }
+  if(e.force_pin_change){setTimeout(openChangePinForced,400);}
 }
 function confirmLogout(){
   if(confirm('Sign out? You will need your PIN to sign back in.'))doLogout();

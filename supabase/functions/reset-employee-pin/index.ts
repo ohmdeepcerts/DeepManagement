@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
 
   const { error: pinErr } = await sb
     .from('employees')
-    .update({ temp_pin: newPin })
+    .update({ temp_pin: newPin, force_pin_change: true })
     .eq('id', employee_id);
 
   if (pinErr) return json({ error: 'Could not store new PIN' }, 500);
