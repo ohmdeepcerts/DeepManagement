@@ -10270,6 +10270,8 @@ async function vehOpenModal(id){
     document.getElementById('vTax').value=data.tax_expiry||'';
     document.getElementById('vIns').value=data.insurance_expiry||'';
     document.getElementById('vInsPersons').value=data.insured_persons||'';
+    document.getElementById('vKeeperName').value=data.registered_keeper_name||'';
+    document.getElementById('vKeeperAddress').value=data.registered_keeper_address||'';
     document.getElementById('vNotes').value=data.notes||'';
     const ids=(data.assigned_employee_ids||[]);
     ids.forEach(id=>{const chk=document.getElementById(`vEmpChk_${id}`);if(chk)chk.checked=true;});
@@ -10295,6 +10297,8 @@ async function vehSaveModal(){
     tax_expiry:document.getElementById('vTax').value||null,
     insurance_expiry:document.getElementById('vIns').value||null,
     insured_persons:(document.getElementById('vInsPersons').value||'').trim()||null,
+    registered_keeper_name:(document.getElementById('vKeeperName').value||'').trim()||null,
+    registered_keeper_address:(document.getElementById('vKeeperAddress').value||'').trim()||null,
     assigned_employee_ids:Array.from(document.querySelectorAll('#vAssignedEmpList input[type="checkbox"]:checked')).map(c=>c.value).filter(Boolean),
     notes:(document.getElementById('vNotes').value||'').trim()||null,
   };
@@ -10501,6 +10505,8 @@ function vehDetail(id){vehOpenModal(id);}
         <div class="fgl"><label>Road Tax Expiry</label><div style="display:flex;gap:6px;align-items:center"><input type="date" id="vTax" style="flex:1"><button onclick="vehCheckTax()" class="btn btn-o" style="flex-shrink:0;padding:6px 10px;font-size:11px;white-space:nowrap" title="Copies reg &amp; opens GOV.UK tax checker"><i class="fa-solid fa-arrow-up-right-from-square"></i> GOV.UK</button></div></div>
         <div class="fgl"><label>Insurance Expiry</label><div style="display:flex;gap:6px;align-items:center"><input type="date" id="vIns" style="flex:1"><button onclick="vehCheckIns()" class="btn btn-o" style="flex-shrink:0;padding:6px 10px;font-size:11px;white-space:nowrap" title="Copies reg &amp; opens MIB insurance checker"><i class="fa-solid fa-arrow-up-right-from-square"></i> MIB</button></div></div>
         <div class="fgl" style="grid-column:1/-1"><label>Insured Persons</label><input type="text" id="vInsPersons" placeholder="e.g. Mandeep, Harjit, Gurpreet"></div>
+        <div class="fgl" style="grid-column:1/-1"><label>Registered Keeper Name <span style="font-weight:400;color:var(--txt2);font-size:11px">(from V5C)</span></label><input type="text" id="vKeeperName" placeholder="e.g. Mandeep Singh"></div>
+        <div class="fgl" style="grid-column:1/-1"><label>Registered Keeper Address <span style="font-weight:400;color:var(--txt2);font-size:11px">(from V5C)</span></label><textarea id="vKeeperAddress" rows="2" placeholder="e.g. 12 High Street, Birmingham, B1 1AA" style="resize:vertical;width:100%;border:1.5px solid var(--bdr);border-radius:var(--rs);padding:8px 10px;font-size:13px;font-family:inherit;background:var(--card2);color:var(--txt);outline:none"></textarea></div>
         <div class="fgl" style="grid-column:1/-1">
           <label>Assigned Employees</label>
           <div id="vAssignedEmpList" style="border:1.5px solid var(--bdr);border-radius:var(--rs);max-height:130px;overflow-y:auto;background:var(--card2)"><div style="padding:8px 12px;font-size:12px;color:var(--txt2)">Loading…</div></div>
