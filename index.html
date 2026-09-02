@@ -3408,10 +3408,10 @@ function fmtLoginAge(ts){
 }
 async function refreshLoginBadges(){
   try{
-    const {data,error}=await sb.rpc('get_employee_last_logins');
+    const {data,error}=await sb.from('employees').select('id,last_active_at');
     if(!error&&data){
       window.empLastLogin={};
-      data.forEach(r=>{window.empLastLogin[r.employee_id]=r.last_sign_in_at;});
+      data.forEach(r=>{window.empLastLogin[r.id]=r.last_active_at;});
     }
   }catch(e){}
   document.querySelectorAll('[data-eml]').forEach(el=>{
