@@ -1573,8 +1573,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
           <button type="button" onclick="resetEmpPin()" class="btn-sm" style="background:var(--acc);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-rotate-right"></i> Reset PIN</button>
           <span id="v2ResetMsg" style="font-size:12px;color:var(--txtm);font-family:monospace;"></span>
         </div>
-        <div class="fgl"><label>Set Temporary PIN (6 digits) — employee will change on first login</label><input type="text" inputmode="numeric" id="eTempPin" maxlength="6" placeholder="e.g. 123456 — leave blank to keep current"></div>
-        <p style="font-size:12px;color:var(--txtm);margin-top:7px;">Once set, share this temp PIN with the employee. They enter it in the v2 app to create their account and set a permanent PIN.</p>
+        <p style="font-size:12px;color:var(--txtm);margin-top:4px;">A first-login PIN is auto-generated when you add a new employee. Share it with them — they use it to create their account and set their own PIN.</p>
       </div>
     </div>
     <!-- SALARY HISTORY TAB -->
@@ -6788,7 +6787,7 @@ async function confirmMarkEx(id){
 function openEmpModal(){
   document.getElementById('empMTitle').textContent='Add Employee';
   document.getElementById('empId').value='';
-  ['eName','eRole','ePhone','eNotes','eSalary','eContHrs','eContHrsD','eDailyRate','eHrRate','eOTThr','eOTMult','eOTFlat','eSat','eSun','eBankAmt','eBankCustom','eTempPin'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['eName','eRole','ePhone','eNotes','eSalary','eContHrs','eContHrsD','eDailyRate','eHrRate','eOTThr','eOTMult','eOTFlat','eSat','eSun','eBankAmt','eBankCustom'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('eStatus').value='Active';
   document.getElementById('eContract').value='PAYE';
   document.getElementById('eOTType').value='multiplier';
@@ -6877,7 +6876,6 @@ async function editEmpModal(id){
   }
   const _v2ResetArea=document.getElementById('v2ResetArea');
   if(_v2ResetArea){_v2ResetArea.style.display=emp.auth_user_id?'flex':'none';const _rm=document.getElementById('v2ResetMsg');if(_rm)_rm.textContent='';}
-  const _eTempPin=document.getElementById('eTempPin');if(_eTempPin)_eTempPin.value='';
   refreshBankSel();
   const stored=emp.bank_name||'';
   const accounts=cfg.bank_accounts||[];
@@ -7010,7 +7008,7 @@ async function saveEmployee(){
     sun_mult:document.getElementById('eSun').value?parseFloat(document.getElementById('eSun').value):null,
     bank_amt:document.getElementById('eBankAmt').value?parseFloat(document.getElementById('eBankAmt').value):null,
     bank_name:bkName||null,
-    temp_pin:(function(){var v=(document.getElementById('eTempPin')?.value||'').trim();return v?v:undefined;})(),
+    temp_pin:empId?undefined:String(Math.floor(Math.random()*900000)+100000),
     show_pay_tab:document.getElementById('eShowPayTab').checked,
     show_running_pay:document.getElementById('eShowRunningPay').checked,
     work_days:(function(){var cbs=document.querySelectorAll('.eWorkDay:checked');return cbs.length?Array.from(cbs).map(function(c){return parseInt(c.value);}):null;})(),
