@@ -570,29 +570,200 @@ body.time-night{--time-tint:rgba(15,23,42,0.15);}
   </div>
 </div>
 
-<div id="changePinModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:flex-end;justify-content:center;">
-  <div style="background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:430px;padding:20px 18px calc(40px + max(env(safe-area-inset-bottom),10px));max-height:88vh;overflow-y:auto;">
-    <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr);margin:0 auto 18px;"></div>
-    <div style="font-size:17px;font-weight:800;margin-bottom:4px;">Change PIN</div>
-    <div id="cpSubtitle" style="font-size:12px;color:var(--txtm);margin-bottom:14px;">Enter your current PIN, then choose a new one.</div>
-    <div style="margin-bottom:10px;">
-      <label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:5px;">Current PIN</label>
-      <input type="password" id="cpCurrent" inputmode="numeric" maxlength="6" placeholder="Current PIN" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bdr);background:var(--card2);color:var(--txt);font-size:16px;letter-spacing:4px;text-align:center;box-sizing:border-box;">
+<style>
+/* ── Premium OTP / Change PIN modal ── */
+#changePinModal{display:none;position:fixed;inset:0;z-index:600;align-items:flex-end;justify-content:center;}
+#cp-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0);backdrop-filter:blur(0px);transition:background .38s ease,backdrop-filter .38s ease;}
+#changePinModal.cpOpen #cp-backdrop{background:rgba(0,0,0,.58);backdrop-filter:blur(10px);}
+#cp-panel{
+  position:relative;width:100%;max-width:430px;
+  height:calc(100% - 28px);
+  background:var(--bg);border-radius:24px 24px 0 0;
+  display:flex;flex-direction:column;overflow:hidden;
+  transform:translateY(100%);
+  transition:transform .48s cubic-bezier(.16,1,.3,1);
+  box-shadow:0 -8px 48px rgba(0,0,0,.22);
+}
+#changePinModal.cpOpen #cp-panel{transform:translateY(0);}
+#cp-screens{flex:1;position:relative;overflow:hidden;}
+.cp-scr{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;
+  padding:0 22px max(env(safe-area-inset-bottom),24px);
+  opacity:0;transform:translateX(32px);pointer-events:none;
+  transition:opacity .32s ease,transform .32s ease;
+  overflow-y:auto;
+}
+.cp-scr.cpA{opacity:1;transform:translateX(0);pointer-events:all;}
+.cp-scr.cpX{opacity:0;transform:translateX(-32px);}
+/* Icon */
+.cp-ico{width:56px;height:56px;border-radius:16px;background:var(--accl);border:1px solid rgba(37,99,235,.18);display:flex;align-items:center;justify-content:center;font-size:24px;margin:22px 0 14px;flex-shrink:0;}
+/* Titles */
+.cp-h{font-size:20px;font-weight:800;color:var(--txt);text-align:center;margin-bottom:5px;line-height:1.25;}
+.cp-s{font-size:12px;color:var(--txtm);text-align:center;line-height:1.55;max-width:230px;}
+/* OTP pill */
+.cp-pill{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--bdr);border-radius:20px;padding:5px 13px;font-size:11px;color:var(--txt2);margin:14px 0 18px;flex-shrink:0;}
+.cp-plsdot{width:6px;height:6px;border-radius:50%;background:var(--acc);flex-shrink:0;animation:cpPPulse 2s ease-in-out infinite;}
+@keyframes cpPPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.28;transform:scale(.6);}}
+/* OTP 6-box row */
+.cp-orow{display:flex;gap:8px;margin:14px 0 20px;flex-shrink:0;}
+.cp-ob{
+  width:40px;height:50px;border-radius:11px;
+  border:1.5px solid var(--bdr);background:var(--card);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:800;color:var(--txt);
+  font-family:'Plus Jakarta Sans',sans-serif;
+  transition:border-color .18s,box-shadow .18s,background .18s;
+}
+.cp-ob.cpCur{border-color:var(--acc);box-shadow:0 0 0 3px rgba(37,99,235,.13);background:var(--accl);}
+.cp-ob.cpDone{border-color:rgba(37,99,235,.35);background:var(--accl);}
+.cp-ob .cp-caret{width:1.5px;height:20px;background:var(--acc);display:none;animation:cpBlnk .9s step-end infinite;}
+.cp-ob.cpCur.cpEmp .cp-caret{display:block;}
+@keyframes cpBlnk{50%{opacity:0;}}
+.cp-ob.cpPop{animation:cpOPop .22s cubic-bezier(.36,.07,.19,.97);}
+@keyframes cpOPop{0%{transform:scale(1);}38%{transform:scale(.84);}70%{transform:scale(1.1);}100%{transform:scale(1);}}
+.cp-ob.cpShk{animation:cpOShk .36s ease;}
+@keyframes cpOShk{0%,100%{transform:translateX(0);}22%{transform:translateX(-6px);}55%{transform:translateX(6px);}78%{transform:translateX(-4px);}92%{transform:translateX(4px);}}
+/* Keypad */
+.cp-kp{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;width:100%;max-width:256px;flex-shrink:0;}
+.cp-k{
+  height:52px;border-radius:12px;border:1px solid var(--bdr);background:var(--card);
+  color:var(--txt);font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:background .12s,transform .1s;user-select:none;-webkit-tap-highlight-color:transparent;
+}
+.cp-k:active{background:var(--card2);transform:scale(.93);}
+.cp-ksm{font-size:12px;color:var(--txtm);font-weight:600;}
+/* CTA button */
+.cp-btn{
+  width:100%;max-width:256px;height:50px;border-radius:13px;border:none;
+  background:var(--acc);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  transition:opacity .18s,transform .12s,background .2s;
+}
+.cp-btn:disabled{opacity:.28;cursor:not-allowed;}
+.cp-btn:not(:disabled):active{transform:scale(.97);}
+/* PIN dots */
+.cp-prow{display:flex;gap:14px;margin:14px 0 24px;flex-shrink:0;}
+.cp-pd{width:14px;height:14px;border-radius:50%;border:2px solid var(--bdr);background:transparent;transition:background .18s,border-color .18s;}
+.cp-pd.on{background:var(--acc);border-color:var(--acc);}
+.cp-pd.pdPop{animation:cpPdPop .2s cubic-bezier(.36,.07,.19,.97);}
+@keyframes cpPdPop{0%{transform:scale(1);}50%{transform:scale(1.55);}100%{transform:scale(1);}}
+/* Verifying screen */
+.cp-vdots{display:flex;gap:9px;margin:36px 0 20px;}
+.cp-vd{width:10px;height:10px;border-radius:50%;background:var(--acc);animation:cpVD 1.2s ease-in-out infinite;}
+.cp-vd:nth-child(2){animation-delay:.15s;}.cp-vd:nth-child(3){animation-delay:.3s;}
+@keyframes cpVD{0%,80%,100%{transform:scale(.5);opacity:.3;}40%{transform:scale(1);opacity:1;}}
+/* Verified ring */
+.cp-ring{width:76px;height:76px;margin:28px 0 14px;flex-shrink:0;}
+.cp-ring .cpTrack{fill:none;stroke:rgba(22,163,74,.15);stroke-width:4;}
+.cp-ring .cpArc{fill:none;stroke:var(--grn);stroke-width:4;stroke-linecap:round;stroke-dasharray:210;stroke-dashoffset:210;transform-origin:center;transform:rotate(-90deg);}
+.cp-ring .cpTick{fill:none;stroke:var(--grn);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:56;stroke-dashoffset:56;}
+#cpScrOK.cpA .cpArc{animation:cpArcIn .55s cubic-bezier(.4,0,.2,1) .06s forwards;}
+#cpScrOK.cpA .cpTick{animation:cpTickIn .28s ease .6s forwards;}
+@keyframes cpArcIn{to{stroke-dashoffset:0;}}
+@keyframes cpTickIn{to{stroke-dashoffset:0;}}
+.cp-vbadge{display:inline-flex;align-items:center;gap:5px;background:var(--grnl);border:1px solid rgba(22,163,74,.25);border-radius:20px;padding:4px 12px;font-size:10px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--grn);margin-bottom:16px;animation:cpBdgIn .4s ease .88s both;}
+@keyframes cpBdgIn{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:none;}}
+/* Header */
+.cp-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 0;flex-shrink:0;width:100%;}
+.cp-back{background:none;border:none;color:var(--acc);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:4px;}
+.cp-steplbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--acc);padding:3px 10px;background:var(--accl);border-radius:20px;}
+/* Error */
+.cp-err{font-size:12px;color:var(--red);min-height:16px;text-align:center;margin-top:8px;flex-shrink:0;max-width:256px;}
+/* Step indicator */
+.cp-sdots{display:flex;gap:5px;margin-top:auto;padding-top:8px;flex-shrink:0;}
+.cp-sd{width:5px;height:5px;border-radius:3px;background:var(--bdr);transition:width .32s,background .32s;}
+.cp-sd.on{width:20px;background:var(--acc);}
+</style>
+
+<div id="changePinModal" style="display:none;align-items:flex-end;justify-content:center;">
+  <div id="cp-backdrop" onclick="if(!_cpForced)closeChangePin()"></div>
+  <div id="cp-panel">
+    <!-- Handle + header -->
+    <div style="width:36px;height:4px;border-radius:2px;background:var(--bdr);margin:14px auto 0;flex-shrink:0;"></div>
+    <div class="cp-hdr">
+      <button class="cp-back" id="cpCancelBtn" onclick="closeChangePin()"><i class="fa-solid fa-chevron-left" style="font-size:12px"></i> Close</button>
+      <div class="cp-steplbl" id="cp-steplbl">Step 1 of 2</div>
     </div>
-    <div style="margin-bottom:10px;">
-      <label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:5px;">New PIN (4-6 digits)</label>
-      <input type="password" id="cpNew" inputmode="numeric" maxlength="6" placeholder="New PIN" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bdr);background:var(--card2);color:var(--txt);font-size:16px;letter-spacing:4px;text-align:center;box-sizing:border-box;">
-    </div>
-    <div style="margin-bottom:14px;">
-      <label style="font-size:12px;font-weight:600;color:var(--txt2);display:block;margin-bottom:5px;">Confirm New PIN</label>
-      <input type="password" id="cpConfirm" inputmode="numeric" maxlength="6" placeholder="Confirm new PIN" style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--bdr);background:var(--card2);color:var(--txt);font-size:16px;letter-spacing:4px;text-align:center;box-sizing:border-box;">
-    </div>
-    <div id="cpErr" style="font-size:12px;color:var(--red);margin-bottom:10px;min-height:16px;"></div>
-    <div style="display:flex;gap:8px;">
-      <button id="cpCancelBtn" class="btn btn-o" style="flex:1;" onclick="closeChangePin()">Cancel</button>
-      <button class="btn btn-p" style="flex:1;" onclick="submitChangePin()"><i class="fa-solid fa-check" style="margin-right:6px;"></i>Save</button>
-    </div>
-  </div>
+    <!-- Screens -->
+    <div id="cp-screens">
+      <!-- S1: OTP / Current PIN entry -->
+      <div class="cp-scr cpA" id="cpScrOtp">
+        <div class="cp-ico" id="cpOtpIco">🔐</div>
+        <div class="cp-h" id="cpOtpTitle">Enter your OTP</div>
+        <div class="cp-s" id="cpOtpSub">Contact your office to receive your one-time passcode</div>
+        <div class="cp-pill" id="cpOtpPill"><div class="cp-plsdot"></div><span id="cpPillTxt">OTP sent to office</span></div>
+        <div class="cp-orow">
+          <div class="cp-ob cpCur cpEmp" id="cpB0"><div class="cp-caret"></div></div>
+          <div class="cp-ob" id="cpB1"></div>
+          <div class="cp-ob" id="cpB2"></div>
+          <div class="cp-ob" id="cpB3"></div>
+          <div class="cp-ob" id="cpB4"></div>
+          <div class="cp-ob" id="cpB5"></div>
+        </div>
+        <div class="cp-kp">
+          <button class="cp-k" onclick="cpOK('1')">1</button><button class="cp-k" onclick="cpOK('2')">2</button><button class="cp-k" onclick="cpOK('3')">3</button>
+          <button class="cp-k" onclick="cpOK('4')">4</button><button class="cp-k" onclick="cpOK('5')">5</button><button class="cp-k" onclick="cpOK('6')">6</button>
+          <button class="cp-k" onclick="cpOK('7')">7</button><button class="cp-k" onclick="cpOK('8')">8</button><button class="cp-k" onclick="cpOK('9')">9</button>
+          <button class="cp-k cp-ksm" onclick="cpOC()">Clear</button><button class="cp-k" onclick="cpOK('0')">0</button><button class="cp-k cp-ksm" onclick="cpOD()">⌫</button>
+        </div>
+        <button class="cp-btn" id="cpBtnVerify" disabled onclick="cpDoVerify()">Verify OTP</button>
+        <div class="cp-err" id="cpErr"></div>
+        <div class="cp-sdots"><div class="cp-sd on"></div><div class="cp-sd"></div></div>
+      </div>
+      <!-- S2: Verifying -->
+      <div class="cp-scr" id="cpScrVfy">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div class="cp-vdots"><div class="cp-vd"></div><div class="cp-vd"></div><div class="cp-vd"></div></div>
+          <div class="cp-h">Verifying OTP…</div>
+          <div class="cp-s" style="margin-top:5px">Checking your one-time passcode</div>
+        </div>
+      </div>
+      <!-- S3: Verified (forced flow only) -->
+      <div class="cp-scr" id="cpScrOK">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-bottom:40px;">
+          <svg class="cp-ring" viewBox="0 0 76 76"><circle class="cpTrack" cx="38" cy="38" r="33"/><circle class="cpArc" cx="38" cy="38" r="33"/><polyline class="cpTick" points="22,38 33,49 54,27"/></svg>
+          <div class="cp-h" style="color:var(--grn);margin-bottom:8px">OTP Verified!</div>
+          <div class="cp-vbadge">✓ Identity confirmed</div>
+          <div class="cp-s">Your one-time passcode has been verified. Now set your new PIN.</div>
+        </div>
+      </div>
+      <!-- S4: New PIN -->
+      <div class="cp-scr" id="cpScrNew">
+        <div class="cp-ico">🔒</div>
+        <div class="cp-h" id="cpNewTitle">Set your new PIN</div>
+        <div class="cp-s" style="margin-bottom:0">Choose 6 digits you'll remember</div>
+        <div class="cp-prow" id="cpNewDots"><div class="cp-pd"></div><div class="cp-pd"></div><div class="cp-pd"></div><div class="cp-pd"></div><div class="cp-pd"></div><div class="cp-pd"></div></div>
+        <div class="cp-kp">
+          <button class="cp-k" onclick="cpNK('1')">1</button><button class="cp-k" onclick="cpNK('2')">2</button><button class="cp-k" onclick="cpNK('3')">3</button>
+          <button class="cp-k" onclick="cpNK('4')">4</button><button class="cp-k" onclick="cpNK('5')">5</button><button class="cp-k" onclick="cpNK('6')">6</button>
+          <button class="cp-k" onclick="cpNK('7')">7</button><button class="cp-k" onclick="cpNK('8')">8</button><button class="cp-k" onclick="cpNK('9')">9</button>
+          <button class="cp-k cp-ksm" onclick="cpNC()">Clear</button><button class="cp-k" onclick="cpNK('0')">0</button><button class="cp-k cp-ksm" onclick="cpND()">⌫</button>
+        </div>
+        <button class="cp-btn" id="cpBtnNext" disabled onclick="cpGoConfirm()">Continue →</button>
+        <div class="cp-err" id="cpErrNew"></div>
+        <div class="cp-sdots"><div class="cp-sd"></div><div class="cp-sd on"></div></div>
+      </div>
+      <!-- S5: Confirm PIN -->
+      <div class="cp-scr" id="cpScrConf">
+        <div class="cp-ico">🔑</div>
+        <div class="cp-h">Confirm your PIN</div>
+        <div class="cp-s" style="margin-bottom:0">Enter the same PIN again</div>
+        <div class="cp-prow" id="cpConfDots"><div class="cp-pd"></div><div class="cp-pd"></div><div class="cp-pd"></div><div class="cp-pd"></div><div class="cp-pd"></div><div class="cp-pd"></div></div>
+        <div class="cp-kp">
+          <button class="cp-k" onclick="cpCK('1')">1</button><button class="cp-k" onclick="cpCK('2')">2</button><button class="cp-k" onclick="cpCK('3')">3</button>
+          <button class="cp-k" onclick="cpCK('4')">4</button><button class="cp-k" onclick="cpCK('5')">5</button><button class="cp-k" onclick="cpCK('6')">6</button>
+          <button class="cp-k" onclick="cpCK('7')">7</button><button class="cp-k" onclick="cpCK('8')">8</button><button class="cp-k" onclick="cpCK('9')">9</button>
+          <button class="cp-k cp-ksm" onclick="cpCC()">Clear</button><button class="cp-k" onclick="cpCK('0')">0</button><button class="cp-k cp-ksm" onclick="cpCD()">⌫</button>
+        </div>
+        <button class="cp-btn" id="cpBtnSave" disabled onclick="submitChangePin()">Save PIN</button>
+        <div class="cp-err" id="cpErrConf"></div>
+        <div class="cp-sdots"><div class="cp-sd"></div><div class="cp-sd on"></div></div>
+      </div>
+    </div><!-- /cp-screens -->
+  </div><!-- /cp-panel -->
 </div>
 
 <!-- APP -->
@@ -1170,13 +1341,23 @@ async function checkForUpdateAndReload(isFirstCheck){
     // Silent — ignore (e.g. offline or version.json not yet deployed)
   }
 }
+/* ── OTP / Change PIN state ── */
+let _cpForced=false,_cpOtpV='',_cpNewV='',_cpConfV='';
+
 function openChangePin(){
   const m=document.getElementById('pillMenu');if(m)m.style.display='none';
-  document.getElementById('cpCurrent').value='';
-  document.getElementById('cpNew').value='';
-  document.getElementById('cpConfirm').value='';
-  document.getElementById('cpErr').textContent='';
-  document.getElementById('changePinModal').style.display='flex';
+  _cpForced=false;
+  _cpResetAll();
+  document.getElementById('cpOtpIco').textContent='🔐';
+  document.getElementById('cpOtpTitle').textContent='Enter your current PIN';
+  document.getElementById('cpOtpSub').textContent='Verify your identity before changing your PIN';
+  document.getElementById('cpOtpPill').style.display='none';
+  document.getElementById('cpCancelBtn').style.display='';
+  document.getElementById('cp-steplbl').textContent='Step 1 of 2';
+  _cpGoScreen('cpScrOtp');
+  const modal=document.getElementById('changePinModal');
+  modal.style.display='flex';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>modal.classList.add('cpOpen')));
 }
 
 // ── PHOTO CHANGE ──
@@ -1398,40 +1579,148 @@ async function empSavePhoto(){
   toast('Photo updated','s');
 }
 function closeChangePin(){
-  document.getElementById('changePinModal').style.display='none';
-  document.getElementById('cpSubtitle').textContent='Enter your current PIN, then choose a new one.';
-  document.getElementById('cpCancelBtn').style.display='';
+  if(_cpForced)return;
+  const modal=document.getElementById('changePinModal');
+  modal.classList.remove('cpOpen');
+  setTimeout(()=>{modal.style.display='none';},480);
 }
 function openChangePinForced(){
-  document.getElementById('cpCurrent').value='';
-  document.getElementById('cpNew').value='';
-  document.getElementById('cpConfirm').value='';
-  document.getElementById('cpErr').textContent='';
-  document.getElementById('cpSubtitle').textContent='Your PIN was reset by the office. Enter the PIN they gave you, then set your new one.';
+  _cpForced=true;
+  _cpResetAll();
+  document.getElementById('cpOtpIco').textContent='🔑';
+  document.getElementById('cpOtpTitle').textContent='Enter your OTP';
+  document.getElementById('cpOtpSub').textContent='Your PIN was reset by the office. Contact them for your one-time passcode.';
+  document.getElementById('cpOtpPill').style.display='';
   document.getElementById('cpCancelBtn').style.display='none';
-  document.getElementById('changePinModal').style.display='flex';
+  document.getElementById('cp-steplbl').textContent='Step 1 of 2';
+  _cpGoScreen('cpScrOtp');
+  const modal=document.getElementById('changePinModal');
+  modal.style.display='flex';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>modal.classList.add('cpOpen')));
 }
 async function submitChangePin(){
-  const cur=document.getElementById('cpCurrent').value;
-  const n1=document.getElementById('cpNew').value;
-  const n2=document.getElementById('cpConfirm').value;
-  const errEl=document.getElementById('cpErr');
-  errEl.textContent='';
-  if(!/^\d{6}$/.test(cur)){errEl.textContent='Enter your current 6-digit PIN';return;}
-  if(!/^\d{6}$/.test(n1)){errEl.textContent='New PIN must be exactly 6 digits';return;}
-  if(n1!==n2){errEl.textContent='New PINs do not match';return;}
-  if(n1===cur){errEl.textContent='New PIN must be different from current PIN';return;}
-  // Re-authenticate to verify the current PIN is correct before allowing change
+  const btn=document.getElementById('cpBtnSave');
+  btn.disabled=true;btn.textContent='Saving…';
   const email=normPhone(emp.phone)+'@ohm.internal';
-  const {error:reAuthErr}=await sb.auth.signInWithPassword({email,password:cur});
-  if(reAuthErr){errEl.textContent='Current PIN is incorrect';return;}
-  const {error}=await sb.auth.updateUser({password:n1});
-  if(error){errEl.textContent='Could not update PIN. Check connection.';return;}
-  // Sync new PIN to employees table so office always sees current PIN
-  await sb.from('employees').update({temp_pin:n1,force_pin_change:false}).eq('id',emp.id);
-  emp.temp_pin=n1;emp.force_pin_change=false;
-  closeChangePin();
+  const {error}=await sb.auth.updateUser({password:_cpNewV});
+  if(error){
+    document.getElementById('cpErrConf').textContent='Could not update PIN. Check connection.';
+    btn.disabled=false;btn.textContent='Save PIN';return;
+  }
+  await sb.from('employees').update({temp_pin:_cpNewV,force_pin_change:false}).eq('id',emp.id);
+  emp.temp_pin=_cpNewV;emp.force_pin_change=false;
+  _cpForced=false;
+  const modal=document.getElementById('changePinModal');
+  modal.classList.remove('cpOpen');
+  setTimeout(()=>{modal.style.display='none';},480);
   toast('PIN updated','s');
+}
+
+/* ── OTP modal helpers ── */
+function _cpResetAll(){
+  _cpOtpV='';_cpNewV='';_cpConfV='';
+  _cpRenderOtp();_cpRenderPinDots('cpNewDots',0);_cpRenderPinDots('cpConfDots',0);
+  document.getElementById('cpErr').textContent='';
+  document.getElementById('cpErrNew').textContent='';
+  document.getElementById('cpErrConf').textContent='';
+  document.getElementById('cpBtnVerify').disabled=true;
+  document.getElementById('cpBtnNext').disabled=true;
+  document.getElementById('cpBtnSave').disabled=true;
+  const sb2=document.getElementById('cpBtnSave');sb2.textContent='Save PIN';
+}
+function _cpGoScreen(id){
+  document.querySelectorAll('.cp-scr').forEach(s=>{
+    s.classList.remove('cpA','cpX');
+    if(s.id!==id)s.classList.add('cpX');
+  });
+  const target=document.getElementById(id);
+  requestAnimationFrame(()=>{target.classList.remove('cpX');target.classList.add('cpA');});
+  const lbl=document.getElementById('cp-steplbl');
+  if(id==='cpScrOtp')lbl.textContent='Step 1 of 2';
+  else if(id==='cpScrNew'||id==='cpScrConf')lbl.textContent='Step 2 of 2';
+  else lbl.textContent='Verifying';
+}
+function _cpRenderOtp(){
+  for(let i=0;i<6;i++){
+    const b=document.getElementById('cpB'+i);
+    if(!b)continue;
+    b.classList.remove('cpCur','cpEmp','cpDone','cpPop');
+    const val=_cpOtpV[i];
+    if(val!=null){
+      b.innerHTML=val;b.classList.add('cpDone');
+    }else{
+      b.innerHTML='<div class="cp-caret"></div>';
+      if(i===_cpOtpV.length){b.classList.add('cpCur','cpEmp');}
+    }
+  }
+}
+function _cpRenderPinDots(elId,len){
+  const row=document.getElementById(elId);if(!row)return;
+  row.querySelectorAll('.cp-pd').forEach((d,i)=>{
+    d.classList.toggle('on',i<len);
+  });
+}
+/* OTP keypad */
+function cpOK(d){
+  if(_cpOtpV.length>=6)return;
+  _cpOtpV+=d;
+  const b=document.getElementById('cpB'+(_cpOtpV.length-1));
+  if(b){b.classList.add('cpPop');setTimeout(()=>b.classList.remove('cpPop'),250);}
+  _cpRenderOtp();
+  document.getElementById('cpBtnVerify').disabled=_cpOtpV.length<6;
+}
+function cpOD(){if(!_cpOtpV.length)return;_cpOtpV=_cpOtpV.slice(0,-1);_cpRenderOtp();document.getElementById('cpBtnVerify').disabled=true;}
+function cpOC(){_cpOtpV='';_cpRenderOtp();document.getElementById('cpBtnVerify').disabled=true;}
+/* New PIN keypad */
+function cpNK(d){
+  if(_cpNewV.length>=6)return;
+  _cpNewV+=d;
+  _cpRenderPinDots('cpNewDots',_cpNewV.length);
+  document.getElementById('cpBtnNext').disabled=_cpNewV.length<6;
+}
+function cpND(){if(!_cpNewV.length)return;_cpNewV=_cpNewV.slice(0,-1);_cpRenderPinDots('cpNewDots',_cpNewV.length);document.getElementById('cpBtnNext').disabled=true;}
+function cpNC(){_cpNewV='';_cpRenderPinDots('cpNewDots',0);document.getElementById('cpBtnNext').disabled=true;}
+/* Confirm PIN keypad */
+function cpCK(d){
+  if(_cpConfV.length>=6)return;
+  _cpConfV+=d;
+  _cpRenderPinDots('cpConfDots',_cpConfV.length);
+  document.getElementById('cpBtnSave').disabled=_cpConfV.length<6;
+}
+function cpCD(){if(!_cpConfV.length)return;_cpConfV=_cpConfV.slice(0,-1);_cpRenderPinDots('cpConfDots',_cpConfV.length);document.getElementById('cpBtnSave').disabled=true;}
+function cpCC(){_cpConfV='';_cpRenderPinDots('cpConfDots',0);document.getElementById('cpBtnSave').disabled=true;}
+/* Verify OTP */
+async function cpDoVerify(){
+  if(_cpOtpV.length<6)return;
+  _cpGoScreen('cpScrVfy');
+  const email=normPhone(emp.phone)+'@ohm.internal';
+  const {error}=await sb.auth.signInWithPassword({email,password:_cpOtpV});
+  if(error){
+    _cpGoScreen('cpScrOtp');
+    document.getElementById('cpErr').textContent='Incorrect OTP — please try again';
+    for(let i=0;i<6;i++){const b=document.getElementById('cpB'+i);if(b)b.classList.add('cpShk');}
+    setTimeout(()=>{for(let i=0;i<6;i++){const b=document.getElementById('cpB'+i);if(b)b.classList.remove('cpShk');}},400);
+    return;
+  }
+  if(_cpForced){
+    _cpGoScreen('cpScrOK');
+    setTimeout(()=>{
+      _cpGoScreen('cpScrNew');
+    },1800);
+  }else{
+    _cpGoScreen('cpScrNew');
+  }
+}
+/* Continue to confirm screen */
+function cpGoConfirm(){
+  if(_cpNewV.length<6)return;
+  if(_cpNewV===_cpOtpV&&!_cpForced){
+    document.getElementById('cpErrNew').textContent='New PIN must be different from your current PIN';return;
+  }
+  document.getElementById('cpErrNew').textContent='';
+  _cpConfV='';_cpRenderPinDots('cpConfDots',0);
+  document.getElementById('cpBtnSave').disabled=true;
+  _cpGoScreen('cpScrConf');
 }
 document.addEventListener('click',e=>{
   const pill=document.getElementById('idPill',{signal:empSignal()});
