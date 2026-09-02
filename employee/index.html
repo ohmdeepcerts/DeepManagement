@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://pajpoerteyjrprcaisom.supabase.co wss://pajpoerteyjrprcaisom.supabase.co https://generativelanguage.googleapis.com wss://realtime.supabase.co https://en.wikipedia.org; img-src 'self' data: blob: https://pajpoerteyjrprcaisom.supabase.co https://upload.wikimedia.org https://*.wikimedia.org; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com https://cdn.jsdelivr.net;">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="OHM Employee">
@@ -67,6 +67,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:22px;}
 .pin-dot{width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,0.3);transition:var(--tr);}
 .pin-dot.on{background:#fff;border-color:#fff;transform:scale(1.1);}
+@keyframes pinPulse{from{opacity:.3;transform:scale(.8);}to{opacity:1;transform:scale(1.15);}}
 .pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
 .pk{height:62px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.08);font-size:22px;font-weight:700;color:#fff;cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;}
 .pk:active{background:rgba(255,255,255,0.22);transform:scale(0.95);}
@@ -1481,6 +1482,8 @@ async function checkPin(){
   if(pinEntry.length<6){errEl.textContent='Enter all 6 digits';return;}
   const email=selPhone+'@ohm.internal';
   document.querySelectorAll('.pk,.back').forEach(b=>b.style.pointerEvents='none');
+  const _dots=document.getElementById('pinDots');
+  if(_dots)_dots.innerHTML='<div style="display:flex;gap:8px;justify-content:center;"><div style="width:10px;height:10px;border-radius:50%;background:var(--acc);animation:pinPulse .7s ease-in-out infinite alternate" ></div><div style="width:10px;height:10px;border-radius:50%;background:var(--acc);animation:pinPulse .7s .2s ease-in-out infinite alternate"></div><div style="width:10px;height:10px;border-radius:50%;background:var(--acc);animation:pinPulse .7s .4s ease-in-out infinite alternate"></div></div>';
   const {data,error}=await sb.auth.signInWithPassword({email,password:pinEntry});
   document.querySelectorAll('.pk,.back').forEach(b=>b.style.pointerEvents='');
   if(error){

@@ -1830,12 +1830,13 @@ const CONFIG_APP = {
   // Uploads
   MAX_FILE_BYTES: 5242880,  // 5MB max upload size
   // UI
-  PIN_LENGTH:         4,    // employee PIN digits
+  PIN_LENGTH:         6,    // employee PIN digits
   PAST_DATE_WARN_DAYS: 30,  // warn if attendance older than X days
 };
 
 const SUPA_URL='https://pajpoerteyjrprcaisom.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhanBvZXJ0ZXlqcnByY2Fpc29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI4NDEsImV4cCI6MjA5NjQ4ODg0MX0.zUzCg-bq_9ZxYWSmk-Y9a_QqAe0t-45tjHP5Eiyxjcc';
+const ADMIN_SECRET='7e335e445aa28ca11b7c762615e500aab048268b42d33fd9';
 const sb=supabase.createClient(SUPA_URL,SUPA_KEY,{
   global:{
     headers:{'X-Client-Info':'dam-pro/2.0'}
@@ -1844,13 +1845,6 @@ const sb=supabase.createClient(SUPA_URL,SUPA_KEY,{
   auth:{persistSession:true,autoRefreshToken:true}
 });
 
-// ── PIN HASHING — SHA-256 via Web Crypto API ──
-// Stored PINs that are 64-char hex are treated as hashed; shorter = legacy plain-text
-async function hashPin(pin){
-  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(pin)));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-function isPinHashed(pin){return typeof pin==='string'&&pin.length===64&&/^[0-9a-f]+$/.test(pin);}
 
 // ── AUTO SESSION RESTORE ──
 (async function(){
@@ -2068,8 +2062,7 @@ const _deb={};
 function deb(k,fn,ms=900){clearTimeout(_deb[k]);_deb[k]=setTimeout(fn,ms);}
 let _lastSyncTime=null;
 let _syncAgoIv=null;
-// called after successful admin login
-function onAdminLoggedIn(){startAdminAutoRefresh();}
+function onAdminLoggedIn(){}
 let _lastRefreshTime=Date.now();
 let _refreshAgoIv=null;
 function updateRefreshAgo(){
@@ -2691,10 +2684,27 @@ async function doAdminLogin(){
   loadAllData();
 }
 let _idleTimer=null;
-function _resetIdleTimer(){}
+let _idleWarnTimer=null;
+function _resetIdleTimer(){
+  clearTimeout(_idleTimer);clearTimeout(_idleWarnTimer);
+  if(!isLoggedIn)return;
+  // Warn after 25 min of inactivity
+  _idleWarnTimer=setTimeout(()=>{
+    if(!isLoggedIn)return;
+    const stay=confirm('You have been inactive for 25 minutes. Stay signed in?');
+    if(stay){_resetIdleTimer();}else{doSignOut();}
+  },25*60*1000);
+  // Force logout at 30 min regardless
+  _idleTimer=setTimeout(()=>{if(isLoggedIn)doSignOut();},30*60*1000);
+}
+
+// Reset idle timer on any user activity
+['click','keydown','mousemove','touchstart'].forEach(ev=>
+  document.addEventListener(ev,()=>{if(isLoggedIn)_resetIdleTimer();},{passive:true})
+);
 
 async function doSignOut(){
-  clearTimeout(_idleTimer);
+  clearTimeout(_idleTimer);clearTimeout(_idleWarnTimer);
   isLoggedIn=false;
   await sb.auth.signOut();
   document.getElementById('auth-overlay').style.display='flex';
@@ -3114,7 +3124,10 @@ async function ensureYearLoaded(year){
   return true;
 }
 
+let _dataLoading=false;
 async function loadAllData(){
+  if(_dataLoading)return;
+  _dataLoading=true;
   setSyncStatus('saving');
   try{
     // Core tables - must succeed
@@ -3126,7 +3139,7 @@ async function loadAllData(){
       sb.from('attendance').select('*').gte('date',_dataFromDate).order('date',{ascending:false}),
       sb.from('expenses').select('*').gte('date',_dataFromDate).order('date',{ascending:false}),
       sb.from('expense_batches').select('*').order('submitted_at',{ascending:false}),
-      sb.from('messages').select('*').order('created_at')
+      sb.from('messages').select('*').order('created_at').limit(2000)
     ]);
     if(empR.error)throw empR.error;
     employees=empR.data||[];
@@ -3216,7 +3229,7 @@ async function loadAllData(){
         loadAllData();
       }
     },1000);
-  }
+  }finally{_dataLoading=false;}
 }
 
 async function sbInsert(table,data){
@@ -6702,7 +6715,7 @@ async function resetEmpPin(){
   const btn=document.querySelector('#v2ResetArea button');const msg=document.getElementById('v2ResetMsg');
   if(btn)btn.disabled=true;if(msg){msg.textContent='Resetting…';msg.style.color='var(--txtm)';}
   try{
-    const res=await fetch(SUPA_URL+'/functions/v1/reset-employee-pin',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},body:JSON.stringify({employee_id:empId})});
+    const res=await fetch(SUPA_URL+'/functions/v1/reset-employee-pin',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY,'x-admin-secret':ADMIN_SECRET},body:JSON.stringify({employee_id:empId})});
     const data=await res.json();
     if(data.pin){
       const emp=employees.find(e=>e.id===empId);if(emp)emp.temp_pin=data.pin;

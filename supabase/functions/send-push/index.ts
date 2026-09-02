@@ -1,10 +1,6 @@
 // Supabase Edge Function: send-push
-// Called by Supabase Database Webhooks when records change in:
+// Triggered by Supabase Database Webhooks on:
 //   messages, attendance, expense_batches, payment_status, attendance_requests, announcements
-//
-// Required Supabase secrets (set via Dashboard → Project Settings → Edge Functions → Secrets):
-//   VAPID_PRIVATE_KEY  — the private VAPID key (keep this secret, never commit the value)
-//   SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically by Supabase
 
 import webpush from 'npm:web-push';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -18,12 +14,17 @@ const sb = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 );
 
+const STATUS_LABEL: Record<string, string> = {
+  'P': 'Present', 'A': 'Absent', 'L': 'Late', 'EL': 'Left Early',
+  'HD': 'Half Day', 'LA': 'Late Arrival', 'H': 'Holiday',
+  'S': 'Sick', 'WFH': 'Working from Home', 'DO': 'Day Off',
+};
+
 function buildNotif(table: string, type: string, record: Record<string, unknown>, oldRecord: Record<string, unknown> | null) {
   let empId: string | null = null;
   let title = '', body = '', tag = 'ohm', important = false;
 
   if (table === 'messages' && type === 'INSERT') {
-    // Only push to employee when office sends — employee→office is handled by office realtime
     if (record.sender !== 'office') return null;
     empId = record.employee_id as string;
     title = '💬 New message from Office';
@@ -34,16 +35,24 @@ function buildNotif(table: string, type: string, record: Record<string, unknown>
     empId = record.employee_id as string;
     const dateStr = (record.date as string) || '';
     const status = (record.status as string) || '';
+    const statusText = STATUS_LABEL[status] || status;
+    const hours = record.hours as number | null;
     const overtime = record.overtime as number | null;
     const d = dateStr ? new Date(dateStr + 'T12:00:00Z') : new Date();
     const fmt = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
     title = type === 'INSERT' ? '📅 Attendance marked' : '📅 Attendance updated';
-    body = `${fmt} — ${status}${overtime ? ` · OT: ${overtime}h` : ''}`;
+    const parts = [fmt, '—', statusText];
+    if (hours) parts.push(`· ${hours}h worked`);
+    if (overtime) parts.push(`· OT: ${overtime}h`);
+    body = parts.join(' ');
     tag = 'att-' + dateStr;
   } else if (table === 'expense_batches' && type === 'UPDATE') {
     empId = record.employee_id as string;
-    if (record.status === 'approved') { title = '✅ Expenses approved'; body = 'Your expense submission has been approved'; }
-    else if (record.status === 'rejected') { title = '❌ Expenses rejected'; body = 'Contact the office for details'; }
+    const total = record.total as number | null;
+    const period = record.month ? `${record.month} ${record.year}` : '';
+    const amt = total ? ` · £${Number(total).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+    if (record.status === 'approved') { title = '✅ Expenses approved'; body = `${period}${amt} — approved`; }
+    else if (record.status === 'rejected') { title = '❌ Expenses rejected'; body = `${period}${amt} — contact the office`; }
     else return null;
     tag = 'expense';
   } else if (table === 'payment_status') {
@@ -85,7 +94,11 @@ async function sendToSubs(subs: Array<{id: number; endpoint: string; p256dh: str
       );
     } catch (err: unknown) {
       const status = (err as { statusCode?: number }).statusCode;
-      if (status === 410 || status === 404) staleIds.push(sub.id);
+      if (status === 410 || status === 404) {
+        staleIds.push(sub.id);
+      } else {
+        console.error('Push delivery failed for sub', sub.id, '— status:', status, err);
+      }
     }
   }));
   if (staleIds.length) await sb.from('push_subscriptions').delete().in('id', staleIds);
@@ -94,6 +107,12 @@ async function sendToSubs(subs: Array<{id: number; endpoint: string; p256dh: str
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+
+  // Verify webhook secret so only Supabase can trigger this
+  const webhookSecret = Deno.env.get('WEBHOOK_SECRET');
+  if (webhookSecret && req.headers.get('x-webhook-secret') !== webhookSecret) {
+    return new Response('Unauthorized', { status: 401 });
+  }
 
   let payload: Record<string, unknown>;
   try { payload = await req.json(); } catch { return new Response('Bad JSON', { status: 400 }); }

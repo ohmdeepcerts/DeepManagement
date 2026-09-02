@@ -1,10 +1,3 @@
-// Supabase Edge Function: employee-first-login
-// Called once per employee to create their individual Supabase Auth account.
-// Verifies the office-set temp_pin, creates the auth user, links it to the employee row.
-//
-// POST body: { phone: string, temp_pin: string, new_pin: string }
-// Returns:   { success: true } | { error: string }
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const sb = createClient(
@@ -13,8 +6,10 @@ const sb = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
+const ALLOWED_ORIGIN = 'https://ohmdeepcerts.github.io';
+
 const CORS = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   'Access-Control-Allow-Headers': 'authorization, content-type',
 };
 
@@ -44,24 +39,22 @@ Deno.serve(async (req) => {
   const norm = normPhone(phone);
   if (norm.length < 10) return json({ error: 'Invalid phone number' }, 400);
 
-  // Find employee by phone with matching temp_pin
+  // Query directly by normalised phone — avoids loading all employees
   const { data: emps, error: empErr } = await sb
     .from('employees')
     .select('id, name, phone, status, auth_user_id, temp_pin')
-    .eq('status', 'Active');
+    .eq('status', 'Active')
+    .eq('temp_pin', temp_pin);
 
-  if (empErr || !emps?.length) return json({ error: 'Could not load employees' }, 500);
+  if (empErr) return json({ error: 'Could not load employees' }, 500);
 
-  const emp = emps.find((e) =>
-    normPhone(e.phone as string) === norm && e.temp_pin === temp_pin
-  );
+  const emp = emps?.find((e) => normPhone(e.phone as string) === norm);
 
   if (!emp) return json({ error: 'Invalid phone or temporary PIN. Contact your office.' }, 401);
   if (emp.auth_user_id) return json({ error: 'Account already set up. Please log in with your PIN.' }, 409);
 
   const email = norm + '@ohm.internal';
 
-  // Create individual Supabase Auth account
   const { data: userData, error: createErr } = await sb.auth.admin.createUser({
     email,
     password: new_pin,
@@ -72,14 +65,15 @@ Deno.serve(async (req) => {
     return json({ error: 'Could not create account: ' + (createErr?.message || 'unknown') }, 500);
   }
 
-  // Link auth user to employee row and clear temp_pin
   const { error: linkErr } = await sb
     .from('employees')
     .update({ auth_user_id: userData.user.id, temp_pin: null })
     .eq('id', emp.id);
 
   if (linkErr) {
-    await sb.auth.admin.deleteUser(userData.user.id);
+    // Best-effort cleanup — log orphan if delete also fails
+    const { error: delErr } = await sb.auth.admin.deleteUser(userData.user.id);
+    if (delErr) console.error('Orphan auth user:', userData.user.id, delErr.message);
     return json({ error: 'Could not link account to employee record' }, 500);
   }
 

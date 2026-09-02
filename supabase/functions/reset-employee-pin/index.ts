@@ -1,10 +1,3 @@
-// Supabase Edge Function: reset-employee-pin
-// Generates a new random PIN for an employee, updates their auth password,
-// and stores the PIN in employees.temp_pin so the office can share it.
-//
-// POST body: { employee_id: string }
-// Returns:   { pin: string } | { error: string }
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const sb = createClient(
@@ -13,9 +6,11 @@ const sb = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
+const ALLOWED_ORIGIN = 'https://ohmdeepcerts.github.io';
+
 const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+  'Access-Control-Allow-Headers': 'authorization, content-type, x-admin-secret',
 };
 
 function json(body: unknown, status = 200) {
@@ -26,12 +21,20 @@ function json(body: unknown, status = 200) {
 }
 
 function randomPin(): string {
-  return String(Math.floor(Math.random() * 900000) + 100000);
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return String(100000 + (arr[0] % 900000));
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+
+  // Verify admin secret — only the office app knows this value
+  const adminSecret = Deno.env.get('ADMIN_SECRET');
+  if (!adminSecret || req.headers.get('x-admin-secret') !== adminSecret) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
 
   let body: { employee_id?: string };
   try { body = await req.json(); } catch { return json({ error: 'Bad JSON' }, 400); }
