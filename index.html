@@ -1577,7 +1577,11 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
       </div>
       <div style="border-top:1px solid var(--bdr);padding-top:13px;margin-top:13px;">
         <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-mobile-screen-button" style="color:var(--acc);margin-right:5px;"></i>v2 Portal Auth <span style="font-weight:400;color:var(--txtm)">(individual login)</span></div>
-        <div id="v2AuthBadge" style="font-size:12px;margin-bottom:10px;"></div>
+        <div id="v2AuthBadge" style="font-size:12px;margin-bottom:8px;"></div>
+        <div id="v2ResetArea" style="display:none;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button type="button" onclick="resetEmpPin()" class="btn-sm" style="background:var(--acc);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-rotate-right"></i> Reset PIN</button>
+          <span id="v2ResetMsg" style="font-size:12px;color:var(--txtm);font-family:monospace;"></span>
+        </div>
         <div class="fgl"><label>Set Temporary PIN (6 digits) — employee will change on first login</label><input type="text" inputmode="numeric" id="eTempPin" maxlength="6" placeholder="e.g. 123456 — leave blank to keep current"></div>
         <p style="font-size:12px;color:var(--txtm);margin-top:7px;">Once set, share this temp PIN with the employee. They enter it in the v2 app to create their account and set a permanent PIN.</p>
       </div>
@@ -3402,6 +3406,32 @@ function checkDateRollover(){
 }
 setInterval(checkDateRollover,60000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDateRollover();});
+// ─── Live login-time badges ──────────────────────────────────────────────────
+function fmtLoginAge(ts){
+  if(!ts)return'<span style="color:var(--red);">Never logged in</span>';
+  const d=new Date(ts),now=new Date(),diff=Math.floor((now-d)/1000);
+  if(diff<60)return'Just now';
+  if(diff<3600)return Math.floor(diff/60)+'m ago';
+  if(diff<86400)return Math.floor(diff/3600)+'h ago';
+  if(diff<172800)return'Yesterday';
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:d.getFullYear()!==now.getFullYear()?'numeric':undefined});
+}
+async function refreshLoginBadges(){
+  try{
+    const {data,error}=await sb.rpc('get_employee_last_logins');
+    if(!error&&data){
+      window.empLastLogin={};
+      data.forEach(r=>{window.empLastLogin[r.employee_id]=r.last_sign_in_at;});
+    }
+  }catch(e){}
+  document.querySelectorAll('[data-eml]').forEach(el=>{
+    const id=el.getAttribute('data-eml');
+    const icon='<i class="fa-solid fa-mobile-screen-button" style="font-size:10px;"></i>';
+    el.innerHTML=icon+' '+fmtLoginAge(window.empLastLogin&&window.empLastLogin[id]);
+  });
+}
+setInterval(refreshLoginBadges,30000);
+// ─────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════
@@ -6666,25 +6696,34 @@ function renderEmployees(){
         <span class="cp ${emp.contract_type==='PAYE'?'cp-p':'cp-s'}">${emp.contract_type||'—'}</span>
       </div>
       <div class="ec-divider"></div>
-      <div style="padding:5px 12px 8px;font-size:11px;color:var(--txtm);display:flex;align-items:center;gap:5px;">
+      <div data-eml="${emp.id}" style="padding:5px 12px 2px;font-size:11px;color:var(--txtm);display:flex;align-items:center;gap:5px;">
         <i class="fa-solid fa-mobile-screen-button" style="font-size:10px;"></i>
-        ${(function(){
-          const ts=window.empLastLogin&&window.empLastLogin[emp.id];
-          if(!ts)return'<span style="color:var(--red);">Never logged in</span>';
-          const d=new Date(ts),now=new Date(),diff=Math.floor((now-d)/1000);
-          if(diff<60)return'Just now';
-          if(diff<3600)return Math.floor(diff/60)+'m ago';
-          if(diff<86400)return Math.floor(diff/3600)+'h ago';
-          if(diff<172800)return'Yesterday';
-          return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:d.getFullYear()!==now.getFullYear()?'numeric':undefined});
-        })()}
+        ${fmtLoginAge(window.empLastLogin&&window.empLastLogin[emp.id])}
       </div>
+      ${emp.temp_pin?`<div style="padding:0 12px 8px;font-size:11px;color:var(--txtm);display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-key" style="font-size:10px;color:var(--acc);"></i>PIN: <span style="font-family:monospace;font-weight:700;color:var(--acc);">${emp.temp_pin}</span></div>`:'<div style="height:8px;"></div>'}
       ${isEx?`<button class="ec-reinstate" onclick="event.stopPropagation();markEmpActive('${emp.id}')"><i class="fa-solid fa-user-check" style="margin-right:4px;"></i>Reinstate Employee</button>`:''}
     </div>`;
   }).join('');
 }
 function setEmpTab(f,el){empTabFilter=f;document.querySelectorAll('#page-employees .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderEmployees();}
 // markEmpEx removed — use the Ex-Employee tab in the employee modal (confirmMarkEx)
+async function resetEmpPin(){
+  const empId=document.getElementById('empId').value;if(!empId)return;
+  const btn=document.querySelector('#v2ResetArea button');const msg=document.getElementById('v2ResetMsg');
+  if(btn)btn.disabled=true;if(msg){msg.textContent='Resetting…';msg.style.color='var(--txtm)';}
+  try{
+    const res=await fetch(SUPA_URL+'/functions/v1/reset-employee-pin',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},body:JSON.stringify({employee_id:empId})});
+    const data=await res.json();
+    if(data.pin){
+      const emp=employees.find(e=>e.id===empId);if(emp)emp.temp_pin=data.pin;
+      const badge=document.getElementById('v2AuthBadge');
+      if(badge)badge.innerHTML='<span style="color:var(--grn,#22c55e);font-weight:700">✓ v2 account active</span> — PIN: <span style="font-family:monospace;font-weight:700;color:var(--acc);">'+data.pin+'</span>';
+      if(msg){msg.textContent='New PIN: '+data.pin;msg.style.color='var(--grn,#22c55e)';}
+      renderEmployees();
+    }else{if(msg){msg.textContent=data.error||'Failed';msg.style.color='var(--red,#ef4444)';}}
+  }catch(e){if(msg){msg.textContent='Network error';msg.style.color='var(--red,#ef4444)';}}
+  if(btn)btn.disabled=false;
+}
 async function markEmpActive(id){const idx=employees.findIndex(e=>e.id===id);if(idx<0)return;const _raR=await sb.from('employees').update({status:'Active',left_date:null}).eq('id',id);
   if(_raR.error){toast('Could not reactivate: '+_raR.error.message,'e');return;}
   employees[idx].status='Active';employees[idx].left_date=null;renderEmployees();toast('Employee reinstated','s');}
@@ -6850,10 +6889,14 @@ async function editEmpModal(id){
   // v2 auth status
   const _v2Badge=document.getElementById('v2AuthBadge');
   if(_v2Badge){
-    if(emp.auth_user_id){_v2Badge.innerHTML='<span style="color:var(--grn,#22c55e);font-weight:700">✓ v2 account active</span>';}
-    else if(emp.temp_pin){_v2Badge.innerHTML='<span style="color:var(--amb,#f59e0b);font-weight:700">⏳ Temp PIN set — waiting for first login</span> <span style="color:var(--txtm)">(current: '+emp.temp_pin+')</span>';}
+    if(emp.auth_user_id){
+      const _pinPart=emp.temp_pin?' — PIN: <span style="font-family:monospace;font-weight:700;color:var(--acc);">'+emp.temp_pin+'</span>':' — PIN set by employee';
+      _v2Badge.innerHTML='<span style="color:var(--grn,#22c55e);font-weight:700">✓ v2 account active</span>'+_pinPart;
+    }else if(emp.temp_pin){_v2Badge.innerHTML='<span style="color:var(--amb,#f59e0b);font-weight:700">⏳ Awaiting first login</span> — PIN: <span style="font-family:monospace;font-weight:700;color:var(--acc);">'+emp.temp_pin+'</span>';}
     else{_v2Badge.innerHTML='<span style="color:var(--txtm)">✗ No v2 account — set a temp PIN below</span>';}
   }
+  const _v2ResetArea=document.getElementById('v2ResetArea');
+  if(_v2ResetArea){_v2ResetArea.style.display=emp.auth_user_id?'flex':'none';const _rm=document.getElementById('v2ResetMsg');if(_rm)_rm.textContent='';}
   const _eTempPin=document.getElementById('eTempPin');if(_eTempPin)_eTempPin.value='';
   document.getElementById('ePin').value='';
   document.getElementById('ePinConfirm').value='';
