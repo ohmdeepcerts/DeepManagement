@@ -10103,6 +10103,17 @@ async function vehLookupDVSA(){
 // FLEET VEHICLES MODULE (Supabase)
 // ═══════════════════════════════════════════════════
 let _vehEditId=null;
+let _vehStatus='active';
+function vehPickStatus(s){
+  _vehStatus=s;
+  ['active','archived','sold'].forEach(k=>{
+    const b=document.getElementById('vSt_'+k);if(!b)return;
+    const sel=k===s;
+    const styles={active:{bg:'var(--grnl)',c:'var(--grn)',bc:'var(--grn)'},archived:{bg:'var(--ambl)',c:'var(--amb)',bc:'var(--amb)'},sold:{bg:'var(--card2)',c:'var(--txt)',bc:'var(--bdr)'}};
+    const st=sel?styles[k]:{bg:'',c:'var(--txt2)',bc:'var(--bdr)'};
+    b.style.background=st.bg;b.style.color=st.c;b.style.borderColor=st.bc;b.style.fontWeight=sel?'800':'600';
+  });
+}
 const VEH_SVGS={
   van:`<svg viewBox="0 0 120 55" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><rect x="2" y="22" width="116" height="22" rx="3"/><rect x="5" y="14" width="70" height="20" rx="3"/><rect x="8" y="16" width="28" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/><rect x="40" y="16" width="28" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/><circle cx="24" cy="45" r="8"/><circle cx="93" cy="45" r="8"/><circle cx="24" cy="45" r="4" fill="var(--bg)"/><circle cx="93" cy="45" r="4" fill="var(--bg)"/></svg>`,
   hatchback:`<svg viewBox="0 0 120 55" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M4 34 L18 20 L45 16 L72 16 L95 22 L118 28 L118 40 L4 40Z"/><rect x="20" y="18" width="22" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/><rect x="46" y="18" width="22" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/><circle cx="28" cy="44" r="8"/><circle cx="88" cy="44" r="8"/><circle cx="28" cy="44" r="4" fill="var(--bg)"/><circle cx="88" cy="44" r="4" fill="var(--bg)"/></svg>`,
@@ -10179,8 +10190,10 @@ async function renderVehicles(){
   const health=document.getElementById('veh-health');
   const insEl=document.getElementById('veh-insights');
   if(grid)grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--txt2)"><i class="fa-solid fa-spinner fa-spin" style="margin-right:8px"></i>Loading vehicles…</div>`;
-  const{data:cars,error}=await sb.from('vehicles').select('*').order('created_at',{ascending:true});
+  const{data:allCars,error}=await sb.from('vehicles').select('*').order('created_at',{ascending:true});
   if(error){toast('Failed to load vehicles: '+error.message,'e');return;}
+  const cars=allCars.filter(c=>!c.status||c.status==='active');
+  const inactiveCars=allCars.filter(c=>c.status==='archived'||c.status==='sold');
 
   const green=cars.filter(c=>vehOverall(c)==='green').length;
   const red=cars.filter(c=>vehOverall(c)==='red').length;
@@ -10214,6 +10227,24 @@ async function renderVehicles(){
   ${car.notes?`<div style="padding:6px 13px;background:var(--card2);border-top:1px solid var(--bdr);font-size:11px;color:var(--txt2)"><i class="fa-solid fa-note-sticky" style="font-size:9px;margin-right:4px"></i>${car.notes}</div>`:''}
 </div>`;
   }).join(''))+`<div class="veh-add" onclick="vehOpenModal(null)"><div style="text-align:center;color:var(--txt2)"><i class="fa-solid fa-plus" style="font-size:18px;margin-bottom:5px;display:block"></i><div style="font-size:12px;font-weight:600">Add Vehicle</div></div></div>`;
+
+  // Archived / Sold section
+  if(inactiveCars.length){
+    const togId='vehInactiveToggle';
+    const bodyId='vehInactiveBody';
+    const inactiveHtml=inactiveCars.map(car=>{
+      const badge=car.status==='sold'?`<span style="font-size:9px;font-weight:700;background:var(--card2);color:var(--txt2);border:1px solid var(--bdr);border-radius:4px;padding:2px 5px;margin-left:6px">SOLD</span>`:`<span style="font-size:9px;font-weight:700;background:var(--ambl);color:var(--amb);border-radius:4px;padding:2px 5px;margin-left:6px">ARCHIVED</span>`;
+      return`<div class="card veh-card" style="opacity:.6;border-top:3px solid var(--bdr);cursor:pointer" onclick="vehOpenModal(${car.id})">
+  <div style="padding:12px 13px 10px;display:flex;justify-content:space-between;align-items:center">
+    <div><div class="veh-reg" style="color:var(--txt2)">${car.reg}${badge}</div>
+    <div style="font-size:11px;color:var(--txt2);margin-top:4px">${[car.colour,car.year,car.make,car.model].filter(Boolean).join(' ')||'—'}</div></div>
+  </div></div>`;
+    }).join('');
+    if(grid)grid.innerHTML+=`<div style="grid-column:1/-1;margin-top:6px">
+  <button id="${togId}" onclick="document.getElementById('${bodyId}').style.display=document.getElementById('${bodyId}').style.display==='none'?'grid':'none';this.querySelector('i').classList.toggle('fa-chevron-down');this.querySelector('i').classList.toggle('fa-chevron-up')" style="border:none;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--txt2);padding:6px 0;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-chevron-down"></i><i class="fa-solid fa-box-archive"></i> Archived / Sold (${inactiveCars.length})</button>
+  <div id="${bodyId}" style="display:none;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:8px">${inactiveHtml}</div>
+</div>`;
+  }
 
 
   if(health)health.innerHTML=`<div class="ch"><div class="ct"><i class="fa-solid fa-heart-pulse" style="color:var(--acc);margin-right:6px"></i>Fleet Health</div></div>
@@ -10251,6 +10282,10 @@ async function vehOpenModal(id){
   _vehEditId=id;
   const isEdit=id!==null;
   document.getElementById('vDelBtn').style.display=isEdit?'':'none';
+  const statusRow=document.getElementById('vStatusRow');
+  if(statusRow)statusRow.style.display=isEdit?'':'none';
+  _vehStatus='active';
+  vehPickStatus('active');
   vehSwitchTab('details');
   ['vReg','vMake','vModel','vColour','vYear','vMot','vTax','vIns','vInsPersons','vNotes'].forEach(x=>{const el=document.getElementById(x);if(el)el.value='';});
   const empList=document.getElementById('vAssignedEmpList');
@@ -10273,6 +10308,7 @@ async function vehOpenModal(id){
     document.getElementById('vKeeperName').value=data.registered_keeper_name||'';
     document.getElementById('vKeeperAddress').value=data.registered_keeper_address||'';
     document.getElementById('vNotes').value=data.notes||'';
+    vehPickStatus(data.status||'active');
     const ids=(data.assigned_employee_ids||[]);
     ids.forEach(id=>{const chk=document.getElementById(`vEmpChk_${id}`);if(chk)chk.checked=true;});
   }
@@ -10301,6 +10337,7 @@ async function vehSaveModal(){
     registered_keeper_address:(document.getElementById('vKeeperAddress').value||'').trim()||null,
     assigned_employee_ids:Array.from(document.querySelectorAll('#vAssignedEmpList input[type="checkbox"]:checked')).map(c=>c.value).filter(Boolean),
     notes:(document.getElementById('vNotes').value||'').trim()||null,
+    status:_vehEditId?_vehStatus:'active',
   };
   const btn=document.querySelector('#vehModal .btn-p');
   if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Saving…';}
@@ -10513,6 +10550,15 @@ function vehDetail(id){vehOpenModal(id);}
           <div style="font-size:11px;color:var(--txt2);margin-top:4px">Select all employees who drive or use this vehicle</div>
         </div>
         <div class="fgl" style="grid-column:1/-1"><label>Notes</label><textarea id="vNotes" rows="2" placeholder="Any additional notes…" style="resize:vertical;width:100%;border:1.5px solid var(--bdr);border-radius:var(--rs);padding:8px 10px;font-size:13px;font-family:inherit;background:var(--card2);color:var(--txt);outline:none"></textarea></div>
+        <div class="fgl" id="vStatusRow" style="grid-column:1/-1;display:none">
+          <label>Vehicle Status</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
+            <button type="button" id="vSt_active" class="btn btn-sm" onclick="vehPickStatus('active')" style="font-size:12px"><i class="fa-solid fa-circle-check" style="margin-right:5px"></i>Active</button>
+            <button type="button" id="vSt_archived" class="btn btn-sm" onclick="vehPickStatus('archived')" style="font-size:12px"><i class="fa-solid fa-box-archive" style="margin-right:5px"></i>Archived</button>
+            <button type="button" id="vSt_sold" class="btn btn-sm" onclick="vehPickStatus('sold')" style="font-size:12px"><i class="fa-solid fa-tag" style="margin-right:5px"></i>Sold</button>
+          </div>
+          <div style="font-size:11px;color:var(--txt2);margin-top:4px">Archived / Sold vehicles are hidden from the active fleet — use Archived for off-road, Sold when disposed</div>
+        </div>
       </div>
     </div>
     <!-- Tab: Documents -->
