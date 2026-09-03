@@ -1986,7 +1986,7 @@ function getRateForDate(emp,pt,dateStr){
   if(typeof salaryHistory==='undefined'||!salaryHistory.length)return currentRate;
   var empHistory=salaryHistory.filter(function(h){return h.employee_id===emp.id&&h.pay_type===pt&&h.effective_from;});
   if(!empHistory.length)return currentRate;
-  empHistory.sort(function(a,b){return (a.effective_from||'').localeCompare(b.effective_from||'');}); // ascending
+  empHistory.sort(function(a,b){var d=(a.effective_from||'').localeCompare(b.effective_from||'');if(d!==0)return d;return (a.created_at||'').localeCompare(b.created_at||'');}); // ascending; tiebreak by created_at so latest change wins
   // Find the latest change that took effect on or before dateStr
   var applicable=null;
   for(var i=0;i<empHistory.length;i++){
