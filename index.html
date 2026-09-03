@@ -2688,14 +2688,14 @@ let _idleWarnTimer=null;
 function _resetIdleTimer(){
   clearTimeout(_idleTimer);clearTimeout(_idleWarnTimer);
   if(!isLoggedIn)return;
-  // Warn after 25 min of inactivity
+  // Warn after 8 hours of inactivity
   _idleWarnTimer=setTimeout(()=>{
     if(!isLoggedIn)return;
-    const stay=confirm('You have been inactive for 25 minutes. Stay signed in?');
+    const stay=confirm('You have been inactive for 8 hours. Stay signed in?');
     if(stay){_resetIdleTimer();}else{doSignOut();}
-  },25*60*1000);
-  // Force logout at 30 min regardless
-  _idleTimer=setTimeout(()=>{if(isLoggedIn)doSignOut();},30*60*1000);
+  },8*60*60*1000);
+  // Force logout after 9 hours regardless
+  _idleTimer=setTimeout(()=>{if(isLoggedIn)doSignOut();},9*60*60*1000);
 }
 
 // Reset idle timer on any user activity
