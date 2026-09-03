@@ -1953,7 +1953,7 @@ async function silentSync(){
     sb.from('payment_status').select('*').eq('employee_id',emp.id),
     sb.from('attendance_requests').select('*').eq('employee_id',emp.id).gte('date',syncCutoff).order('date',{ascending:false}).limit(200),
     sb.from('payroll_summary').select('*').eq('employee_id',emp.id),
-    sb.from('vehicles').select('*').contains('assigned_employee_ids',[emp.id])
+    sb.from('vehicles').select('*').contains('assigned_employee_ids',[emp.id]).eq('status','active')
   ]);
   const hadNewMsg=myMsgs.length<(msgR.data||[]).length;
   const prevBatches=[...myBatches];
@@ -2245,7 +2245,7 @@ function updateBadges(){
 let _myVehicles=[];
 async function loadMyVehicle(){
   if(!emp)return;
-  const{data}=await sb.from('vehicles').select('*').contains('assigned_employee_ids',[emp.id]);
+  const{data}=await sb.from('vehicles').select('*').contains('assigned_employee_ids',[emp.id]).eq('status','active');
   _myVehicles=data||[];
   const btn=document.getElementById('nb-veh');
   if(btn)btn.style.display=_myVehicles.length?'':'none';
