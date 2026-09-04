@@ -1425,9 +1425,9 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 
     <!-- WAGE LEDGER PAGE -->
     <div class="page" id="page-wage-ledger">
-      <div class="ph"><div><h1>Wage Ledger</h1><p>Debit / credit running balance per employee</p></div><div class="ps"><select id="wlEmpSel" onchange="renderWageLedger()" style="padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;min-width:170px;"><option value="">Select employee…</option></select><button class="btn btn-p btn-sm" onclick="openWageEntry()"><i class="fa-solid fa-plus"></i>Add Entry</button></div></div>
+      <div class="ph"><div><h1>Wage Ledger</h1><p>Running balance overview — select an employee to drill in</p></div><div class="ps"><select id="wlEmpSel" onchange="renderWageLedger()" style="padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;min-width:170px;"><option value="">All Employees</option></select><button class="btn btn-p btn-sm" onclick="openWageEntry()"><i class="fa-solid fa-plus"></i>Add Entry</button></div></div>
       <div class="cr cr4" id="wlStats" style="display:none;margin-bottom:14px;"></div>
-      <div class="card"><div class="ch"><div class="ct" id="wlTitle">Select an employee to view their ledger</div></div><div class="ts" id="wlTable"><div style="padding:40px;text-align:center;color:var(--txtm);"><i class="fa-solid fa-hand-pointer" style="font-size:24px;display:block;margin-bottom:8px;opacity:.3;"></i>Select an employee above</div></div></div>
+      <div class="card"><div class="ch"><div class="ct" id="wlTitle">All Employees</div></div><div class="ts" id="wlTable"><div style="padding:30px;text-align:center;color:var(--txtm);">Loading…</div></div></div>
     </div>
 
     <!-- ABSENCE AGREEMENTS PAGE -->
@@ -10835,11 +10835,7 @@ async function renderWageLedger(){
   const wrap=document.getElementById('wlTable');
   const statsEl=document.getElementById('wlStats');
   const titleEl=document.getElementById('wlTitle');
-  if(!empId){
-    wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--txtm);"><i class="fa-solid fa-hand-pointer" style="font-size:24px;display:block;margin-bottom:8px;opacity:.3;"></i>Select an employee above</div>';
-    if(statsEl)statsEl.style.display='none';
-    return;
-  }
+  if(!empId){renderWageLedgerOverview();return;}
   wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--txtm);">Loading…</div>';
   const{data,error}=await window._sb.from('wage_adjustments').select('*').eq('employee_id',empId).order('effective_date',{ascending:true}).order('created_at',{ascending:true});
   if(error){wrap.innerHTML=`<div style="padding:20px;color:var(--err);">${error.message}</div>`;return;}
@@ -10875,6 +10871,73 @@ async function renderWageLedger(){
       {v:data.length,l:'Entries',c:'var(--txtm)'},
     ].map(s=>`<div class="card" style="padding:14px;text-align:center;"><div style="font-size:20px;font-weight:900;color:${s.c};font-variant-numeric:tabular-nums;">${s.v}</div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);margin-top:5px;">${s.l}</div></div>`).join('');
   }
+}
+
+async function renderWageLedgerOverview(){
+  const wrap=document.getElementById('wlTable');
+  const statsEl=document.getElementById('wlStats');
+  const titleEl=document.getElementById('wlTitle');
+  if(titleEl)titleEl.textContent='All Employees';
+  wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--txtm);">Loading…</div>';
+  if(!window._sb){wrap.innerHTML='<div style="padding:20px;color:var(--txtm);">Connecting to database…</div>';setTimeout(renderWageLedgerOverview,400);return;}
+  const{data,error}=await window._sb.from('wage_adjustments').select('*').order('effective_date',{ascending:true});
+  if(error){wrap.innerHTML=`<div style="padding:20px;color:var(--err);">${error.message}</div>`;return;}
+  const empList=(typeof employees!=='undefined'?employees:[]).filter(e=>e.status==='Active');
+  const byEmp={};
+  (data||[]).forEach(r=>{
+    if(!byEmp[r.employee_id])byEmp[r.employee_id]={balance:0,lastDate:null,entries:0,totPaid:0};
+    const signed=(WL_SIGN[r.type]||0)*parseFloat(r.amount||0);
+    byEmp[r.employee_id].balance+=signed;
+    byEmp[r.employee_id].entries++;
+    if(r.effective_date&&(!byEmp[r.employee_id].lastDate||r.effective_date>byEmp[r.employee_id].lastDate))byEmp[r.employee_id].lastDate=r.effective_date;
+    if(r.type==='paid')byEmp[r.employee_id].totPaid+=parseFloat(r.amount||0);
+  });
+  const now=new Date();
+  const mStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  let totalOwed=0,openCount=0,thisMonthPaid=0;
+  Object.values(byEmp).forEach(e=>{if(e.balance>0.01){totalOwed+=e.balance;openCount++;}});
+  (data||[]).forEach(r=>{if(r.type==='paid'&&r.effective_date&&r.effective_date.startsWith(mStr))thisMonthPaid+=parseFloat(r.amount||0);});
+  if(statsEl){
+    statsEl.style.display='grid';
+    statsEl.innerHTML=[
+      {v:`£${totalOwed.toFixed(2)}`,l:'Total Owed to Staff',c:'#22c55e'},
+      {v:openCount,l:'Open Balances',c:openCount>0?'#f59e0b':'var(--txtm)'},
+      {v:`£${thisMonthPaid.toFixed(2)}`,l:'Paid This Month',c:'#60a5fa'},
+      {v:(data||[]).length,l:'Total Entries',c:'var(--txtm)'},
+    ].map(s=>`<div class="card" style="padding:14px;text-align:center;"><div style="font-size:20px;font-weight:900;color:${s.c};font-variant-numeric:tabular-nums;">${s.v}</div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);margin-top:5px;">${s.l}</div></div>`).join('');
+  }
+  const inits=n=>{const p=(n||'').trim().split(/\s+/);return p.length>=2?p[0][0]+p[p.length-1][0]:(n||'??').slice(0,2).toUpperCase();};
+  const rows=empList.map(emp=>{
+    const d=byEmp[emp.id];
+    const bal=d?d.balance:0;
+    const balColor=bal>0.01?'#22c55e':bal<-0.01?'#ef4444':'var(--txtm)';
+    const balLabel=bal>0.01?`Owe £${bal.toFixed(2)}`:bal<-0.01?`Over £${Math.abs(bal).toFixed(2)}`:(d?'Settled':'No entries');
+    return`<tr style="cursor:pointer;border-bottom:1px solid var(--bdr);" onclick="document.getElementById('wlEmpSel').value='${emp.id}';renderWageLedger();">
+      <td style="padding:11px 12px;"><span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--pri);color:#fff;font-size:11px;font-weight:800;margin-right:9px;flex-shrink:0;">${inits(emp.name)}</span><strong>${emp.name}</strong></td>
+      <td style="padding:11px 12px;text-align:right;font-size:12px;font-weight:800;color:${balColor};white-space:nowrap;">${balLabel}</td>
+      <td style="padding:11px 12px;text-align:right;font-size:12px;color:var(--txtm);white-space:nowrap;">${d?.lastDate||'—'}</td>
+      <td style="padding:11px 12px;text-align:right;font-size:12px;color:var(--txtm);">${d?.entries||0}</td>
+      <td style="padding:11px 12px;text-align:right;"><button onclick="event.stopPropagation();document.getElementById('wlEmpSel').value='${emp.id}';renderWageLedger();" class="btn btn-sm" style="font-size:11px;padding:4px 10px;">View</button></td>
+    </tr>`;
+  });
+  const owing=empList.filter(e=>byEmp[e.id]?.balance>0.01).sort((a,b)=>(byEmp[b.id]?.balance||0)-(byEmp[a.id]?.balance||0));
+  const noEntry=empList.filter(e=>!byEmp[e.id]);
+  const insights=[];
+  if(owing.length)insights.push(`<strong style="color:#22c55e;">${owing.length} employee${owing.length>1?'s':''}</strong> with outstanding balance${owing.length>1?'s':''}. Highest: <strong>${owing[0].name}</strong> at £${(byEmp[owing[0].id]?.balance||0).toFixed(2)}.`);
+  if(noEntry.length)insights.push(`<strong style="color:var(--txtm);">${noEntry.length} employee${noEntry.length>1?'s':''}</strong> ${noEntry.length>1?'have':'has'} no ledger entries yet — click their row to start.`);
+  if(thisMonthPaid>0)insights.push(`£${thisMonthPaid.toFixed(2)} paid out to staff so far this month.`);
+  if(!owing.length&&empList.length>0&&(data||[]).length>0)insights.push(`All balances are settled. No money owed to any employee.`);
+  const insightHtml=insights.length?`<div style="padding:14px 18px;background:var(--bgd);border-radius:var(--rs);margin-bottom:14px;border-left:3px solid var(--pri);display:flex;flex-direction:column;gap:8px;">${insights.map(i=>`<div style="font-size:13px;color:var(--txt);">💡 ${i}</div>`).join('')}</div>`:'';
+  wrap.innerHTML=insightHtml+`<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="border-bottom:1px solid var(--bdr);">
+      <th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;">Employee</th>
+      <th style="text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;white-space:nowrap;">Balance</th>
+      <th style="text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;white-space:nowrap;">Last Entry</th>
+      <th style="text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;white-space:nowrap;">Entries</th>
+      <th style="padding:9px 12px;width:60px;"></th>
+    </tr></thead>
+    <tbody>${rows.join('')}</tbody>
+  </table>`;
 }
 
 function openWageEntry(empId){
