@@ -677,6 +677,8 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
     <div class="nav-item" data-page="search"><i class="fa-solid fa-magnifying-glass"></i><span>Global Search</span></div>
     <div class="sb-sec">Pay</div>
     <div class="nav-item" data-page="payroll"><i class="fa-solid fa-sterling-sign"></i><span>Payroll</span></div>
+    <div class="nav-item" data-page="wage-ledger"><i class="fa-solid fa-scale-balanced"></i><span>Wage Ledger</span></div>
+    <div class="nav-item" data-page="absence-debts"><i class="fa-solid fa-handshake"></i><span>Absence Agreements</span></div>
     <div class="sb-sec">People</div>
     <div class="nav-item" data-page="employees"><i class="fa-solid fa-users"></i><span>Employees</span></div>
     <div class="nav-item" data-page="messages"><i class="fa-solid fa-comments"></i><span>Messages</span><span class="nb" id="msgBadge" style="display:none">0</span></div>
@@ -773,6 +775,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div class="cb" id="nmList"></div>
       </div>
       <div id="dashAnniversaries"></div>
+      <div id="agReminderBanner"></div>
 
       <!-- ROW 1: 4 ATTENDANCE KPI CARDS -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;" id="kpiRow"></div>
@@ -1221,6 +1224,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
           </div>
           <select id="prMonth" style="display:none;"></select><select id="prYear" style="display:none;"></select><button class="btn btn-s btn-sm" onclick="exportPayrollCSV()"><i class="fa-solid fa-file-csv"></i>CSV</button><button class="btn btn-o btn-sm" onclick="window.print()"><i class="fa-solid fa-print"></i>Print</button><button class="btn btn-o btn-sm" id="recalcBtn" onclick="recalcPayrollBtn()"><i class="fa-solid fa-arrows-rotate"></i>Recalculate</button><button class="btn btn-o btn-sm" id="lockBtn" onclick="togglePayrollLock()"><i class="fa-solid fa-lock"></i>Lock</button></div></div>
       <div id="prLockBanner" style="display:none;" class="lkd-b"><i class="fa-solid fa-lock"></i><span id="prLockTxt">Locked</span></div>
+      <div id="prAgBanner" style="margin-bottom:14px;"></div>
       <div class="cr cr4" id="prStats"></div>
       <div class="card"><div class="ch"><div class="ct" id="prTitle">Payroll</div><div class="cs">Expenses auto-pulled from ledger · OT & bonus per day</div></div><div class="ts" id="prTable"></div></div>
     </div>
@@ -1417,6 +1421,20 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
           <div class="cb"><button class="btn btn-p btn-sm" onclick="navigate('vehicles')"><i class="fa-solid fa-car"></i> View Fleet Vehicles</button></div>
         </div>
       </div>
+    </div>
+
+    <!-- WAGE LEDGER PAGE -->
+    <div class="page" id="page-wage-ledger">
+      <div class="ph"><div><h1>Wage Ledger</h1><p>Debit / credit running balance per employee</p></div><div class="ps"><select id="wlEmpSel" onchange="renderWageLedger()" style="padding:7px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;min-width:170px;"><option value="">Select employee…</option></select><button class="btn btn-p btn-sm" onclick="openWageEntry()"><i class="fa-solid fa-plus"></i>Add Entry</button></div></div>
+      <div class="cr cr4" id="wlStats" style="display:none;margin-bottom:14px;"></div>
+      <div class="card"><div class="ch"><div class="ct" id="wlTitle">Select an employee to view their ledger</div></div><div class="ts" id="wlTable"><div style="padding:40px;text-align:center;color:var(--txtm);"><i class="fa-solid fa-hand-pointer" style="font-size:24px;display:block;margin-bottom:8px;opacity:.3;"></i>Select an employee above</div></div></div>
+    </div>
+
+    <!-- ABSENCE AGREEMENTS PAGE -->
+    <div class="page" id="page-absence-debts">
+      <div class="ph"><div><h1>Absence Agreements</h1><p>Fixed-salary staff repayment plans — agreed at end-of-year reviews</p></div><div class="ps"><button class="btn btn-p" onclick="openNewAgreement()"><i class="fa-solid fa-plus"></i>New Agreement</button></div></div>
+      <div class="card" style="margin-bottom:13px;"><div class="cb" style="padding:12px 16px;font-size:12px;color:var(--txtm);line-height:1.8;"><i class="fa-solid fa-circle-info" style="color:var(--acc);margin-right:5px;"></i>For employees paid full salary during absences — record the repayment plan agreed in your review meeting. Each month, click <strong>Apply Installment</strong> to post a deduction to their Wage Ledger.</div></div>
+      <div class="card"><div class="ch"><div class="ct">Active &amp; Historical Agreements</div></div><div class="ts" id="agTable"><div style="padding:30px;text-align:center;color:var(--txtm);">Loading…</div></div></div>
     </div>
 
   </div><!-- end content -->
@@ -3267,7 +3285,7 @@ async function sbUpsertSettings(data){
 // ═══════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════
-const PG_TITLES={dashboard:'DASHBOARD',mark:'MARK ATTENDANCE',ledger:'EXPENSE LEDGER',approvals:'APPROVALS',tags:'TAGS & ANALYTICS',materials:'MATERIALS',monthly:'MONTHLY VIEW',daily:'DAILY VIEW','emp-report':'EMPLOYEE REPORT',yearly:'YEARLY SUMMARY',search:'GLOBAL SEARCH',payroll:'PAYROLL',employees:'EMPLOYEES',messages:'MESSAGES',flags:'FLAGGED ITEMS',vehicles:'FLEET VEHICLES',settings:'SETTINGS & TOOLS'};
+const PG_TITLES={dashboard:'DASHBOARD',mark:'MARK ATTENDANCE',ledger:'EXPENSE LEDGER',approvals:'APPROVALS',tags:'TAGS & ANALYTICS',materials:'MATERIALS',monthly:'MONTHLY VIEW',daily:'DAILY VIEW','emp-report':'EMPLOYEE REPORT',yearly:'YEARLY SUMMARY',search:'GLOBAL SEARCH',payroll:'PAYROLL','wage-ledger':'WAGE LEDGER','absence-debts':'ABSENCE AGREEMENTS',employees:'EMPLOYEES',messages:'MESSAGES',flags:'FLAGGED ITEMS',vehicles:'FLEET VEHICLES',settings:'SETTINGS & TOOLS'};
 
 function navigate(page){
   if(page!=="ledger")document.getElementById("mainContent")?.classList.remove("ledger-mode");
@@ -3296,6 +3314,8 @@ function navigate(page){
   else if(page==='yearly')renderYearly();
   else if(page==='search'){setTimeout(()=>document.getElementById('srchInput')?.focus(),80);}
   else if(page==='payroll')renderPayroll();
+  else if(page==='wage-ledger'){wlPopulateEmpSel();renderWageLedger();}
+  else if(page==='absence-debts')renderAgreements();
   else if(page==='employees')renderEmployees();
   else if(page==='messages'){populateMsgSel();populateMsgEmpList();loadAnnouncementsAdmin();renderBroadcastHistory();}
   else if(page==='flags')renderFlags();
@@ -4114,6 +4134,8 @@ function renderDashboard(){
       banEl.innerHTML=`<div style="background:var(--redl);border:1px solid rgba(220,38,38,0.25);border-left:4px solid var(--red);border-radius:var(--r);padding:9px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="navigate('employees')"><i class="fa-solid fa-file-circle-exclamation" style="color:var(--red);font-size:16px;"></i><span style="font-size:13px;font-weight:600;color:var(--red);">${expired>0?expired+' document'+(expired>1?'s':'')+' expired · ':''}${urgentDocs.length} document${urgentDocs.length>1?'s':''} need attention</span><span style="margin-left:auto;font-size:12px;color:var(--red);font-weight:600;">View →</span></div>`;
     }else banEl.innerHTML='';
   }
+  // Agreement installment reminders (async — fills agReminderBanner)
+  loadAgReminder();
 }
 
 
@@ -6372,7 +6394,7 @@ function renderPayroll(){
     const hasRate=(pt==='fixed'&&emp.salary)||(pt==='daily'&&emp.daily_rate)||emp.hourly_rate;
     const bkName=emp.bank_name||'bank';
     rows+=`<tr>
-      <td style="min-width:155px;"><span class="ava" style="background:${avcol(emp.id)}">${inits(emp.name)}</span><strong>${emp.name}</strong>${ptBdg}<br><span style="font-size:10px;color:var(--txtm);">${emp.role||''} ${cPill}</span></td>
+      <td style="min-width:155px;"><span class="ava" style="background:${avcol(emp.id)}">${inits(emp.name)}</span><strong>${emp.name}</strong>${ptBdg}<span id="agchip-${emp.id}" style="display:inline;"></span><br><span style="font-size:10px;color:var(--txtm);">${emp.role||''} ${cPill}</span></td>
       <td style="text-align:center;${absent>0?'color:var(--red);font-weight:700;':''}">${absent>0?absent:'—'}</td>
       <td style="text-align:center;">${otH.toFixed(1)}h</td>
       <td style="font-weight:600;">${hasRate?baseDisp:'<span style="color:var(--txtm);font-style:italic;font-size:12px;">Set pay →</span>'}</td>
@@ -6409,6 +6431,8 @@ function renderPayroll(){
   const totalOT2=mRecs.reduce((s,r)=>s+(parseFloat(r.overtime)||0),0);
   document.getElementById('prStats').innerHTML=`<div class="sc b"><div class="sc-lbl">Total Hours</div><div class="sc-val">${totalH2.toFixed(0)}</div><div class="sc-sub">${MONTHS[m]} ${y}</div><i class="fa-solid fa-clock sc-ico"></i></div><div class="sc a"><div class="sc-lbl">OT Hours</div><div class="sc-val">${totalOT2.toFixed(0)}</div><i class="fa-solid fa-hourglass-half sc-ico"></i></div><div class="sc tl"><div class="sc-lbl">To Bank (all)</div><div class="sc-val">${C}${gBank.toFixed(0)}</div><i class="fa-solid fa-building-columns sc-ico"></i></div><div class="sc g"><div class="sc-lbl">Total Payable</div><div class="sc-val">${C}${gTotal.toFixed(0)}</div><div class="sc-sub">${C}${gCash.toFixed(0)} cash</div><i class="fa-solid fa-sterling-sign sc-ico"></i></div>`;
   document.getElementById('prTable').innerHTML=`<div class="ts" style="overflow-x:auto;max-height:calc(100vh - 320px);overflow-y:auto;"><table style="border-collapse:collapse;width:100%;"><thead style="position:sticky;top:0;z-index:10;"><tr style="background:var(--card);"><th style="min-width:170px;background:var(--card);border-bottom:2px solid var(--bdr);">Employee</th><th style="text-align:center;color:var(--red);background:var(--card);border-bottom:2px solid var(--bdr);">Absent</th><th style="text-align:center;background:var(--card);border-bottom:2px solid var(--bdr);">OT Hrs</th><th style="background:var(--card);border-bottom:2px solid var(--bdr);">Base Pay</th><th style="background:var(--card);border-bottom:2px solid var(--bdr);">OT Pay</th><th style="color:var(--grn);background:var(--card);border-bottom:2px solid var(--bdr);">Bonus</th><th style="color:var(--tel);background:var(--card);border-bottom:2px solid var(--bdr);">Expenses</th><th style="background:var(--card);border-bottom:2px solid var(--bdr);">Total Payable</th><th style="min-width:175px;"><i class="fa-solid fa-building-columns" style="color:var(--tel);margin-right:4px;"></i>Bank / Cash</th><th style="min-width:130px;">Payment Status</th></tr></thead><tbody>${rows}</tbody></table></div><div style="padding:9px 16px;font-size:11px;color:var(--txtm);">* Estimates only — tax and NI not included. Expenses auto-pulled from ledger.</div>`;
+  // Agreement chips and banner (async — fills agchip spans + prAgBanner)
+  loadPrAgBanner(m, y);
 }
 async function updateBankAmt(el,rowTotal){
   const empId=el.dataset.eid;const val=parseFloat(el.value)||0;
@@ -10647,6 +10671,359 @@ function vehDetail(id){vehOpenModal(id);}
     </div>
   </div>
 </div>
+
+<!-- ══ WAGE ENTRY MODAL ══ -->
+<div class="mo" id="wageEntryMo">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><div class="mt">Add Wage Entry</div><button class="mc" onclick="document.getElementById('wageEntryMo').classList.remove('open')"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="mb" style="padding:18px;display:flex;flex-direction:column;gap:13px;">
+      <div class="fgl"><label>Employee</label><select id="weEmp" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"><option value="">Select…</option></select></div>
+      <div class="fgl"><label>Type</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;" id="weTypeBtns">
+          <button data-wt="earned" onclick="wePick('earned')" class="btn btn-sm" style="color:#4ade80;border-color:#4ade80">Earned</button>
+          <button data-wt="bonus" onclick="wePick('bonus')" class="btn btn-sm" style="color:#67e8f9;border-color:#67e8f9">Bonus</button>
+          <button data-wt="paid" onclick="wePick('paid')" class="btn btn-sm" style="color:#60a5fa;border-color:#60a5fa">Paid Out</button>
+          <button data-wt="advance" onclick="wePick('advance')" class="btn btn-sm" style="color:#fb923c;border-color:#fb923c">Advance</button>
+          <button data-wt="deduction" onclick="wePick('deduction')" class="btn btn-sm" style="color:#f87171;border-color:#f87171">Deduction</button>
+          <button data-wt="note" onclick="wePick('note')" class="btn btn-sm">Note only</button>
+        </div>
+        <p id="weTypeHint" style="font-size:11px;color:var(--txtm);margin-top:5px;"></p>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="fgl" id="weAmtWrap"><label>Amount (£)</label><input type="number" id="weAmt" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"></div>
+        <div class="fgl"><label>Date</label><input type="date" id="weDate" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"></div>
+      </div>
+      <div class="fgl"><label>Description</label><input type="text" id="weDesc" placeholder="e.g. Week 1 wages, Cash advance, Damage deduction…" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"></div>
+      <div class="fgl"><label>Period Label <span style="font-weight:400;color:var(--txtm)">(optional)</span></label><input type="text" id="wePeriod" placeholder="e.g. Week 1 Sep 2026 / September 2026" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"></div>
+      <p id="weErr" style="font-size:12px;color:var(--err);display:none;"></p>
+    </div>
+    <div class="mf" style="padding:12px 18px;border-top:1px solid var(--bdr);display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="document.getElementById('wageEntryMo').classList.remove('open')">Cancel</button>
+      <button class="btn btn-p" onclick="weSave()"><i class="fa-solid fa-floppy-disk"></i>Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ NEW AGREEMENT MODAL ══ -->
+<div class="mo" id="agMo">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><div class="mt">New Absence Agreement</div><button class="mc" onclick="document.getElementById('agMo').classList.remove('open')"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="mb" style="padding:18px;display:flex;flex-direction:column;gap:13px;">
+      <div class="fgl"><label>Employee</label><select id="agEmp" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"><option value="">Select…</option></select></div>
+      <div class="fgl"><label>Review Period <span style="font-weight:400;color:var(--txtm)">(e.g. Jan–Dec 2025)</span></label><input type="text" id="agPeriod" placeholder="Jan – Dec 2025" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="fgl"><label>Total to Repay (£)</label><input type="number" id="agTotal" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"></div>
+        <div class="fgl"><label>Monthly Installment (£)</label><input type="number" id="agInst" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"></div>
+      </div>
+      <div class="fgl"><label>Start Date</label><input type="date" id="agStart" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"></div>
+      <div class="fgl"><label>Notes from Review Meeting</label><textarea id="agNotes" rows="3" placeholder="Employee agreed to repay £X in £Y/month installments…" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;font-family:inherit;resize:vertical;"></textarea></div>
+      <p id="agErr" style="font-size:12px;color:var(--err);display:none;"></p>
+    </div>
+    <div class="mf" style="padding:12px 18px;border-top:1px solid var(--bdr);display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="document.getElementById('agMo').classList.remove('open')">Cancel</button>
+      <button class="btn btn-p" onclick="agSave()"><i class="fa-solid fa-handshake"></i>Create Agreement</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APPLY INSTALLMENT MODAL ══ -->
+<div class="mo" id="instMo">
+  <div class="modal" style="max-width:380px">
+    <div class="mh"><div class="mt">Apply Installment</div><button class="mc" onclick="document.getElementById('instMo').classList.remove('open')"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="mb" style="padding:18px;display:flex;flex-direction:column;gap:13px;">
+      <div id="instDetails" style="font-size:13px;line-height:1.8;color:var(--txtm);padding:10px 12px;background:var(--bgd);border-radius:var(--rs);"></div>
+      <div class="fgl"><label>Amount (£) — pre-filled with agreed installment</label><input type="number" id="instAmt" min="0" step="0.01" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"></div>
+      <div class="fgl"><label>Date</label><input type="date" id="instDate" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"></div>
+      <div class="fgl"><label>Note <span style="font-weight:400;color:var(--txtm)">(optional)</span></label><input type="text" id="instNote" placeholder="Installment 1, October wages…" style="width:100%;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--card);color:var(--txt);font-size:13px;"></div>
+      <p id="instErr" style="font-size:12px;color:var(--err);display:none;"></p>
+    </div>
+    <div class="mf" style="padding:12px 18px;border-top:1px solid var(--bdr);display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="document.getElementById('instMo').classList.remove('open')">Cancel</button>
+      <button class="btn btn-p" style="background:var(--err);border-color:var(--err)" onclick="instSave()"><i class="fa-solid fa-minus"></i>Apply Deduction</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// AGREEMENT REMINDERS — Dashboard & Payroll
+// ═══════════════════════════════════════════════════
+async function _getActiveAgreements(){
+  if(!window._sb)return[];
+  const{data}=await window._sb.from('absence_agreements').select('*,employees(name,id)').eq('status','active');
+  return data||[];
+}
+async function _instThisMonth(agId,m,y){
+  if(!window._sb)return[];
+  const mStart=`${y}-${String(m+1).padStart(2,'0')}-01`;
+  const mEnd=`${y}-${String(m+1).padStart(2,'0')}-${new Date(y,m+1,0).getDate()}`;
+  const{data}=await window._sb.from('wage_adjustments').select('id,amount').eq('agreement_id',agId).gte('effective_date',mStart).lte('effective_date',mEnd);
+  return data||[];
+}
+async function _agPaidTotal(agId){
+  if(!window._sb)return 0;
+  const{data}=await window._sb.from('wage_adjustments').select('amount').eq('agreement_id',agId);
+  return(data||[]).reduce((s,r)=>s+parseFloat(r.amount||0),0);
+}
+
+async function loadAgReminder(){
+  const el=document.getElementById('agReminderBanner');
+  if(!el||!window._sb)return;
+  const now=new Date(),m=now.getMonth(),y=now.getFullYear();
+  const ags=await _getActiveAgreements();
+  if(!ags.length){el.innerHTML='';return;}
+  const due=[];
+  for(const ag of ags){
+    if(ag.start_date&&new Date(ag.start_date+'T00:00:00')>new Date(y,m+1,0))continue;
+    const paid=await _agPaidTotal(ag.id);
+    const rem=Math.max(0,parseFloat(ag.total_amount)-paid);
+    if(rem<=0.01)continue;
+    const monthInst=await _instThisMonth(ag.id,m,y);
+    if(!monthInst.length)due.push({ag,rem});
+  }
+  if(!due.length){el.innerHTML='';return;}
+  const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const items=due.map(({ag,rem})=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid rgba(245,158,11,0.2);"><div><span style="font-size:13px;font-weight:700;">${ag.employees?.name||'—'}</span><span style="font-size:11px;color:var(--txtm);margin-left:7px;">${ag.description||'Absence agreement'} · £${rem.toFixed(2)} remaining</span></div><button class="btn btn-sm" style="border-color:#f59e0b;color:#f59e0b;white-space:nowrap;" onclick='instOpen(${JSON.stringify(ag).replace(/'/g,"&#39;")});'><i class="fa-solid fa-minus"></i> £${parseFloat(ag.monthly_installment).toFixed(2)} due</button></div>`).join('');
+  el.innerHTML=`<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-left:4px solid #f59e0b;border-radius:var(--r);padding:9px 14px;margin-bottom:14px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><i class="fa-solid fa-handshake" style="color:#f59e0b;font-size:15px;"></i><span style="font-size:13px;font-weight:700;color:#f59e0b;">${due.length} Agreement Installment${due.length>1?'s':''} Due — ${MNAMES[m]} ${y}</span><button onclick="navigate('absence-debts')" class="btn btn-sm" style="margin-left:auto;color:#f59e0b;border-color:#f59e0b;">View All</button></div>${items}</div>`;
+}
+
+async function loadPrAgBanner(m,y){
+  const banEl=document.getElementById('prAgBanner');
+  if(!banEl||!window._sb)return;
+  const ags=await _getActiveAgreements();
+  if(!ags.length){banEl.innerHTML='';return;}
+  const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const due=[];
+  for(const ag of ags){
+    if(ag.start_date&&new Date(ag.start_date+'T00:00:00')>new Date(y,m+1,0))continue;
+    const paid=await _agPaidTotal(ag.id);
+    const rem=Math.max(0,parseFloat(ag.total_amount)-paid);
+    if(rem<=0.01)continue;
+    const monthInst=await _instThisMonth(ag.id,m,y);
+    const done=monthInst.length>0;
+    const chip=document.getElementById(`agchip-${ag.employee_id}`);
+    if(chip){
+      chip.innerHTML=done
+        ?`<span style="font-size:9px;font-weight:800;padding:1px 5px;border-radius:3px;background:#16a34a22;color:#22c55e;margin-left:3px;" title="Installment already applied this month">✓ INST</span>`
+        :`<span style="font-size:9px;font-weight:800;padding:1px 5px;border-radius:3px;background:#d9770622;color:#f59e0b;margin-left:3px;cursor:pointer;" onclick='instOpen(${JSON.stringify(ag).replace(/'/g,"&#39;")})' title="Click to apply this month's installment">⚠ £${parseFloat(ag.monthly_installment).toFixed(2)} DUE</span>`;
+    }
+    if(!done)due.push({ag,rem});
+  }
+  if(!due.length){banEl.innerHTML='';return;}
+  const items=due.map(({ag,rem})=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;"><span style="font-size:13px;font-weight:600;">${ag.employees?.name||'—'} <span style="font-size:11px;color:var(--txtm);font-weight:400;">· ${ag.description||''} · £${rem.toFixed(2)} remaining</span></span><button class="btn btn-sm" style="border-color:#f59e0b;color:#f59e0b;" onclick='instOpen(${JSON.stringify(ag).replace(/'/g,"&#39;")})'><i class="fa-solid fa-minus"></i> Apply £${parseFloat(ag.monthly_installment).toFixed(2)}</button></div>`).join('');
+  banEl.innerHTML=`<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-left:4px solid #f59e0b;border-radius:var(--r);padding:10px 14px;"><div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:8px;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:5px;"></i>${due.length} Installment${due.length>1?'s':''} Not Yet Applied for ${MNAMES[m]} ${y}</div>${items}</div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// WAGE LEDGER
+// ═══════════════════════════════════════════════════
+const WL_SIGN={earned:1,bonus:1,paid:-1,advance:-1,deduction:-1,note:0};
+const WL_HINTS={earned:'Adds to what you owe the employee',bonus:'One-off extra — adds to what you owe',paid:'Actual payment — reduces balance',advance:'Cash advance — reduces balance now',deduction:'Deduction from wages (damage, shortage, installment)',note:'Text note only — no balance effect'};
+let _wlSelType='earned', _wlAgreement=null;
+
+function wlPopulateEmpSel(){
+  const sel=document.getElementById('wlEmpSel');
+  if(!sel)return;
+  const cur=sel.value;
+  const empList=(typeof employees!=='undefined'?employees:[]).filter(e=>e.status==='Active').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  sel.innerHTML='<option value="">Select employee…</option>'+empList.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  if(cur)sel.value=cur;
+}
+
+async function renderWageLedger(){
+  const empId=document.getElementById('wlEmpSel')?.value;
+  const wrap=document.getElementById('wlTable');
+  const statsEl=document.getElementById('wlStats');
+  const titleEl=document.getElementById('wlTitle');
+  if(!empId){
+    wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--txtm);"><i class="fa-solid fa-hand-pointer" style="font-size:24px;display:block;margin-bottom:8px;opacity:.3;"></i>Select an employee above</div>';
+    if(statsEl)statsEl.style.display='none';
+    return;
+  }
+  wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--txtm);">Loading…</div>';
+  const{data,error}=await window._sb.from('wage_adjustments').select('*').eq('employee_id',empId).order('effective_date',{ascending:true}).order('created_at',{ascending:true});
+  if(error){wrap.innerHTML=`<div style="padding:20px;color:var(--err);">${error.message}</div>`;return;}
+  const emp=(typeof employees!=='undefined'?employees:[]).find(e=>e.id===empId);
+  if(titleEl)titleEl.textContent=emp?.name||'Wage Ledger';
+  if(!data||!data.length){
+    wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--txtm);"><i class="fa-solid fa-inbox" style="font-size:24px;display:block;margin-bottom:8px;opacity:.3;"></i>No entries yet — click Add Entry to start</div>';
+    if(statsEl)statsEl.style.display='none';
+    return;
+  }
+  let run=0,totE=0,totP=0;
+  const rows=data.map(r=>{
+    const signed=(WL_SIGN[r.type]||0)*parseFloat(r.amount||0);
+    run+=signed;
+    if(signed>0)totE+=signed;else if(signed<0)totP+=Math.abs(signed);
+    const amtHtml=r.type==='note'?'<span style="color:var(--txtm)">—</span>':`<span style="color:${signed>=0?'#22c55e':'#ef4444'};font-weight:700;">${signed>=0?'+':''}£${parseFloat(r.amount).toFixed(2)}</span>`;
+    const runColor=run>0.01?'#22c55e':run<-0.01?'#ef4444':'var(--txtm)';
+    const runLabel=run>0.01?`OWE £${run.toFixed(2)}`:run<-0.01?`OVER £${Math.abs(run).toFixed(2)}`:'Settled';
+    const desc=[r.description,r.period_label].filter(Boolean).join(' · ');
+    const typePill=`<span style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;text-transform:uppercase;background:var(--bgd);color:var(--txtm)">${r.type}</span>`;
+    return`<tr><td style="font-size:12px;color:var(--txtm);white-space:nowrap;">${r.effective_date||'—'}</td><td>${typePill}</td><td style="font-size:12px;">${desc||'—'}</td><td style="text-align:right;">${amtHtml}</td><td style="text-align:right;font-size:11px;font-weight:800;color:${runColor};">${runLabel}</td><td style="text-align:right;"><button onclick="wlDelEntry('${r.id}')" style="border:none;background:none;color:var(--txtm);cursor:pointer;opacity:.5;padding:2px 5px;" title="Delete"><i class="fa-solid fa-trash" style="font-size:10px;"></i></button></td></tr>`;
+  });
+  wrap.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr><th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);white-space:nowrap;">Date</th><th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);white-space:nowrap;">Type</th><th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);">Description · Period</th><th style="text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);white-space:nowrap;">Amount</th><th style="text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);white-space:nowrap;">Running Balance</th><th style="padding:9px 12px;border-bottom:1px solid var(--bdr);width:36px;"></th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+  // Stats bar
+  const balColor=run>0.01?'#22c55e':run<-0.01?'#ef4444':'var(--txtm)';
+  const balLabel=run>0.01?`OWE £${run.toFixed(2)}`:run<-0.01?`OVER £${Math.abs(run).toFixed(2)}`:'Settled';
+  if(statsEl){
+    statsEl.style.display='grid';
+    statsEl.innerHTML=[
+      {v:`£${totE.toFixed(2)}`,l:'Total Earned',c:'#22c55e'},
+      {v:`£${totP.toFixed(2)}`,l:'Total Paid/Deducted',c:'#60a5fa'},
+      {v:balLabel,l:'Current Balance',c:balColor},
+      {v:data.length,l:'Entries',c:'var(--txtm)'},
+    ].map(s=>`<div class="card" style="padding:14px;text-align:center;"><div style="font-size:20px;font-weight:900;color:${s.c};font-variant-numeric:tabular-nums;">${s.v}</div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);margin-top:5px;">${s.l}</div></div>`).join('');
+  }
+}
+
+function openWageEntry(empId){
+  wlPopulateEmpSel();
+  const empSel=document.getElementById('weEmp');
+  if(empSel){
+    empSel.innerHTML='<option value="">Select…</option>'+(typeof employees!=='undefined'?employees:[]).filter(e=>e.status==='Active').sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+    if(empId)empSel.value=empId;
+    else{const cur=document.getElementById('wlEmpSel')?.value;if(cur)empSel.value=cur;}
+  }
+  document.getElementById('weAmt').value='';
+  document.getElementById('weDesc').value='';
+  document.getElementById('wePeriod').value='';
+  document.getElementById('weDate').value=new Date().toISOString().slice(0,10);
+  document.getElementById('weErr').style.display='none';
+  wePick('earned');
+  document.getElementById('wageEntryMo').classList.add('open');
+}
+
+function wePick(t){
+  _wlSelType=t;
+  document.querySelectorAll('#weTypeBtns button').forEach(b=>{
+    const sel=b.dataset.wt===t;
+    b.style.fontWeight=sel?'800':'600';
+    b.style.opacity=sel?'1':'0.5';
+  });
+  document.getElementById('weTypeHint').textContent=WL_HINTS[t]||'';
+  document.getElementById('weAmtWrap').style.display=t==='note'?'none':'';
+}
+
+async function weSave(){
+  const err=document.getElementById('weErr');err.style.display='none';
+  const empId=document.getElementById('weEmp').value;
+  if(!empId){err.textContent='Select an employee';err.style.display='block';return;}
+  const amt=_wlSelType==='note'?0:parseFloat(document.getElementById('weAmt').value)||0;
+  if(_wlSelType!=='note'&&amt<=0){err.textContent='Enter a valid amount';err.style.display='block';return;}
+  const dt=document.getElementById('weDate').value;
+  if(!dt){err.textContent='Select a date';err.style.display='block';return;}
+  const{error}=await window._sb.from('wage_adjustments').insert({employee_id:empId,type:_wlSelType,amount:amt,description:document.getElementById('weDesc').value.trim()||null,period_label:document.getElementById('wePeriod').value.trim()||null,effective_date:dt});
+  if(error){err.textContent=error.message;err.style.display='block';return;}
+  document.getElementById('wageEntryMo').classList.remove('open');
+  renderWageLedger();
+}
+
+async function wlDelEntry(id){
+  if(!confirm('Delete this entry? This cannot be undone.'))return;
+  await window._sb.from('wage_adjustments').delete().eq('id',id);
+  renderWageLedger();
+}
+
+// ═══════════════════════════════════════════════════
+// ABSENCE AGREEMENTS
+// ═══════════════════════════════════════════════════
+async function renderAgreements(){
+  const wrap=document.getElementById('agTable');
+  if(!wrap)return;
+  wrap.innerHTML='<div style="padding:30px;text-align:center;color:var(--txtm);">Loading…</div>';
+  const{data:ags,error}=await window._sb.from('absence_agreements').select('*,employees(name)').order('created_at',{ascending:false});
+  if(error){wrap.innerHTML=`<div style="padding:20px;color:var(--err);">${error.message}</div>`;return;}
+  if(!ags||!ags.length){wrap.innerHTML='<div style="padding:40px;text-align:center;color:var(--txtm);">No agreements yet — click New Agreement to create one</div>';return;}
+  const{data:allAdj}=await window._sb.from('wage_adjustments').select('agreement_id,amount').not('agreement_id','is',null);
+  const paidMap={};(allAdj||[]).forEach(r=>{paidMap[r.agreement_id]=(paidMap[r.agreement_id]||0)+parseFloat(r.amount||0);});
+  const rows=ags.map(a=>{
+    const paid=paidMap[a.id]||0;
+    const total=parseFloat(a.total_amount||0);
+    const rem=Math.max(0,total-paid);
+    const pct=total>0?Math.round((paid/total)*100):0;
+    const stColors={active:'#22c55e',completed:'#60a5fa',cancelled:'var(--txtm)'};
+    const stPill=`<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:${stColors[a.status]||'var(--bgd)'}22;color:${stColors[a.status]||'var(--txtm)'}">${a.status}</span>`;
+    const applyBtn=a.status==='active'?`<button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick='instOpen(${JSON.stringify(a).replace(/'/g,"&#39;")})'><i class="fa-solid fa-minus"></i>Apply</button>`:'';
+    const completeBtn=a.status==='active'&&rem<=0.01?`<button class="btn btn-sm" style="color:#22c55e;border-color:#22c55e;" onclick="agMarkComplete('${a.id}')">Mark Complete</button>`:'';
+    const cancelBtn=a.status==='active'?`<button class="btn btn-sm" style="color:var(--err);border-color:var(--err);" onclick="agCancel('${a.id}')">Cancel</button>`:'';
+    const notesTitle=a.notes?`title="${a.notes.replace(/"/g,'&quot;')}"`:''
+    return`<tr><td style="font-weight:700;">${a.employees?.name||'—'}</td><td style="font-size:12px;color:var(--txtm);" ${notesTitle}>${a.description||'—'}</td><td style="font-variant-numeric:tabular-nums;">£${total.toFixed(2)}</td><td style="font-variant-numeric:tabular-nums;">£${parseFloat(a.monthly_installment||0).toFixed(2)}/mo</td><td style="font-variant-numeric:tabular-nums;">£${paid.toFixed(2)} <span style="font-size:11px;color:var(--txtm);">(${pct}%)</span></td><td style="font-variant-numeric:tabular-nums;font-weight:700;color:${rem>0.01?'#f59e0b':'#22c55e'};">${rem>0.01?`£${rem.toFixed(2)}`:'✓ Done'}</td><td>${stPill}</td><td style="display:flex;gap:5px;flex-wrap:wrap;">${applyBtn}${completeBtn}${cancelBtn}</td></tr>`;
+  });
+  wrap.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr><th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);">Employee</th><th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);">Review Period</th><th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);">Total Agreed</th><th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);">Installment</th><th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);">Paid Back</th><th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);">Remaining</th><th style="text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txtm);padding:9px 12px;border-bottom:1px solid var(--bdr);">Status</th><th style="padding:9px 12px;border-bottom:1px solid var(--bdr);"></th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+}
+
+function openNewAgreement(){
+  const sel=document.getElementById('agEmp');
+  if(sel)sel.innerHTML='<option value="">Select…</option>'+(typeof employees!=='undefined'?employees:[]).filter(e=>e.status==='Active').sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  document.getElementById('agPeriod').value='';
+  document.getElementById('agTotal').value='';
+  document.getElementById('agInst').value='';
+  document.getElementById('agStart').value=new Date().toISOString().slice(0,10);
+  document.getElementById('agNotes').value='';
+  document.getElementById('agErr').style.display='none';
+  document.getElementById('agMo').classList.add('open');
+}
+
+async function agSave(){
+  const err=document.getElementById('agErr');err.style.display='none';
+  const empId=document.getElementById('agEmp').value;
+  const total=parseFloat(document.getElementById('agTotal').value)||0;
+  const inst=parseFloat(document.getElementById('agInst').value)||0;
+  const start=document.getElementById('agStart').value;
+  if(!empId){err.textContent='Select an employee';err.style.display='block';return;}
+  if(total<=0||inst<=0||!start){err.textContent='Fill in all required fields';err.style.display='block';return;}
+  const{error}=await window._sb.from('absence_agreements').insert({employee_id:empId,total_amount:total,monthly_installment:inst,start_date:start,description:document.getElementById('agPeriod').value.trim()||null,notes:document.getElementById('agNotes').value.trim()||null,status:'active'});
+  if(error){err.textContent=error.message;err.style.display='block';return;}
+  document.getElementById('agMo').classList.remove('open');
+  renderAgreements();
+}
+
+async function agMarkComplete(id){
+  if(!confirm('Mark this agreement as completed?'))return;
+  await window._sb.from('absence_agreements').update({status:'completed'}).eq('id',id);
+  renderAgreements();
+}
+
+async function agCancel(id){
+  if(!confirm('Cancel this agreement? Installments already applied will remain in the wage ledger.'))return;
+  await window._sb.from('absence_agreements').update({status:'cancelled'}).eq('id',id);
+  renderAgreements();
+}
+
+function instOpen(ag){
+  _wlAgreement=ag;
+  const allAdj_q=window._sb.from('wage_adjustments').select('amount').eq('agreement_id',ag.id);
+  allAdj_q.then(({data})=>{
+    const paid=(data||[]).reduce((s,r)=>s+parseFloat(r.amount||0),0);
+    const rem=Math.max(0,parseFloat(ag.total_amount)-paid);
+    document.getElementById('instDetails').innerHTML=`<strong>${ag.employees?.name||'Employee'}</strong><br>Total: £${parseFloat(ag.total_amount).toFixed(2)} &nbsp;·&nbsp; Paid back: £${paid.toFixed(2)} &nbsp;·&nbsp; <strong>Remaining: £${rem.toFixed(2)}</strong>`;
+    document.getElementById('instAmt').value=Math.min(parseFloat(ag.monthly_installment||0),rem).toFixed(2);
+    document.getElementById('instDate').value=new Date().toISOString().slice(0,10);
+    document.getElementById('instNote').value='';
+    document.getElementById('instErr').style.display='none';
+    document.getElementById('instMo').classList.add('open');
+  });
+}
+
+async function instSave(){
+  const err=document.getElementById('instErr');err.style.display='none';
+  const amt=parseFloat(document.getElementById('instAmt').value)||0;
+  const dt=document.getElementById('instDate').value;
+  if(amt<=0||!dt){err.textContent='Enter amount and date';err.style.display='block';return;}
+  const note=document.getElementById('instNote').value.trim()||`Absence agreement installment — ${_wlAgreement.description||_wlAgreement.id}`;
+  const{error}=await window._sb.from('wage_adjustments').insert({employee_id:_wlAgreement.employee_id,type:'deduction',amount:amt,description:note,effective_date:dt,agreement_id:_wlAgreement.id});
+  if(error){err.textContent=error.message;err.style.display='block';return;}
+  document.getElementById('instMo').classList.remove('open');
+  renderAgreements();
+}
+
+// ── Wire up _sb reference — existing app uses `sb` ──
+(function waitForSb(){
+  if(typeof sb!=='undefined'&&sb.from){window._sb=sb;}
+  else setTimeout(waitForSb,300);
+})();
+</script>
 
 <!-- Vehicle doc preview overlay -->
 <div id="vehDocPrevOv" style="display:none;position:fixed;inset:0;z-index:10101;background:#000;flex-direction:column">
