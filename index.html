@@ -2177,11 +2177,9 @@ function calcPay(emp,rec){
     const hasOwnMult=emp.ot_mult!=null&&emp.ot_mult!=='';
     let otM;
     if(hasOwnMult){
-      otM=parseFloat(emp.ot_mult); // 0 = track hours, pay £0
-    } else if(payType==='daily'){
-      otM=0; // daily wage default: track OT hours, pay £0 unless set
+      otM=parseFloat(emp.ot_mult); // explicit 0 = track hours, pay £0
     } else {
-      otM=parseFloat(cfg.rate_ot)||1.5; // hourly/fixed: use global default
+      otM=parseFloat(cfg.rate_ot)||1.5; // global default for all pay types
     }
     if(otM>0){
       let bh=0;
@@ -5870,7 +5868,6 @@ async function renderEmpReport(){
         var hasOwnMult=emp.ot_mult!=null&&emp.ot_mult!=='';
         var otM;
         if(hasOwnMult){otM=parseFloat(emp.ot_mult);}
-        else if(emp.pay_type==='daily'){otM=0;}
         else{otM=parseFloat(cfg.rate_ot)||1.5;}
         var baseHourlyEquiv=emp.pay_type==='daily'?(parseFloat(emp.daily_rate)||0)/ch:parseFloat(emp.hourly_rate)||0;
         otHrRate=baseHourlyEquiv*otM;
