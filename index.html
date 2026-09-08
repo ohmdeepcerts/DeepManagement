@@ -1558,8 +1558,8 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div class="fg fg2"><div class="fgl"><label>OT Threshold (hrs/day)</label><input type="number" id="eOTThr" min="0" max="16" step="0.5" placeholder="Uses global if blank"></div></div>
       </div>
       <div style="border-top:1px solid var(--bdr);padding-top:13px;margin-top:13px;">
-        <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-hourglass-half" style="color:var(--amb);margin-right:5px;"></i>Overtime Rate</div>
-        <div class="fg fg3"><div class="fgl"><label>OT Type</label><select id="eOTType" onchange="toggleOTF()"><option value="multiplier">Multiplier ×</option><option value="flat">Flat £/h</option></select></div><div class="fgl" id="otMF"><label>Multiplier</label><input type="number" id="eOTMult" min="1" max="5" step="0.1" placeholder="e.g. 1.5"></div><div class="fgl" id="otFF" style="display:none;"><label>Flat Rate £/h</label><input type="number" id="eOTFlat" min="0" step="0.5" placeholder="e.g. 20"></div></div>
+        <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-hourglass-half" style="color:var(--amb);margin-right:5px;"></i>Overtime Rate <span id="otDailyReq" style="display:none;font-size:10px;font-weight:700;color:var(--red);padding:2px 7px;background:rgba(239,68,68,0.1);border-radius:3px;margin-left:4px;">REQUIRED — enter 0 if no OT paid</span></div>
+        <div class="fg fg3"><div class="fgl"><label>OT Type</label><select id="eOTType" onchange="toggleOTF()"><option value="multiplier">Multiplier ×</option><option value="flat">Flat £/h</option></select></div><div class="fgl" id="otMF"><label>Multiplier <span style="font-size:9px;font-weight:400;color:var(--txtm);">0 = no OT · 1 = same rate · 1.5 = time & half</span></label><input type="number" id="eOTMult" min="0" max="5" step="0.1" placeholder="e.g. 0, 1, or 1.5"></div><div class="fgl" id="otFF" style="display:none;"><label>Flat Rate £/h <span style="font-size:9px;font-weight:400;color:var(--txtm);">0 = no OT pay</span></label><input type="number" id="eOTFlat" min="0" step="0.5" placeholder="e.g. 0 or 20"></div></div>
       </div>
       <div style="border-top:1px solid var(--bdr);padding-top:13px;margin-top:13px;">
         <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-calendar-week" style="color:var(--pur);margin-right:5px;"></i>Weekend Rates</div>
@@ -2177,9 +2177,11 @@ function calcPay(emp,rec){
     const hasOwnMult=emp.ot_mult!=null&&emp.ot_mult!=='';
     let otM;
     if(hasOwnMult){
-      otM=parseFloat(emp.ot_mult); // explicit 0 = track hours, pay £0
+      otM=parseFloat(emp.ot_mult); // 0 = track hours, pay £0
+    } else if(payType==='daily'){
+      otM=0; // daily wage default: track OT hours, pay £0 unless set
     } else {
-      otM=parseFloat(cfg.rate_ot)||1.5; // global default for all pay types
+      otM=parseFloat(cfg.rate_ot)||1.5; // hourly/fixed: use global default
     }
     if(otM>0){
       let bh=0;
@@ -5868,6 +5870,7 @@ async function renderEmpReport(){
         var hasOwnMult=emp.ot_mult!=null&&emp.ot_mult!=='';
         var otM;
         if(hasOwnMult){otM=parseFloat(emp.ot_mult);}
+        else if(emp.pay_type==='daily'){otM=0;}
         else{otM=parseFloat(cfg.rate_ot)||1.5;}
         var baseHourlyEquiv=emp.pay_type==='daily'?(parseFloat(emp.daily_rate)||0)/ch:parseFloat(emp.hourly_rate)||0;
         otHrRate=baseHourlyEquiv*otM;
@@ -7016,6 +7019,11 @@ async function saveEmployee(){
   const name=document.getElementById('eName').value.trim().toUpperCase();
   if(!name){toast('Please enter a name','e');_resetSaveBtn();return;}
   const payType2=document.querySelector('.ptc.sel')?.id?.replace('pt-','')||'fixed';
+  if(payType2==='daily'){
+    const _otT=document.getElementById('eOTType').value;
+    if(_otT==='multiplier'&&document.getElementById('eOTMult').value===''){toast('OT Multiplier is required for daily rate employees — enter 0 if no OT paid','e');_resetSaveBtn();return;}
+    if(_otT==='flat'&&document.getElementById('eOTFlat').value===''){toast('OT Flat Rate is required for daily rate employees — enter 0 if no OT paid','e');_resetSaveBtn();return;}
+  }
   const bkSel=document.getElementById('eBankName').value;
   const bkName=bkSel==='custom'?document.getElementById('eBankCustom').value:bkSel;
   const data={
@@ -7036,8 +7044,8 @@ async function saveEmployee(){
     hourly_rate:document.getElementById('eHrRate').value?parseFloat(document.getElementById('eHrRate').value):null,
     ot_threshold:document.getElementById('eOTThr').value?parseFloat(document.getElementById('eOTThr').value):null,
     ot_type:document.getElementById('eOTType').value,
-    ot_mult:document.getElementById('eOTMult').value?parseFloat(document.getElementById('eOTMult').value):null,
-    ot_flat:document.getElementById('eOTFlat').value?parseFloat(document.getElementById('eOTFlat').value):null,
+    ot_mult:document.getElementById('eOTMult').value!==''?parseFloat(document.getElementById('eOTMult').value):null,
+    ot_flat:document.getElementById('eOTFlat').value!==''?parseFloat(document.getElementById('eOTFlat').value):null,
     sat_mult:document.getElementById('eSat').value?parseFloat(document.getElementById('eSat').value):null,
     sun_mult:document.getElementById('eSun').value?parseFloat(document.getElementById('eSun').value):null,
     bank_amt:document.getElementById('eBankAmt').value?parseFloat(document.getElementById('eBankAmt').value):null,
@@ -7149,6 +7157,13 @@ function switchEmpTab(tab,el){
 }
 function selPayType(type){
   ['fixed','daily','hourly'].forEach(t=>{document.getElementById('pt-'+t).classList.toggle('sel',t===type);document.getElementById('pf-'+t).style.display=t===type?'block':'none';});
+  // Show required OT badge and update placeholder for daily rate employees
+  const _otReq=document.getElementById('otDailyReq');
+  if(_otReq)_otReq.style.display=type==='daily'?'inline':'none';
+  const _otMEl=document.getElementById('eOTMult');
+  if(_otMEl)_otMEl.placeholder=type==='daily'?'Required — e.g. 0, 1, or 1.5':'e.g. 1.5 (blank = global default)';
+  const _otFEl=document.getElementById('eOTFlat');
+  if(_otFEl)_otFEl.placeholder=type==='daily'?'Required — e.g. 0 or 20':'e.g. 20';
   // Sync contracted hours between panels when switching
   var ch=document.getElementById('eContHrs').value||document.getElementById('eContHrsD').value;
   if(ch){
