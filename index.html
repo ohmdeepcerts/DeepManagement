@@ -10312,6 +10312,47 @@ async function renderVehicles(){
   if(green===total&&total>0)insights.push({i:'fa-circle-check',c:'var(--grn)',t:'All vehicles fully compliant'});
   if(insEl)insEl.innerHTML=`<div class="ch"><div class="ct"><i class="fa-solid fa-lightbulb" style="color:var(--amb);margin-right:6px"></i>Smart Insights</div></div>
 <div class="cb">${insights.slice(0,7).map(x=>`<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px"><i class="fa-solid ${x.i}" style="color:${x.c};font-size:12px;margin-top:2px;flex-shrink:0"></i><span style="font-size:12px;line-height:1.5;color:var(--txt2)">${x.t}</span></div>`).join('')||'<div style="text-align:center;color:var(--txt2);font-size:12px;padding:8px">All systems go!</div>'}</div>`;
+
+  // Auto-refresh MOT via DVSA for any vehicle expired or within 10 days
+  _dvsaAutoRefreshMOT(cars);
+}
+
+let _vehAutoRefreshing=false;
+async function _dvsaAutoRefreshMOT(cars){
+  if(_vehAutoRefreshing||!cfg.dvsa_client_id)return;
+  const toCheck=cars.filter(car=>{
+    if(!car.mot_expiry)return false;
+    const d=vehDays(car.mot_expiry);
+    return d!==null&&d<=10;
+  });
+  if(!toCheck.length)return;
+  let updated=false;
+  for(const car of toCheck){
+    try{
+      const resp=await fetch(`${SUPA_URL}/functions/v1/dvsa-lookup`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY},
+        body:JSON.stringify({reg:car.reg})
+      });
+      const data=await resp.json();
+      if(!resp.ok||data.error)continue;
+      if(data.motTests&&data.motTests.length){
+        const passed=data.motTests.find(t=>t.testResult==='PASSED');
+        if(passed&&passed.expiryDate){
+          const newMot=passed.expiryDate.replace(/(\d{2})\.(\d{2})\.(\d{4})/,'$3-$2-$1');
+          if(newMot.length===10&&newMot!==car.mot_expiry){
+            await sb.from('vehicles').update({mot_expiry:newMot}).eq('id',car.id);
+            updated=true;
+          }
+        }
+      }
+    }catch(e){}
+  }
+  if(updated){
+    _vehAutoRefreshing=true;
+    await renderVehicles();
+    _vehAutoRefreshing=false;
+  }
 }
 
 async function vehOpenModal(id){
