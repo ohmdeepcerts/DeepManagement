@@ -3428,7 +3428,7 @@ function renderExpenses(){
       </div>
       ${canEdit?`<div id="expRowActions-${eH(e.id)}" style="display:none;position:absolute;inset:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background:rgba(255,255,255,0.45);border-radius:10px;align-items:center;justify-content:center;gap:8px;z-index:5;flex-wrap:wrap;">
         <button onclick="event.stopPropagation();toggleExpRowActions('${eH(e.id)}')" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:1px solid var(--bdr);background:var(--card);color:var(--txt);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);">Close</button>
-        <button onclick="event.stopPropagation();deleteExp('${eH(e.id)}',this)" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:none;background:var(--red);color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.18);"><i class="fa-solid fa-trash"></i>Delete</button>
+        ${(e.status!=='draft'&&e.status!=='approved')?`<button onclick="event.stopPropagation();deleteExp('${eH(e.id)}',this)" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:none;background:var(--red);color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.18);"><i class="fa-solid fa-trash"></i>Delete</button>`:''}
         <button onclick="event.stopPropagation();openExpDetailModal('${eH(e.id)}')" style="font-size:12px;font-weight:700;padding:8px 14px;border-radius:8px;border:none;background:var(--acc);color:#fff;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.18);"><i class="fa-solid fa-pen"></i>Edit</button>
       </div>`:''}
     </div>`;
@@ -3597,13 +3597,14 @@ function openExpDetailModal(id){
   const _edLocked=isMonthLocked(_edD.getMonth(),_edD.getFullYear());
   const edSaveBtn=document.getElementById('edSaveBtn');
   const edDeleteBtn=document.getElementById('edDeleteBtn');
+  const _officeOwned=e.status==='approved'||e.status==='draft';
   if(_edLocked){
     document.getElementById('edEditSub').textContent='⛔ Payroll for this month is already locked by the office — contact them to make changes';
     if(edSaveBtn)edSaveBtn.disabled=true;
     if(edDeleteBtn)edDeleteBtn.disabled=true;
   } else {
     if(edSaveBtn)edSaveBtn.disabled=false;
-    if(edDeleteBtn)edDeleteBtn.disabled=false;
+    if(edDeleteBtn){edDeleteBtn.disabled=_officeOwned;edDeleteBtn.style.display=_officeOwned?'none':'';}
   }
   document.getElementById('edDate').value=e.date||dk(new Date());
   document.getElementById('edMerchantInp').value=e.merchant||'';
@@ -3719,8 +3720,10 @@ async function deleteExp(id,btnEl){
   if(isMonthLocked(_delD.getMonth(),_delD.getFullYear())){
     toast('⛔ Payroll for this month is already locked by the office — this expense can\'t be deleted','e');return;
   }
-  const warnApproved=e.status==='approved'?' This expense was already approved by the office.':'';
-  if(!confirm(`Delete this expense — ${e.merchant||'Untitled'} (${fmt(e.amount)})? This can't be undone.${warnApproved}`))return;
+  if(e.status==='approved'||e.status==='draft'){
+    toast('⛔ This entry was added or approved by the office and cannot be deleted. Contact the office if this is incorrect.','e');return;
+  }
+  if(!confirm(`Delete this expense — ${e.merchant||'Untitled'} (${fmt(e.amount)})? This can't be undone.`))return;
   const origLabel=btnEl?btnEl.innerHTML:null;
   if(btnEl){btnEl.disabled=true;btnEl.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i>';}
   const r=await sb.from('expenses').delete().eq('id',id);
