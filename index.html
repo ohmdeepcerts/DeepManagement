@@ -2834,26 +2834,22 @@ function goToExpenseInLedger(expenseId,employeeId,date){
   },350);
 }
 // ── STALE-DEPLOYMENT DETECTION ──
-// Fetches the page fresh every 5 minutes and compares a signature; if a new
-// version was deployed, shows a persistent toast prompting a reload rather
-// than force-reloading (the admin may be mid-edit in the ledger).
+// Polls version.json every 5 minutes; when a new version is detected shows a
+// persistent banner at the top of the page with a "Restart Now" button that
+// hard-clears all caches (SW caches + sessionStorage) before reloading.
 let _updateCheckIv=null,_updateNotified=false;
 async function checkOfficeUpdate(){
-  // Self-fetching to detect a new deployed version can only work on a real host —
-  // from a file:// URL every attempt is blocked by the browser and just spams the
-  // console with CORS errors during local testing, so skip entirely.
   if(location.protocol==='file:')return;
   try{
-    const res=await fetch(location.pathname+'?_v='+Date.now(),{cache:'no-store'});
+    const base=location.origin+location.pathname.replace(/\/[^/]*$/,'/');
+    const res=await fetch(base+'version.json?_v='+Date.now(),{cache:'no-store'});
     if(!res.ok)return;
-    const text=await res.text();
-    const sig=text.length+':'+text.slice(0,300)+text.slice(-300);
+    const data=await res.json();
+    const sig=data.v||data.version||'';
+    if(!sig)return;
     const stored=sessionStorage.getItem('dam_office_sig');
     if(!stored){sessionStorage.setItem('dam_office_sig',sig);return;}
-    if(sig!==stored&&!_updateNotified){
-      _updateNotified=true;
-      toast('🔄 A new version of the app is available — refresh the page (Ctrl+R) when convenient','i');
-    }
+    if(sig!==stored&&!_updateNotified){_updateNotified=true;_showUpdateBanner();}
   }catch(e){/* offline etc — silent */}
 }
 function startOfficeUpdateCheck(){
@@ -2861,6 +2857,22 @@ function startOfficeUpdateCheck(){
   checkOfficeUpdate();
   _updateCheckIv=setInterval(checkOfficeUpdate,5*60000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkOfficeUpdate();});
+}
+function _showUpdateBanner(){
+  if(document.getElementById('updateBanner'))return;
+  const b=document.createElement('div');
+  b.id='updateBanner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#92400e;color:#fff;display:flex;align-items:center;justify-content:center;gap:12px;padding:10px 18px;font-size:13px;font-weight:600;box-shadow:0 3px 14px rgba(0,0,0,0.35);';
+  b.innerHTML='<i class="fa-solid fa-arrows-rotate" style="font-size:15px;"></i>'
+    +'<span>A new version of the app is available — restart to get the latest updates.</span>'
+    +'<button onclick="forceHardReload()" style="background:#fff;color:#92400e;border:none;border-radius:7px;padding:6px 16px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;margin-left:4px;">↺ Restart Now</button>';
+  document.body.prepend(b);
+}
+async function forceHardReload(){
+  if('caches' in window){try{const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)));}catch(e){}}
+  if('serviceWorker' in navigator){try{const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()));}catch(e){}}
+  sessionStorage.clear();
+  location.reload(true);
 }
 // ═══════════════════════════════════════════════════
 // OFFICE NOTIFICATION SETTINGS — bell icon in the topbar
