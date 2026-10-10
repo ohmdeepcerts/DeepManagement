@@ -6000,27 +6000,19 @@ async function renderEmpReport(){
           <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Category</th>
           <th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Notes</th>
           <th style="text-align:right;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Amount</th>
+          <th style="text-align:right;padding:7px 10px;font-size:11px;color:var(--txtm);font-weight:600;">Running</th>
         </tr>
       </thead>
       <tbody>
-        ${mExpenses.sort(function(a,b){return a.date.localeCompare(b.date);}).map(function(e){
-          var neg=parseFloat(e.amount)<0;
-          return '<tr style="border-bottom:0.5px solid var(--bdr);">'
-            +'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+e.date+'</td>'
-            +'<td style="padding:7px 10px;font-weight:600;">'+( e.merchant||'—')+'</td>'
-            +'<td style="padding:7px 10px;"><span style="background:var(--card2);padding:2px 7px;border-radius:4px;font-size:11px;">'+(e.category||'—')+'</span></td>'
-            +'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+(e.notes||'—')+'</td>'
-            +'<td style="padding:7px 10px;text-align:right;font-weight:700;color:'+(neg?'var(--red)':'var(--tel)')+';">'+(neg?'−':'+')+C+Math.abs(parseFloat(e.amount)).toFixed(2)+(neg?'<div style=\'font-size:10px;font-weight:500;\'>deduction</div>':'')+'</td>'
-            +'</tr>';
-        }).join('')}
+        ${(function(){var _s=[...mExpenses].sort(function(a,b){return a.date.localeCompare(b.date);});var _o=_s.filter(function(e){return(parseFloat(e.amount)||0)>=0;}).concat(_s.filter(function(e){return(parseFloat(e.amount)||0)<0;}));var _run=0;return _o.map(function(e){var amt=parseFloat(e.amount)||0;var neg=amt<0;_run+=amt;var runNeg=_run<0;return'<tr style="border-bottom:0.5px solid var(--bdr);">'+'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+e.date+'</td>'+'<td style="padding:7px 10px;font-weight:600;">'+(e.merchant||'—')+'</td>'+'<td style="padding:7px 10px;"><span style="background:var(--card2);padding:2px 7px;border-radius:4px;font-size:11px;">'+(e.category||'—')+'</span></td>'+'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+(e.notes||'—')+'</td>'+'<td style="padding:7px 10px;text-align:right;font-weight:700;color:'+(neg?'var(--red)':'var(--tel)')+';">'+(neg?'−':'+')+C+Math.abs(amt).toFixed(2)+(neg?'<div style=\'font-size:10px;font-weight:500;\'>deduction</div>':'')+'</td>'+'<td style="padding:7px 10px;text-align:right;color:'+(runNeg?'var(--red)':'var(--txtm)')+';">'+(runNeg?'−':'')+C+Math.abs(_run).toFixed(2)+'</td>'+'</tr>';}).join('');})()}
       </tbody>
       <tfoot>
         <tr style="border-top:2px solid var(--bdr);font-weight:700;">
-          <td colspan="4" style="padding:8px 10px;">Total Expenses</td>
+          <td colspan="5" style="padding:8px 10px;">Total Expenses</td>
           <td style="padding:8px 10px;text-align:right;color:${mExpTotal<0?'var(--red)':'var(--tel)'};">${mExpTotal<0?'−':''}${C}${Math.abs(mExpTotal).toFixed(2)}</td>
         </tr>
         ${hasRate?`<tr style="background:var(--grnl);font-weight:700;font-size:14px;">
-          <td colspan="4" style="padding:8px 10px;">TOTAL PAYABLE (Pay + Expenses)</td>
+          <td colspan="5" style="padding:8px 10px;">TOTAL PAYABLE (Pay + Expenses)</td>
           <td style="padding:8px 10px;text-align:right;color:${(totalPay+mExpTotal)<0?'var(--red)':'var(--grn)'};">${C}${(totalPay+mExpTotal).toFixed(2)}</td>
         </tr>`:''}
       </tfoot>
