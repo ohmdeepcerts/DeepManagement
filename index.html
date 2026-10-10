@@ -568,7 +568,7 @@ tr.rsun td{background:var(--sut)!important;}
 @media(max-width:768px){.led-split{flex-direction:column!important;}.led-right{width:100%!important;border-right:none!important;border-top:1px solid var(--bdr);}}
 @media(max-width:900px){.cr4{grid-template-columns:repeat(2,1fr);}.sidebar{width:58px;min-width:58px;}.sidebar .nav-item span,.sidebar .sb-sec,.sidebar .sb-uname,.sidebar .sb-urole,.sidebar .sb-signout span,.ver{display:none;}}
 .print-only{display:none;}
-@media print{.sidebar,.topbar,.dn,.btn,.bg,.ph .btn,.no-print{display:none!important;}body{display:block;height:auto;overflow:visible;}.main{display:block;height:auto;}.content{padding:0;overflow:visible;}.page{display:block!important;}.page:not(.active){display:none!important;}.card{box-shadow:none;border:1px solid #ddd;}table{font-size:11px;}@page{margin:1.5cm;}.print-only{display:block!important;}
+@media print{.sidebar,.topbar,.dn,.btn,.bg,.ph .btn,.no-print{display:none!important;}body{display:block;height:auto;overflow:visible;}.main{display:block;height:auto;}.content{padding:0;overflow:visible;}.page{display:block!important;}.page:not(.active){display:none!important;}.card{box-shadow:none;border:1px solid #ddd;}table{font-size:11px;}@page{margin:1.5cm;@bottom-center{content:"Page " counter(page) " of " counter(pages);font-size:9pt;font-family:sans-serif;color:#666;}}.print-only{display:block!important;}
 /* Standalone timesheet printing (Ledger "Timesheet" button, Employee Report "Timesheet" button) — hide the live page content (staff pills, tables, action buttons) so only the generated print sheet shows, not both. */
 #page-ledger.ts-print-mode>*:not(#ledgerTsSheet){display:none!important;}
 #page-emp-report.ts-print-mode>*:not(#tsSheet){display:none!important;}
@@ -6017,8 +6017,6 @@ async function renderEmpReport(){
       </thead>
       <tbody>
         ${(function(){var _s=[...mExpenses].sort(function(a,b){return a.date.localeCompare(b.date);});var _o=_s.filter(function(e){return(parseFloat(e.amount)||0)>=0;}).concat(_s.filter(function(e){return(parseFloat(e.amount)||0)<0;}));var _run=0;return _o.map(function(e){var amt=parseFloat(e.amount)||0;var neg=amt<0;_run+=amt;var runNeg=_run<0;return'<tr style="border-bottom:0.5px solid var(--bdr);">'+'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+e.date+'</td>'+'<td style="padding:7px 10px;font-weight:600;">'+(e.merchant||'—')+'</td>'+'<td style="padding:7px 10px;"><span style="background:var(--card2);padding:2px 7px;border-radius:4px;font-size:11px;">'+(e.category||'—')+'</span></td>'+'<td style="padding:7px 10px;color:var(--txtm);font-size:12px;">'+(e.notes||'—')+'</td>'+'<td style="padding:7px 10px;text-align:right;font-weight:700;color:'+(neg?'var(--red)':'var(--tel)')+';">'+(neg?'−':'+')+C+Math.abs(amt).toFixed(2)+(neg?'<div style=\'font-size:10px;font-weight:500;\'>deduction</div>':'')+'</td>'+'<td style="padding:7px 10px;text-align:right;color:'+(runNeg?'var(--red)':'var(--txtm)')+';">'+(runNeg?'−':'')+C+Math.abs(_run).toFixed(2)+'</td>'+'</tr>';}).join('');})()}
-      </tbody>
-      <tfoot>
         <tr style="border-top:2px solid var(--bdr);font-weight:700;">
           <td colspan="5" style="padding:8px 10px;">Total Expenses</td>
           <td style="padding:8px 10px;text-align:right;color:${mExpTotal<0?'var(--red)':'var(--tel)'};">${mExpTotal<0?'−':''}${C}${Math.abs(mExpTotal).toFixed(2)}</td>
@@ -6027,7 +6025,7 @@ async function renderEmpReport(){
           <td colspan="5" style="padding:8px 10px;">TOTAL PAYABLE (Pay + Expenses)</td>
           <td style="padding:8px 10px;text-align:right;color:${(totalPay+mExpTotal)<0?'var(--red)':'var(--grn)'};">${C}${(totalPay+mExpTotal).toFixed(2)}</td>
         </tr>`:''}
-      </tfoot>
+      </tbody>
     </table>
     ${(()=>{
       const catTotals={};
