@@ -1588,7 +1588,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:9px;"><i class="fa-solid fa-mobile-screen-button" style="color:var(--acc);margin-right:5px;"></i>v2 Portal Auth <span style="font-weight:400;color:var(--txtm)">(individual login)</span></div>
         <div id="v2AuthBadge" style="font-size:12px;margin-bottom:8px;"></div>
         <div id="v2ResetArea" style="display:none;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button type="button" onclick="resetEmpPin()" class="btn-sm" style="background:var(--acc);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-rotate-right"></i> Reset PIN</button>
+          <button type="button" id="v2ResetBtn" onclick="resetEmpPin()" class="btn-sm" style="background:var(--acc);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-rotate-right"></i> Reset PIN</button>
           <span id="v2ResetMsg" style="font-size:12px;color:var(--txtm);font-family:monospace;"></span>
         </div>
         <p style="font-size:12px;color:var(--txtm);margin-top:4px;">A first-login PIN is auto-generated when you add a new employee. Share it with them — they use it to create their account and set their own PIN.</p>
@@ -6914,7 +6914,13 @@ async function editEmpModal(id){
     else{_v2Badge.innerHTML='<span style="color:var(--txtm)">✗ No v2 account — set a temp PIN below</span>';}
   }
   const _v2ResetArea=document.getElementById('v2ResetArea');
-  if(_v2ResetArea){_v2ResetArea.style.display=emp.auth_user_id?'flex':'none';const _rm=document.getElementById('v2ResetMsg');if(_rm)_rm.textContent='';}
+  if(_v2ResetArea){
+    const _showReset=emp.auth_user_id||!emp.temp_pin;
+    _v2ResetArea.style.display=_showReset?'flex':'none';
+    const _rb=document.getElementById('v2ResetBtn');
+    if(_rb)_rb.innerHTML='<i class="fa-solid fa-rotate-right"></i> '+(emp.auth_user_id||emp.temp_pin?'Reset PIN':'Generate PIN');
+    const _rm=document.getElementById('v2ResetMsg');if(_rm)_rm.textContent='';
+  }
   refreshBankSel();
   const stored=emp.bank_name||'';
   const accounts=cfg.bank_accounts||[];
