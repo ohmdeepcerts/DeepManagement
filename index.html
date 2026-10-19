@@ -3245,28 +3245,22 @@ async function loadAllData(){
     // ────────────────────────────────────────────────────────────────
     initSelectors();
     navigate('dashboard');
-    updateBadges();
-    // Background sync every 11 seconds
-    if(window._bgSyncInterval)clearInterval(window._bgSyncInterval);
-    window._bgSyncInterval=setInterval(async()=>{
-      if(!isLoggedIn)return;
-      try{
-        await loadAllDataSilent();
-        const page=currentPage||'dashboard';
-        if(typeof window['render'+page.charAt(0).toUpperCase()+page.slice(1).replace(/-([a-z])/g,(_,c)=>c.toUpperCase())]!=='function')return;
-        updateBadges();
-      }catch(e){/* silent */}
-    },11000);
-    // Realtime: the employee app has had live push updates all along; the
-    // office side only ever polled. This makes new expenses, submissions,
-    // attendance requests, and messages appear the moment they happen.
-    // The 11s poll above stays as a safety net in case realtime drops.
-    setupOfficeRealtime();
-    // Stale-deployment check (GitHub Pages caches aggressively; the employee
-    // app has had this for a while — the office app could silently run an old
-    // version for days after a redeploy). Non-intrusive: shows a toast rather
-    // than force-reloading, since the office may be mid-edit.
-    startOfficeUpdateCheck();
+    try{
+      updateBadges();
+      // Background sync every 11 seconds
+      if(window._bgSyncInterval)clearInterval(window._bgSyncInterval);
+      window._bgSyncInterval=setInterval(async()=>{
+        if(!isLoggedIn)return;
+        try{
+          await loadAllDataSilent();
+          const page=currentPage||'dashboard';
+          if(typeof window['render'+page.charAt(0).toUpperCase()+page.slice(1).replace(/-([a-z])/g,(_,c)=>c.toUpperCase())]!=='function')return;
+          updateBadges();
+        }catch(e){/* silent */}
+      },11000);
+      setupOfficeRealtime();
+      startOfficeUpdateCheck();
+    }catch(e2){ console.warn('Post-load setup error:',e2); }
     // employeeDocuments already loaded above - no separate call needed
   }catch(e){
     // Ignore network/CORS/manifest errors — these are connectivity blips, not bugs
@@ -9246,7 +9240,7 @@ document.getElementById('docViewModal').addEventListener('click',function(e){if(
 // ── NETWORK & ERROR HANDLING ──
 window.addEventListener('online', ()=>{
   toast('Back online — syncing...','s');
-  if(typeof loadAllData==='function')loadAllData();
+  setTimeout(()=>{ if(typeof loadAllDataSilent==='function')loadAllDataSilent().catch(()=>{}); },1500);
 });
 window.addEventListener('offline', ()=>{
   toast('No internet connection','e');
