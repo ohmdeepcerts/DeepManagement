@@ -11182,7 +11182,7 @@ async function instSave(){
 // ═══════════════════════════════════════════════════
 // VAT RECORDS
 // ═══════════════════════════════════════════════════
-let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set();
+let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set(),_vatImportingExpId=null;
 
 async function renderVatPage(){
   const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
@@ -11249,6 +11249,7 @@ function vatRenderDash(){
     <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--grn);">${_gbp(sVat)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Sales VAT</div></div>
     <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:${posClr};">${_gbp(Math.abs(vatPos))}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">${posLabel}</div></div>
   </div>
+  ${vatDraftsHtml()}
   <div class="card"><div class="ch"><div class="ct">Recent Transactions (${Math.min(tx.length,20)} of ${tx.length})</div></div><div class="ts" style="overflow-x:auto;">${vatTxTable(tx.slice(0,20),true)}</div></div>`;
 }
 
@@ -11281,6 +11282,89 @@ function vatTxTable(rows,compact=false){
     </tr>`;
   }).join('');
   return`<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead style="background:var(--bdr);">${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+// ─── VAT Expense Drafts ───────────────────────────
+function vatGetPendingDrafts(){
+  const dismissed=new Set(JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]'));
+  const imported=new Set(JSON.parse(localStorage.getItem('vat_imported_exp')||'[]'));
+  return(expenses||[]).filter(e=>
+    e.tags?.includes('VAT')&&
+    !dismissed.has(String(e.id))&&
+    !imported.has(String(e.id))
+  ).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+}
+function vatDraftsHtml(){
+  const drafts=vatGetPendingDrafts();
+  if(!drafts.length)return'';
+  const rows=drafts.slice(0,15).map(e=>{
+    const gross=parseFloat(e.amount)||0;
+    const thumb=e.receipt_url
+      ?`<img src="${e.receipt_url}" style="width:38px;height:38px;object-fit:cover;border-radius:5px;flex-shrink:0;" onerror="this.style.display='none'">`
+      :`<div style="width:38px;height:38px;border-radius:5px;background:var(--bdr);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;"><i class="fa-solid fa-receipt" style="color:var(--txtm);"></i></div>`;
+    return`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--bdr);">
+      ${thumb}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.merchant||'Unknown'}</div>
+        <div style="font-size:11px;color:var(--txtm);">${e.date||''} · ${_gbp(gross)} · ${e.category||''}</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0;">
+        <button class="btn btn-p" style="font-size:11px;padding:3px 9px;" onclick="vatImportExpDraft('${e.id}')"><i class="fa-solid fa-file-import"></i> Import</button>
+        <button class="btn btn-o" style="font-size:11px;padding:3px 7px;color:var(--txtm);border-color:var(--bdr);" title="Dismiss" onclick="vatDismissExpDraft('${e.id}')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+  const more=drafts.length>15?`<div style="padding:7px 12px;font-size:11px;color:var(--txtm);text-align:center;">+${drafts.length-15} more VAT-tagged expenses — tag more in the Expense Ledger</div>`:'';
+  return`<div class="card" style="margin-bottom:14px;">
+    <div class="ch">
+      <div style="display:flex;align-items:center;gap:8px;"><div class="ct">Expense Drafts</div><span style="background:var(--acc);color:#fff;font-size:10px;font-weight:700;padding:1px 8px;border-radius:10px;">${drafts.length}</span></div>
+      <button class="btn btn-o" style="font-size:11px;" onclick="navigate('ledger')"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open Ledger</button>
+    </div>
+    <div style="padding:4px 0 0;">${rows}${more}</div>
+  </div>`;
+}
+function vatDismissExpDraft(expId){
+  const list=JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]');
+  if(!list.includes(String(expId)))list.push(String(expId));
+  localStorage.setItem('vat_dismissed_exp',JSON.stringify(list));
+  vatRenderDash();
+}
+async function vatImportExpDraft(expId){
+  const e=(expenses||[]).find(ex=>String(ex.id)===String(expId));
+  if(!e)return;
+  _vatImportingExpId=String(expId);
+  const tab=document.querySelector('#page-vat .vat-tab[data-vt="purchase"]');
+  vatTab(tab,'purchase');
+  await new Promise(r=>requestAnimationFrame(r));
+  const d=document.getElementById('vatFDate');
+  const s=document.getElementById('vatFSupplier');
+  const c=document.getElementById('vatFCat');
+  const n=document.getElementById('vatFNet');
+  const rt=document.getElementById('vatFRate');
+  if(d&&e.date)d.value=e.date;
+  if(s&&e.merchant)s.value=e.merchant;
+  if(c&&e.category){for(const o of c.options)if(o.value===e.category){o.selected=true;break;}}
+  if(n&&e.amount){
+    const gross=parseFloat(e.amount)||0;
+    const rate=parseFloat(rt?.value||'20')||20;
+    n.value=(Math.round(gross/(1+rate/100)*100)/100).toFixed(2);
+    vatAutoCalc();
+  }
+  if(e.receipt_url){
+    try{
+      const res=await fetch(e.receipt_url);
+      const blob=await res.blob();
+      const reader=new FileReader();
+      reader.onload=ev=>{
+        _vatFileData=ev.target.result;
+        _vatFileName='receipt_'+String(expId).slice(0,8)+'.jpg';
+        const prev=document.getElementById('vatFPreview'),img=document.getElementById('vatFImg');
+        if(prev)prev.style.display='block';if(img)img.src=_vatFileData;
+      };
+      reader.readAsDataURL(blob);
+    }catch(_){}
+  }
+  toast('Form filled from expense — review &amp; save','s');
 }
 
 // ─── Log Form (purchase / sale) ───────────────────
@@ -11546,6 +11630,12 @@ async function vatSaveForm(type){
   if(r.error){errEl.textContent=r.error.message;errEl.style.display='block';return;}
   _vatEditId=null;_vatFileData=null;_vatFileName=null;
   toast(editingId!==null?'Transaction updated':'Transaction saved','s');
+  if(_vatImportingExpId){
+    const imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]');
+    if(!imp.includes(_vatImportingExpId))imp.push(_vatImportingExpId);
+    localStorage.setItem('vat_imported_exp',JSON.stringify(imp));
+    _vatImportingExpId=null;
+  }
   const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
   _vatTx=data||[];
   vatRenderForm(type);
