@@ -4178,7 +4178,7 @@ function renderDashboard(){
     }else banEl.innerHTML='';
   }
   // Agreement installment reminders (async — fills agReminderBanner)
-  loadAgReminder();
+  if(typeof loadAgReminder==='function')loadAgReminder();
 }
 
 
@@ -11206,7 +11206,7 @@ function vatTab(el,name){
 }
 
 // ─── helpers ─────────────────────────────────────
-function _£(n){return'£'+(parseFloat(n)||0).toFixed(2);}
+function _gbp(n){return'£'+(parseFloat(n)||0).toFixed(2);}
 function vatPeriodFilter(p){
   const now=new Date(),y=now.getFullYear(),m=now.getMonth();
   let from,to;
@@ -11243,11 +11243,11 @@ function vatRenderDash(){
     <button class="btn btn-o" style="font-size:11px;padding:4px 10px;" onclick="renderVatPage()"><i class="fa-solid fa-rotate-right"></i></button>
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px;">
-    <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--acc);">${_£(pNet)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Purchases Net</div></div>
-    <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--amb);">${_£(pVat)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Purchases VAT</div></div>
-    <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--grn);">${_£(sNet)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Sales Net</div></div>
-    <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--grn);">${_£(sVat)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Sales VAT</div></div>
-    <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:${posClr};">${_£(Math.abs(vatPos))}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">${posLabel}</div></div>
+    <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--acc);">${_gbp(pNet)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Purchases Net</div></div>
+    <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--amb);">${_gbp(pVat)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Purchases VAT</div></div>
+    <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--grn);">${_gbp(sNet)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Sales Net</div></div>
+    <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--grn);">${_gbp(sVat)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Sales VAT</div></div>
+    <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:${posClr};">${_gbp(Math.abs(vatPos))}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">${posLabel}</div></div>
   </div>
   <div class="card"><div class="ch"><div class="ct">Recent Transactions (${Math.min(tx.length,20)} of ${tx.length})</div></div><div class="ts" style="overflow-x:auto;">${vatTxTable(tx.slice(0,20),true)}</div></div>`;
 }
@@ -11263,17 +11263,17 @@ function vatTxTable(rows,compact=false){
     if(compact){
       return`<tr>
         <td>${t.date}</td><td>${tag}</td><td>${(t.supplier||'-')}${rcptIcon}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums;">${_£(t.net)}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums;">${_£(t.vat_amount)}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums;">${_£(t.gross)}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.net)}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.vat_amount)}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.gross)}</td>
       </tr>`;
     }
     return`<tr>
       <td>${t.date}</td><td>${tag}</td><td>${(t.supplier||'-')}${rcptIcon}</td><td>${t.category||''}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;">${_£(t.net)}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.net)}</td>
       <td style="text-align:right;">${t.vat_rate}%</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;">${_£(t.vat_amount)}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;">${_£(t.gross)}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.vat_amount)}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.gross)}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn-o" style="font-size:10px;padding:2px 7px;" onclick="vatEditTx(${t.id})"><i class="fa-solid fa-pencil"></i></button>
         <button class="btn btn-o" style="font-size:10px;padding:2px 7px;color:var(--red);border-color:var(--red);" onclick="vatDeleteTx(${t.id})"><i class="fa-solid fa-trash"></i></button>
@@ -11422,7 +11422,7 @@ function vatPickExpense(){
           <img src="${e.receipt_url}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;background:var(--bdr);" onerror="this.style.display='none'">
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.merchant||'Unknown'}</div>
-            <div style="font-size:11px;color:var(--txtm);">${e.date||''} · ${_£(e.amount)} · ${e.category||''}</div>
+            <div style="font-size:11px;color:var(--txtm);">${e.date||''} · ${_gbp(e.amount)} · ${e.category||''}</div>
           </div>
         </div>`).join('')}
       </div>
