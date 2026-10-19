@@ -3233,6 +3233,9 @@ async function loadAllData(){
       };
     });
     setSyncStatus('saved');
+    // Clear any retry toast left over from a previous failed attempt
+    clearInterval(window._retryIv);
+    document.getElementById('retryCountdownToast')?.remove();
     // ── PERFORMANCE MAPS — built once after load ────────────────────
     window.employeeMap=new Map(employees.map(e=>[e.id,e]));
     const _mkFn=r=>{if(r.date&&!r._monthKey)r._monthKey=r.date.slice(0,7);};
