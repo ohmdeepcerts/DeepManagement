@@ -11182,7 +11182,7 @@ async function instSave(){
 // ═══════════════════════════════════════════════════
 // VAT RECORDS
 // ═══════════════════════════════════════════════════
-let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[];
+let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set();
 
 async function renderVatPage(){
   const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
@@ -11667,38 +11667,117 @@ async function vatDeleteTx(id){
 // ─── Export ───────────────────────────────────────
 function vatRenderExport(){
   const el=document.getElementById('vp-export');
-  const y=new Date().getFullYear();
+  const months=[...new Set(_vatTx.map(t=>t.date.slice(0,7)))].sort().reverse();
+  if(!_vatExSelMonths.size&&months.length)months.forEach(m=>_vatExSelMonths.add(m));
+  const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const chips=months.map(m=>{
+    const sel=_vatExSelMonths.has(m);
+    const[y,mo]=m.split('-');
+    return`<span onclick="vatExToggle('${m}')" style="display:inline-block;padding:4px 11px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid ${sel?'var(--acc)':'var(--bdr)'};background:${sel?'var(--acc)':'transparent'};color:${sel?'#fff':'var(--txt)'};user-select:none;transition:all .1s;">${mn[+mo-1]} ${y}</span>`;
+  }).join('');
+  const selN=_vatExSelMonths.size;
+  const rcptN=_vatTx.filter(t=>t.file_data&&_vatExSelMonths.has(t.date.slice(0,7))).length;
   el.innerHTML=`
-  <div class="card" style="max-width:460px;">
+  <div class="card" style="max-width:520px;">
     <div class="ch"><div class="ct">Export Transactions</div></div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">From</label>
-          <input type="date" id="vatExFrom" value="${y}-01-01" class="vinp"></div>
-        <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">To</label>
-          <input type="date" id="vatExTo" value="${y}-12-31" class="vinp"></div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+          <label style="font-size:11px;color:var(--txtm);font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Select Months</label>
+          <div style="display:flex;gap:5px;">
+            <button class="btn btn-o" style="font-size:10px;padding:2px 8px;" onclick="vatExSelAll(true)">All</button>
+            <button class="btn btn-o" style="font-size:10px;padding:2px 8px;" onclick="vatExSelAll(false)">None</button>
+          </div>
+        </div>
+        ${months.length?`<div style="display:flex;flex-wrap:wrap;gap:5px;">${chips}</div>`:`<div style="font-size:12px;color:var(--txtm);">No transactions yet</div>`}
       </div>
       <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Type</label>
         <select id="vatExType" class="vinp"><option value="">All</option><option value="purchase">Purchases Only</option><option value="sale">Sales Only</option></select></div>
-      <button class="btn btn-p" onclick="vatDoExport()"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--bdr);">
+        <button class="btn btn-p" onclick="vatDoExport()" style="flex:1;min-width:130px;"><i class="fa-solid fa-file-csv"></i> Export CSV${selN?' ('+selN+' mo)':''}</button>
+        <button class="btn btn-s" onclick="vatDoZipExport()" style="flex:1;min-width:160px;background:var(--acc);color:#fff;border-color:var(--acc);"><i class="fa-solid fa-file-zipper"></i> Download ZIP${rcptN?' + '+rcptN+' receipts':''}</button>
+      </div>
+      <div id="vatExStatus" style="display:none;font-size:12px;color:var(--txtm);text-align:center;padding:6px;"></div>
     </div>
   </div>`;
 }
+function vatExToggle(ym){
+  if(_vatExSelMonths.has(ym))_vatExSelMonths.delete(ym);else _vatExSelMonths.add(ym);
+  vatRenderExport();
+}
+function vatExSelAll(on){
+  const months=[...new Set(_vatTx.map(t=>t.date.slice(0,7)))];
+  if(on)months.forEach(m=>_vatExSelMonths.add(m));else _vatExSelMonths.clear();
+  vatRenderExport();
+}
+function vatExLabel(){
+  const s=[..._vatExSelMonths].sort();
+  if(!s.length)return'export';
+  return s.length===1?s[0]:s[0]+'_to_'+s[s.length-1];
+}
+function vatExtFromDataUrl(d){
+  const m=(d||'').match(/^data:([^;]+);/);
+  const t=m?m[1]:'';
+  if(t==='application/pdf')return'pdf';
+  if(t==='image/png')return'png';
+  if(t==='image/gif')return'gif';
+  if(t==='image/webp')return'webp';
+  return'jpg';
+}
+function vatSanitizeFName(s){
+  return String(s||'file').replace(/[^a-zA-Z0-9\-_.]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,80)||'file';
+}
 
 function vatDoExport(){
-  const from=document.getElementById('vatExFrom').value;
-  const to=document.getElementById('vatExTo').value;
   const type=document.getElementById('vatExType').value;
-  let rows=_vatTx.filter(t=>t.date>=from&&t.date<=to);
+  let rows=_vatTx.filter(t=>_vatExSelMonths.has(t.date.slice(0,7)));
   if(type)rows=rows.filter(t=>t.type===type);
-  if(!rows.length){toast('No transactions in selected range','w');return;}
+  if(!rows.length){toast('No transactions for selected months','w');return;}
   const esc=v=>`"${String(v||'').replace(/"/g,'""')}"`;
-  const headers='Date,Type,Supplier/Customer,Category,Receipt No,Net,VAT Rate,VAT Amount,Gross';
-  const csv=[headers,...rows.map(t=>[t.date,t.type,esc(t.supplier),esc(t.category),esc(t.receipt_no),t.net,t.vat_rate,t.vat_amount,t.gross].join(','))].join('\n');
+  const hdr='Date,Type,Supplier/Customer,Category,Receipt No,Net,VAT Rate,VAT Amount,Gross';
+  const csv=[hdr,...rows.map(t=>[t.date,t.type,esc(t.supplier),esc(t.category),esc(t.receipt_no),t.net,t.vat_rate,t.vat_amount,t.gross].join(','))].join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download=`vat-${from}-to-${to}${type?'-'+type:''}.csv`;
+  a.download=`vat-${vatExLabel()}${type?'-'+type:''}.csv`;
   a.click();
+}
+
+async function vatDoZipExport(){
+  if(typeof JSZip==='undefined'){toast('JSZip library not loaded','e');return;}
+  const type=document.getElementById('vatExType').value;
+  let rows=_vatTx.filter(t=>_vatExSelMonths.has(t.date.slice(0,7)));
+  if(type)rows=rows.filter(t=>t.type===type);
+  if(!rows.length){toast('No transactions for selected months','w');return;}
+  const statusEl=document.getElementById('vatExStatus');
+  statusEl.textContent='Building ZIP…';statusEl.style.display='block';
+  const zip=new JSZip();
+  const rf=zip.folder('receipts');
+  // CSV (with receipt filename column)
+  const esc=v=>`"${String(v||'').replace(/"/g,'""')}"`;
+  const hdr='Date,Type,Supplier/Customer,Category,Receipt No,Net,VAT Rate,VAT Amount,Gross,Receipt File';
+  const seen=new Map();
+  const rowLines=rows.map(t=>{
+    let rfile='';
+    if(t.file_data){
+      const ext=vatExtFromDataUrl(t.file_data);
+      let base=vatSanitizeFName(t.receipt_no||`${t.type}-${t.date}-${t.supplier||'unknown'}`);
+      let fname=base+'.'+ext;
+      if(seen.has(fname)){const n=seen.get(fname)+1;seen.set(fname,n);fname=base+'-'+n+'.'+ext;}else seen.set(fname,1);
+      rf.file(fname,t.file_data.split(',')[1],{base64:true});
+      rfile=fname;
+    }
+    return[t.date,t.type,esc(t.supplier),esc(t.category),esc(t.receipt_no),t.net,t.vat_rate,t.vat_amount,t.gross,esc(rfile)].join(',');
+  });
+  zip.file('transactions.csv',[hdr,...rowLines].join('\n'));
+  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},
+    m=>{statusEl.textContent=`Building ZIP… ${m.percent.toFixed(0)}%`;});
+  statusEl.style.display='none';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`vat-${vatExLabel()}${type?'-'+type:''}.zip`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+  toast('ZIP downloaded','s');
 }
 </script>
 
