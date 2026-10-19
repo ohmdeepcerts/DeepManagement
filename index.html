@@ -11182,7 +11182,7 @@ async function instSave(){
 // ═══════════════════════════════════════════════════
 // VAT RECORDS
 // ═══════════════════════════════════════════════════
-let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null;
+let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[];
 
 async function renderVatPage(){
   const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
@@ -11295,6 +11295,7 @@ function vatRenderForm(type){
   const supplierLabel=type==='purchase'?'Supplier':'Customer';
 
   panel.innerHTML=`
+  ${vatScanQueueHtml(type)}
   <div class="card" style="max-width:600px;">
     <div class="ch">
       <div class="ct">${isEdit?'Edit':'Log New'} ${type==='purchase'?'Purchase':'Sale'}</div>
@@ -11341,6 +11342,7 @@ function vatRenderForm(type){
     </div>
   </div>`;
 
+  vatScanInit(type);
   // restore in-memory file if any
   if(_vatFileData&&!ed?.file_data){
     document.getElementById('vatFPreview').style.display='block';
@@ -11374,6 +11376,150 @@ function vatClearFile(){
   document.getElementById('vatFPreview').style.display='none';
   document.getElementById('vatFImg').src='';
   const fi=document.getElementById('vatFFile');if(fi)fi.value='';
+}
+
+// ─── Gemini Scan Queue ────────────────────────────
+function vatScanQueueHtml(type){
+  const key=localStorage.getItem('vat_gemini_key')||'';
+  const items=_vatScanQueue.filter(i=>i.status!=='used');
+  const pending=items.filter(i=>i.status==='pending').length;
+  const keyRow=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+    <input id="vatGKey" type="password" placeholder="Gemini API key (stored in browser only)" value="${key.replace(/"/g,'&quot;')}"
+      class="vinp" style="flex:1;font-size:12px;" oninput="localStorage.setItem('vat_gemini_key',this.value)">
+    <a href="https://aistudio.google.com/app/apikey" target="_blank" style="font-size:11px;color:var(--acc);white-space:nowrap;text-decoration:none;">Get key ↗</a>
+  </div>`;
+  const compact=items.length>0;
+  const dropZone=`<div id="vatDropZone" style="border:2px dashed var(--bdr);border-radius:8px;padding:${compact?'7px 12px':'18px'};text-align:center;cursor:pointer;color:var(--txtm);font-size:12px;transition:background .15s;"
+    onclick="document.getElementById('vatBulkFile').click()"
+    ondragover="event.preventDefault();this.style.background='var(--bdr)';"
+    ondragleave="this.style.background='';"
+    ondrop="event.preventDefault();this.style.background='';vatQueueAdd(event.dataTransfer.files,'${type}')">
+    <i class="fa-solid fa-cloud-arrow-up" style="font-size:${compact?'13':'18'}px;${compact?'margin-right:5px;':'display:block;margin-bottom:5px;'}"></i>${compact?'Drop / paste more files':'Drop receipts &amp; invoices here · paste from clipboard · or click to browse'}
+    <input id="vatBulkFile" type="file" accept="image/*,application/pdf" multiple style="display:none;" onchange="vatQueueAdd(this.files,'${type}');this.value=''">
+  </div>`;
+  if(!items.length)return`<div id="vatScanSec" style="max-width:600px;margin-bottom:12px;"><div class="card" style="padding:10px 12px;">${keyRow}${dropZone}</div></div>`;
+  const qRows=items.map(i=>{
+    const isImg=i.mimeType.startsWith('image/');
+    const thumb=isImg?`<img src="${i.dataUrl}" style="width:38px;height:38px;object-fit:cover;border-radius:5px;flex-shrink:0;">`
+      :`<div style="width:38px;height:38px;border-radius:5px;background:var(--bdr);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;"><i class="fa-solid fa-file-pdf" style="color:var(--red);"></i></div>`;
+    let badge,actions;
+    if(i.status==='pending'){
+      badge=`<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(100,100,100,.1);color:var(--txtm);">&#x23F3; Pending</span>`;
+      actions=`<button class="btn btn-o" style="font-size:10px;padding:2px 7px;" onclick="vatScanItem('${i.id}','${type}')"><i class="fa-solid fa-wand-magic-sparkles"></i> Scan</button>`;
+    }else if(i.status==='scanning'){
+      badge=`<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(37,99,235,.1);color:var(--acc);"><i class="fa-solid fa-spinner fa-spin"></i> Scanning…</span>`;
+      actions='';
+    }else if(i.status==='scanned'){
+      badge=`<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(22,163,74,.12);color:#16a34a;"><i class="fa-solid fa-check"></i> Scanned</span>`;
+      actions=`<button class="btn btn-p" style="font-size:10px;padding:2px 7px;" onclick="vatScanFillForm('${i.id}','${type}')"><i class="fa-solid fa-fill-drip"></i> Fill Form</button>`;
+    }else{
+      badge=`<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(200,30,30,.1);color:var(--red);"><i class="fa-solid fa-triangle-exclamation"></i> Failed</span>`;
+      actions=`<button class="btn btn-o" style="font-size:10px;padding:2px 7px;" title="${(i.error||'').replace(/"/g,'&quot;')}" onclick="vatScanItem('${i.id}','${type}')"><i class="fa-solid fa-rotate"></i> Retry</button>`;
+    }
+    const rl=i.result?`<div style="font-size:10px;color:var(--txtm);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${[i.result.supplier,i.result.date,i.result.gross_inc_vat!=null?'£'+(+i.result.gross_inc_vat).toFixed(2):null].filter(Boolean).join(' · ')}</div>`:'';
+    return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr);">
+      ${thumb}
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">${badge}<span style="font-size:10px;color:var(--txtm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">${i.fileName}</span></div>${rl}
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0;">${actions}<button class="btn btn-o" style="font-size:10px;padding:2px 6px;color:var(--red);border-color:var(--red);" onclick="vatScanRemove('${i.id}','${type}')"><i class="fa-solid fa-xmark"></i></button></div>
+    </div>`;
+  }).join('');
+  const scanAll=pending>0&&key?`<button class="btn btn-p" style="font-size:11px;padding:3px 9px;" onclick="vatScanAll('${type}')"><i class="fa-solid fa-wand-magic-sparkles"></i> Scan All (${pending})</button>`:'';
+  return`<div id="vatScanSec" style="max-width:600px;margin-bottom:12px;"><div class="card" style="padding:10px 12px;">
+    ${keyRow}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <span style="font-size:12px;font-weight:600;">Scan Queue <span style="font-size:10px;color:var(--txtm);font-weight:400;">(${items.length} file${items.length!==1?'s':''})</span></span>
+      ${scanAll}
+    </div>
+    ${dropZone}
+    <div style="margin-top:4px;">${qRows}</div>
+  </div></div>`;
+}
+function vatScanInit(type){
+  if(window._vatPasteCleanup)window._vatPasteCleanup();
+  const onPaste=e=>{
+    if(document.getElementById('vp-'+type)?.style.display==='none')return;
+    const files=[...e.clipboardData.items].filter(i=>i.kind==='file').map(i=>i.getAsFile()).filter(Boolean);
+    if(files.length){e.preventDefault();vatQueueAdd(files,type);}
+  };
+  document.addEventListener('paste',onPaste);
+  window._vatPasteCleanup=()=>document.removeEventListener('paste',onPaste);
+}
+function vatQueueAdd(files,type){
+  const arr=Array.from(files).filter(f=>f&&(f.type.startsWith('image/')||f.type==='application/pdf'));
+  if(!arr.length){toast('Drop image or PDF files only','w');return;}
+  arr.forEach(f=>{
+    const id='q'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+    const reader=new FileReader();
+    reader.onload=e=>{
+      _vatScanQueue.push({id,dataUrl:e.target.result,mimeType:f.type||'image/jpeg',fileName:f.name,status:'pending',result:null,error:null});
+      vatScanQueueReRender(type);
+    };
+    reader.readAsDataURL(f);
+  });
+}
+function vatScanQueueReRender(type){
+  _vatScanQueue=_vatScanQueue.filter(i=>i.status!=='used');
+  const sec=document.getElementById('vatScanSec');
+  if(sec)sec.outerHTML=vatScanQueueHtml(type);
+  else vatRenderForm(type);
+}
+function vatScanRemove(id,type){
+  _vatScanQueue=_vatScanQueue.filter(i=>i.id!==id);
+  vatScanQueueReRender(type);
+}
+async function vatScanItem(id,type){
+  const key=localStorage.getItem('vat_gemini_key');
+  if(!key){toast('Enter your Gemini API key above first','w');return;}
+  const item=_vatScanQueue.find(i=>i.id===id);
+  if(!item)return;
+  item.status='scanning';item.error=null;
+  vatScanQueueReRender(type);
+  try{
+    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+encodeURIComponent(key),{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[
+        {inlineData:{mimeType:item.mimeType,data:item.dataUrl.split(',')[1]}},
+        {text:'Extract data from this receipt/invoice. Respond ONLY with a valid JSON object (no markdown, no explanation) with keys: "date" (YYYY-MM-DD), "supplier" (string), "category" (one of: Travel, Fuel, Materials, Parking, Tolls, Car Services, Office, Rent, Advance — or empty string), "net_ex_vat" (number), "vat_rate" (number: 20, 5, or 0), "vat_amount" (number), "gross_inc_vat" (number), "receipt_no" (string). Unknown values → null.'}
+      ]}]})
+    });
+    if(!res.ok){const t=await res.text();let msg=t.slice(0,180);try{msg=JSON.parse(t).error?.message||msg;}catch(_){}throw new Error(res.status+': '+msg);}
+    const body=await res.json();
+    const raw=(body.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json\n?/gi,'').replace(/```/g,'').trim();
+    item.result=JSON.parse(raw);
+    item.status='scanned';
+  }catch(err){item.status='failed';item.error=err.message||String(err);}
+  vatScanQueueReRender(type);
+}
+async function vatScanAll(type){
+  const pending=_vatScanQueue.filter(i=>i.status==='pending');
+  for(let i=0;i<pending.length;i++){
+    await vatScanItem(pending[i].id,type);
+    if(i<pending.length-1)await new Promise(r=>setTimeout(r,4200)); // ~14/min, safe for free tier
+  }
+}
+function vatScanFillForm(id,type){
+  const item=_vatScanQueue.find(i=>i.id===id);
+  if(!item?.result)return;
+  const r=item.result;
+  const d=document.getElementById('vatFDate'),s=document.getElementById('vatFSupplier'),
+        c=document.getElementById('vatFCat'),n=document.getElementById('vatFNet'),
+        rt=document.getElementById('vatFRate'),rn=document.getElementById('vatFRecNo');
+  if(d&&r.date)d.value=r.date;
+  if(s&&r.supplier)s.value=r.supplier;
+  if(c&&r.category){for(const o of c.options)if(o.value===r.category){o.selected=true;break;}}
+  if(n&&r.net_ex_vat!=null)n.value=(+r.net_ex_vat).toFixed(2);
+  if(rt&&r.vat_rate!=null){const rv=String(+r.vat_rate);for(const o of rt.options)if(o.value===rv){o.selected=true;break;}}
+  if(rn&&r.receipt_no)rn.value=r.receipt_no||'';
+  vatAutoCalc();
+  _vatFileData=item.dataUrl;_vatFileName=item.fileName;
+  const prev=document.getElementById('vatFPreview'),img=document.getElementById('vatFImg');
+  if(prev)prev.style.display='block';if(img)img.src=item.dataUrl;
+  item.status='used';
+  vatScanQueueReRender(type);
+  document.getElementById('vatFSupplier')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+  toast('Form filled from scan — review &amp; save','s');
 }
 
 async function vatSaveForm(type){
