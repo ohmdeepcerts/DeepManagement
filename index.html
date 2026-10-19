@@ -3269,18 +3269,20 @@ async function loadAllData(){
     startOfficeUpdateCheck();
     // employeeDocuments already loaded above - no separate call needed
   }catch(e){
-    // Ignore CORS/manifest errors from file:// protocol — these are not real data errors
-    if(e&&e.message&&(e.message.includes('CORS')||e.message.includes('manifest')||e.message.includes('fetch')))return;
+    // Ignore network/CORS/manifest errors — these are connectivity blips, not bugs
+    const _em=(e?.message||String(e)||'').toLowerCase();
+    if(_em.includes('cors')||_em.includes('manifest')||_em.includes('fetch')||_em.includes('network')||_em.includes('load failed')||_em.includes('abort')||_em.includes('cancelled'))return;
     setSyncStatus('err');
     console.error('Load error:',e);
+    const _errDetail=e?.message||e?.code||String(e)||'unknown';
     // Show retry countdown toast
     let _retrySecs=30;
     const _retryToast=document.getElementById('retryCountdownToast');
     if(_retryToast)_retryToast.remove();
     const _rt=document.createElement('div');
     _rt.id='retryCountdownToast';
-    _rt.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;display:flex;align-items:center;gap:10px;border:1px solid rgba(239,68,68,0.4);box-shadow:0 4px 20px rgba(0,0,0,0.4);';
-    _rt.innerHTML=`<i class="fa-solid fa-wifi-slash" style="color:#f87171;"></i><span id="retryCountdownTxt">Failed to load data — retrying in 30s</span><button onclick="clearInterval(window._retryIv);document.getElementById('retryCountdownToast')?.remove();loadAllData();" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;">Retry now</button>`;
+    _rt.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;display:flex;align-items:center;gap:10px;border:1px solid rgba(239,68,68,0.4);box-shadow:0 4px 20px rgba(0,0,0,0.4);max-width:90vw;flex-wrap:wrap;';
+    _rt.innerHTML=`<i class="fa-solid fa-wifi-slash" style="color:#f87171;"></i><span id="retryCountdownTxt">Failed to load data — retrying in 30s</span><span style="font-size:11px;opacity:.7;font-weight:400;">${_errDetail}</span><button onclick="clearInterval(window._retryIv);document.getElementById('retryCountdownToast')?.remove();loadAllData();" style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;">Retry now</button>`;
     document.body.appendChild(_rt);
     if(window._retryIv)clearInterval(window._retryIv);
     window._retryIv=setInterval(()=>{
