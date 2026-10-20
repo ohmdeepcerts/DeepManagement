@@ -12023,7 +12023,10 @@ function _vrwOpen(){
   const months=[...new Set(_vrwList.map(r=>r.date?.slice(0,7)).filter(Boolean))].sort().reverse();
   const isAdded=!!(exp&&imp.has(String(exp?.id)));
   const isRejected=!!(exp&&rej.has(String(exp?.id)));
-  const isPdf=!!(exp&&(exp.receipt_url||'').split('?')[0].toLowerCase().endsWith('.pdf'));
+  const _rclean=(exp?.receipt_url||'').split('?')[0].toLowerCase();
+  const isPdf=_rclean.endsWith('.pdf');
+  const isImg=/\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|avif)$/.test(_rclean);
+  const isViewable=isPdf||isImg;
   const bs='background:none;border:1px solid rgba(255,255,255,.14);color:#ccc;border-radius:6px;cursor:pointer;';
 
   // status counts for the full list (ignoring month filter for counts)
@@ -12053,9 +12056,26 @@ function _vrwOpen(){
   const mediaHtml=!exp
     ?`<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#444;font-size:14px;">No receipts in this period</div>`
     :isPdf
-    ?`<iframe src="${exp.receipt_url}" style="width:100%;height:100%;border:none;"></iframe>`
-    :`<div id="vrwWrap" style="width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;">
+    ?`<div style="width:100%;height:100%;display:flex;flex-direction:column;background:#1a1a1a;">
+        <object data="${exp.receipt_url}" type="application/pdf" style="width:100%;flex:1;border:none;min-height:0;">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;">
+            <i class="fa-solid fa-file-pdf" style="font-size:52px;color:#ef4444;opacity:.7;"></i>
+            <div style="color:#888;font-size:13px;">PDF cannot be shown inline</div>
+            <a href="${exp.receipt_url}" target="_blank" style="background:#2563eb;color:#fff;padding:9px 20px;border-radius:7px;text-decoration:none;font-size:13px;font-weight:600;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open PDF in new tab</a>
+          </div>
+        </object>
+        <div style="padding:8px;text-align:center;border-top:1px solid rgba(255,255,255,.08);">
+          <a href="${exp.receipt_url}" target="_blank" style="color:#93c5fd;font-size:12px;text-decoration:none;"><i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px;"></i> Open PDF in new tab</a>
+        </div>
+      </div>`
+    :isImg
+    ?`<div id="vrwWrap" style="width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;">
         <img id="vrwImg" src="${exp.receipt_url}" draggable="false" style="max-width:none;max-height:none;transform-origin:center;transform:scale(${_vrwZoom}) rotate(${_vrwRot}deg) translate(${_vrwPanX}px,${_vrwPanY}px);pointer-events:none;">
+      </div>`
+    :`<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#1a1a1a;">
+        <i class="fa-solid fa-file" style="font-size:48px;color:#6b7280;opacity:.7;"></i>
+        <div style="color:#888;font-size:13px;">File type cannot be previewed</div>
+        <a href="${exp.receipt_url}" target="_blank" style="background:#374151;color:#e5e7eb;padding:9px 20px;border-radius:7px;text-decoration:none;font-size:13px;font-weight:600;"><i class="fa-solid fa-download"></i> Download / Open file</a>
       </div>`;
   const rcptNoVal=(exp?.vrw_receipt_no||'').replace(/"/g,'&quot;');
   document.body.insertAdjacentHTML('beforeend',`
@@ -12080,7 +12100,7 @@ function _vrwOpen(){
           <button onclick="_vrwNav(-1)" ${!exp||_vrwIdx<=0?'disabled':''} style="${bs}padding:3px 9px;font-size:12px;" title="Prev (←)"><i class="fa-solid fa-chevron-left"></i> Prev</button>
           <button onclick="_vrwNav(1)" ${!exp||_vrwIdx>=n-1?'disabled':''} style="${bs}padding:3px 9px;font-size:12px;" title="Next (→)">Next <i class="fa-solid fa-chevron-right"></i></button>
           <div style="flex:1;"></div>
-          ${exp&&!isPdf?`<button onclick="_vrwZoomBtn(-1)" style="${bs}width:26px;height:26px;font-size:11px;"><i class="fa-solid fa-minus"></i></button>
+          ${exp&&isImg?`<button onclick="_vrwZoomBtn(-1)" style="${bs}width:26px;height:26px;font-size:11px;"><i class="fa-solid fa-minus"></i></button>
           <span id="vrwZL" style="color:#666;font-size:10px;min-width:36px;text-align:center;">${Math.round(_vrwZoom*100)}%</span>
           <button onclick="_vrwZoomBtn(1)" style="${bs}width:26px;height:26px;font-size:11px;"><i class="fa-solid fa-plus"></i></button>
           <button onclick="_vrwZoomReset()" style="${bs}padding:0 8px;height:26px;font-size:10px;">Fit</button>
