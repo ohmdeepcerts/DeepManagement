@@ -12079,16 +12079,12 @@ function _vrwClickCell(el,field,expId){
   inp.style.cssText='width:62px;background:none;border:none;border-bottom:1.5px solid var(--acc);color:var(--txt);font-size:14px;font-weight:700;text-align:center;outline:none;font-family:inherit;padding:1px 0 0;display:block;margin:0 auto;';
   disp.style.display='none';el.appendChild(inp);inp.focus();inp.select();
   const save=()=>{
-    const v=Math.max(0,parseFloat(inp.value)||0);
-    const getAmt=id=>{const e=document.getElementById(id);return e?parseFloat(e.textContent.replace('£',''))||0:0;};
-    let g=getAmt('vrwGrossAmt'),vat=getAmt('vrwVatAmt'),net=getAmt('vrwNetAmt');
-    if(field==='gross'){g=v;net=+(g-vat).toFixed(2);if(net<0){vat=g;net=0;}}
-    else if(field==='vat'){vat=Math.min(v,g);net=+(g-vat).toFixed(2);}
-    else if(field==='net'){net=Math.min(v,g);vat=+(g-net).toFixed(2);}
-    const setAmt=(id,val)=>{const e=document.getElementById(id);if(e)e.textContent='£'+val.toFixed(2);};
-    setAmt('vrwGrossAmt',g);setAmt('vrwVatAmt',vat);setAmt('vrwNetAmt',net);
+    const v=+(Math.max(0,parseFloat(inp.value)||0)).toFixed(2);
+    // No cross-field formula — each field is independent; only update the edited one
+    const idMap={gross:'vrwGrossAmt',vat:'vrwVatAmt',net:'vrwNetAmt'};
+    const el2=document.getElementById(idMap[field]);if(el2)el2.textContent='£'+v.toFixed(2);
     const prevOvr=_vrwOverrides[expId]||{};
-    _vrwOverrides[expId]={...prevOvr,net,vat,gross:g};
+    _vrwOverrides[expId]={...prevOvr,[field]:v};
     sb.from('vat_expense_meta').upsert({expense_id:String(expId),vat_override:_vrwOverrides[expId]},{onConflict:'expense_id'});
     disp.style.display='';inp.remove();
   };
