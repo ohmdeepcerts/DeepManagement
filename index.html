@@ -11227,7 +11227,7 @@ function vatPeriodFilter(p){
   return _vatTx.filter(t=>{const d=new Date((t.date||'')+'T00:00:00');if(b.from&&d<b.from)return false;if(b.to&&d>b.to)return false;return true;});
 }
 function _vatFmtD(d){if(!d)return'';return d.getDate()+' '+MONTHS[d.getMonth()].slice(0,3)+' '+d.getFullYear();}
-function _vatDashSetP(p){_vatDashP=p;if(p!=='custom')vatRenderDash();}
+function _vatDashSetP(p){_vatDashP=p;vatRenderDash();}
 function _vatDashApplyCustom(){
   _vatDashCFrom=document.getElementById('vatDashFrom')?.value||'';
   _vatDashCTo=document.getElementById('vatDashTo')?.value||'';
