@@ -12043,51 +12043,54 @@ function _vrwOpen(){
         </div>
         <div style="flex:1;overflow:hidden;">${mediaHtml}</div>
       </div>
-      <div style="width:260px;flex-shrink:0;border-left:1px solid rgba(255,255,255,.07);background:#111;display:flex;flex-direction:column;overflow-y:auto;">
-        ${exp?`<div style="padding:13px;border-bottom:1px solid rgba(255,255,255,.06);">
-          ${isAdded?`<div style="background:rgba(34,197,94,.09);border:1px solid rgba(34,197,94,.22);border-radius:6px;padding:6px 10px;margin-bottom:10px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;font-size:12px;"></i><span style="color:#86efac;font-size:11px;font-weight:600;">Added to VAT Records</span></div>`:''}
-          ${(!isAdded&&isRejected)?`<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:6px;padding:6px 10px;margin-bottom:10px;display:flex;align-items:center;gap:6px;justify-content:space-between;"><span style="display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-ban" style="color:#ef4444;font-size:12px;"></i><span style="color:#fca5a5;font-size:11px;font-weight:600;">Rejected</span></span><button onclick="_vrwUnreject()" style="background:none;border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;font-family:inherit;">Undo</button></div>`:''}
-          <div style="margin-bottom:8px;"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Merchant</div><div style="font-size:13px;color:#e0e0e0;font-weight:600;word-break:break-word;">${exp.merchant||'—'}</div></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Date</div><div style="font-size:12px;color:#ccc;">${_dmy(exp.date)}</div></div>
-            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Gross</div><div style="font-size:12px;color:#e0e0e0;font-weight:600;">£${(parseFloat(exp.amount)||0).toFixed(2)}</div></div>
+      <div style="width:380px;flex-shrink:0;border-left:1px solid var(--bdr);background:var(--card);display:flex;flex-direction:column;overflow-y:auto;">
+        ${exp?`<div style="padding:16px;border-bottom:1px solid var(--bdr);">
+          ${isAdded?`<div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:7px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;gap:7px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;font-size:14px;"></i><span style="color:#16a34a;font-size:13px;font-weight:600;">Added to VAT Records</span></div>`:''}
+          ${(!isAdded&&isRejected)?`<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;gap:7px;justify-content:space-between;"><span style="display:flex;align-items:center;gap:7px;"><i class="fa-solid fa-ban" style="color:#ef4444;font-size:14px;"></i><span style="color:#ef4444;font-size:13px;font-weight:600;">Rejected</span></span><button onclick="_vrwUnreject()" style="background:none;border:1px solid rgba(239,68,68,.35);color:#ef4444;border-radius:5px;font-size:11px;padding:3px 9px;cursor:pointer;font-family:inherit;">Undo</button></div>`:''}
+          <div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Merchant</div><div style="font-size:16px;color:var(--txt);font-weight:700;word-break:break-word;">${exp.merchant||'—'}</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Date</div><div style="font-size:14px;color:var(--txt);font-weight:500;">${_dmy(exp.date)}</div></div>
+            <div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Gross</div><div style="font-size:14px;color:var(--txt);font-weight:700;">£${(parseFloat(exp.amount)||0).toFixed(2)}</div></div>
           </div>
-          ${(()=>{const empObj=employeeMap?.get(exp.employee_id);const empName=empObj?.name||exp.employee_id||null;return empName?`<div style="margin-bottom:8px;">
-            <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Employee</div>
-            <button onclick="document.getElementById('vrwPanel').remove();goToExpenseInLedger('${exp.id}','${exp.employee_id}','${exp.date||''}');" style="display:flex;align-items:center;gap:7px;width:100%;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.25);border-radius:6px;padding:6px 9px;cursor:pointer;font-family:inherit;text-align:left;">
-              <div style="width:26px;height:26px;border-radius:50%;background:${avcol(exp.employee_id)};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">${empName.charAt(0).toUpperCase()}</div>
+          ${(()=>{const empObj=employeeMap?.get(exp.employee_id);const empName=empObj?.name||exp.employee_id||null;return empName?`<div style="margin-bottom:10px;">
+            <div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Employee</div>
+            <button onclick="document.getElementById('vrwPanel').remove();goToExpenseInLedger('${exp.id}','${exp.employee_id}','${exp.date||''}');" style="display:flex;align-items:center;gap:9px;width:100%;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.22);border-radius:8px;padding:8px 11px;cursor:pointer;font-family:inherit;text-align:left;">
+              <div style="width:32px;height:32px;border-radius:50%;background:${avcol(exp.employee_id)};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;">${empName.charAt(0).toUpperCase()}</div>
               <div style="flex:1;min-width:0;">
-                <div style="font-size:12px;color:#93c5fd;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${empName}</div>
-                <div style="font-size:10px;color:#555;">Tap to open in Ledger</div>
+                <div style="font-size:14px;color:var(--acc);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${empName}</div>
+                <div style="font-size:11px;color:var(--txtm);">Tap to open in Ledger <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:9px;"></i></div>
               </div>
-              <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px;color:#4a7fd4;flex-shrink:0;"></i>
             </button>
           </div>`:'';})()}
-          <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:6px;padding:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px;text-align:center;">
-            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">NET</div><div style="font-size:12px;color:#ccc;font-weight:500;">£${(+(parseFloat(exp.amount)||0)/1.2).toFixed(2)}</div></div>
-            <div style="border-left:1px solid rgba(255,255,255,.06);border-right:1px solid rgba(255,255,255,.06);">
-              <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">VAT 20%</div><div style="font-size:12px;color:#f59e0b;font-weight:500;">£${((parseFloat(exp.amount)||0)-(+(parseFloat(exp.amount)||0)/1.2)).toFixed(2)}</div>
+          ${(()=>{const _g=parseFloat(exp.amount)||0;const _ovrMap=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');const _ovr=_ovrMap[String(exp.id)];const _v=_ovr!==undefined?+(parseFloat(_ovr)||0).toFixed(2):+(_g/6).toFixed(2);const _n=+(_g-_v).toFixed(2);const _isCust=_ovr!==undefined;return`<div style="background:var(--bdr);border:1px solid var(--bdr);border-radius:8px;padding:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:10px;text-align:center;">
+            <div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">NET</div><div id="vrwNetAmt" style="font-size:14px;color:var(--txt);font-weight:600;">£${_n.toFixed(2)}</div></div>
+            <div style="border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);">
+              <div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">VAT ${_isCust?'<span style="font-size:9px;color:#d97706;font-weight:700;">CUSTOM</span>':'20%'}</div>
+              <div style="display:flex;align-items:center;justify-content:center;gap:1px;">
+                <span style="font-size:14px;color:#d97706;font-weight:600;line-height:1;">£</span>
+                <input id="vrwVatInput" type="number" min="0" max="${_g.toFixed(2)}" step="0.01" value="${_v.toFixed(2)}" style="width:54px;background:none;border:none;border-bottom:1.5px solid #d97706;color:#d97706;font-size:14px;font-weight:600;text-align:center;outline:none;font-family:inherit;padding:1px 0 0;" title="Type to override VAT amount" oninput="(function(el){const g=${_g.toFixed(2)};const v=Math.max(0,Math.min(g,parseFloat(el.value)||0));const net=+(g-v).toFixed(2);const netEl=document.getElementById('vrwNetAmt');if(netEl)netEl.textContent='£'+net.toFixed(2);const m=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');if(Math.abs(v-+(g/6).toFixed(2))<0.005){delete m['${exp.id}'];}else{m['${exp.id}']=v;}localStorage.setItem('vat_vat_override',JSON.stringify(m));})(this)">
+              </div>
             </div>
-            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">GROSS</div><div style="font-size:12px;color:#e0e0e0;font-weight:600;">£${(parseFloat(exp.amount)||0).toFixed(2)}</div></div>
-          </div>
-          ${exp.category?`<div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Category</div><div style="font-size:11px;color:#aaa;">${exp.category}</div></div>`:''}
+            <div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">GROSS</div><div style="font-size:14px;color:var(--txt);font-weight:700;">£${_g.toFixed(2)}</div></div>
+          </div>`;})()}
+          ${exp.category?`<div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Category</div><div style="font-size:13px;color:var(--txt);">${exp.category}</div></div>`:''}
         </div>
-        <div style="padding:13px;border-bottom:1px solid rgba(255,255,255,.06);">
-          <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Receipt Number <span style="color:#444;font-size:9px;font-style:italic;">(used as filename)</span></div>
-          <input id="vrwRcptNo" type="text" placeholder="e.g. INV-2025-001" value="${rcptNoVal}" style="width:100%;box-sizing:border-box;background:#1c1c1c;border:1px solid rgba(255,255,255,.12);border-radius:5px;color:#e0e0e0;padding:6px 9px;font-size:12px;outline:none;font-family:inherit;" oninput="_vrwSaveRcptNo()">
+        <div style="padding:16px;border-bottom:1px solid var(--bdr);">
+          <div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Receipt Number <span style="font-size:10px;font-style:italic;font-weight:400;">(used as filename)</span></div>
+          <input id="vrwRcptNo" type="text" placeholder="e.g. INV-2025-001" value="${rcptNoVal}" style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);padding:8px 10px;font-size:13px;outline:none;font-family:inherit;" oninput="_vrwSaveRcptNo()">
         </div>
-        <div style="padding:13px;display:flex;flex-direction:column;gap:8px;">
+        <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
           ${isAdded
-            ?`<div style="display:flex;gap:6px;">
-                <button disabled style="flex:1;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.22);color:#86efac;border-radius:6px;padding:8px;font-size:12px;font-weight:600;cursor:default;font-family:inherit;"><i class="fa-solid fa-circle-check"></i> Added</button>
-                <button onclick="_vrwUndoAdd()" style="background:none;border:1px solid rgba(255,255,255,.13);color:#888;border-radius:6px;padding:7px 10px;font-size:11px;cursor:pointer;font-family:inherit;" title="Remove added marker — use if the VAT transaction was deleted"><i class="fa-solid fa-rotate-left"></i></button>
+            ?`<div style="display:flex;gap:8px;">
+                <button disabled style="flex:1;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#16a34a;border-radius:7px;padding:10px;font-size:13px;font-weight:600;cursor:default;font-family:inherit;"><i class="fa-solid fa-circle-check"></i> Added</button>
+                <button onclick="_vrwUndoAdd()" style="background:var(--card);border:1px solid var(--bdr);color:var(--txtm);border-radius:7px;padding:9px 12px;font-size:12px;cursor:pointer;font-family:inherit;" title="Remove added marker — use if the VAT transaction was deleted"><i class="fa-solid fa-rotate-left"></i></button>
               </div>`
-            :`<button id="vrwAddBtn" onclick="_vrwAddToVat()" style="background:var(--acc);border:1px solid transparent;color:#fff;border-radius:6px;padding:8px;font-size:12px;font-weight:600;cursor:pointer;width:100%;font-family:inherit;"><i class="fa-solid fa-file-invoice"></i> Add to VAT Records</button>`}
-          <div style="display:flex;gap:6px;">
-            <button onclick="_vrwDownload()" style="flex:1;background:none;border:1px solid rgba(255,255,255,.13);color:#ccc;border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit;"><i class="fa-solid fa-download"></i> Download</button>
-            ${!isAdded?`<button onclick="_vrwReject()" style="flex:1;background:${isRejected?'#ef4444':'rgba(239,68,68,.08)'};border:1px solid ${isRejected?'#ef4444':'rgba(239,68,68,.35)'};color:${isRejected?'#fff':'#f87171'};border-radius:6px;padding:7px;font-size:12px;font-weight:${isRejected?'600':'400'};cursor:pointer;font-family:inherit;" title="${isRejected?'Already rejected — click to undo':'Mark as not applicable'}"><i class="fa-solid fa-ban"></i> ${isRejected?'Rejected':'Reject'}</button>`:''}
+            :`<button id="vrwAddBtn" onclick="_vrwAddToVat()" style="background:var(--acc);border:1px solid transparent;color:#fff;border-radius:7px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;width:100%;font-family:inherit;"><i class="fa-solid fa-file-invoice"></i> Add to VAT Records</button>`}
+          <div style="display:flex;gap:8px;">
+            <button onclick="_vrwDownload()" style="flex:1;background:var(--card);border:1px solid var(--bdr);color:var(--txt);border-radius:7px;padding:9px;font-size:13px;cursor:pointer;font-family:inherit;"><i class="fa-solid fa-download"></i> Download</button>
+            ${!isAdded?`<button onclick="_vrwReject()" style="flex:1;background:${isRejected?'#ef4444':'rgba(239,68,68,.08)'};border:1px solid ${isRejected?'#ef4444':'rgba(239,68,68,.35)'};color:${isRejected?'#fff':'#ef4444'};border-radius:7px;padding:9px;font-size:13px;font-weight:${isRejected?'600':'400'};cursor:pointer;font-family:inherit;" title="${isRejected?'Already rejected — click to undo':'Mark as not applicable'}"><i class="fa-solid fa-ban"></i> ${isRejected?'Rejected':'Reject'}</button>`:''}
           </div>
-        </div>`:`<div style="padding:24px;color:#444;font-size:13px;text-align:center;">No receipts in this period</div>`}
+        </div>`:`<div style="padding:32px;color:var(--txtm);font-size:14px;text-align:center;">No receipts in this period</div>`}
       </div>
     </div>
   </div>`);
@@ -12158,8 +12161,10 @@ async function _vrwAddToVat(){
       fileData=await new Promise(resolve=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.readAsDataURL(blob);});
     }catch(fe){/* proceed without file */}
     const gross=parseFloat(exp.amount)||0;
-    const net=+(gross/1.2).toFixed(2);
-    const vatAmount=+(gross-net).toFixed(2);
+    const _ovrMap=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');
+    const _ovr=_ovrMap[String(exp.id)];
+    const vatAmount=_ovr!==undefined?+(parseFloat(_ovr)||0).toFixed(2):+(gross-+(gross/1.2).toFixed(2)).toFixed(2);
+    const net=+(gross-vatAmount).toFixed(2);
     const row={type:'purchase',date:exp.date,supplier:exp.merchant||'',category:exp.category||'',receipt_no:rcptNo,net,vat_rate:20,vat_amount:vatAmount,gross,file_data:fileData,file_name:fileName};
     const{data:ins,error}=await sb.from('vat_transactions').insert(row).select().single();
     if(error)throw error;
