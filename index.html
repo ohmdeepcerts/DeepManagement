@@ -11890,23 +11890,18 @@ function _vatRcptNav(dir){
 
 // ─── VAT Receipt Review Workflow (from Tags page) ─
 async function _vrwReconcileImported(){
-  // Fetch only the mapped tx IDs from Supabase so we always have fresh data,
-  // regardless of whether the user has visited the VAT Records page.
-  const map=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
-  const txIds=Object.keys(map);
-  if(!txIds.length)return;
-  const{data:existing}=await sb.from('vat_transactions').select('id').in('id',txIds);
-  const validTxIds=new Set((existing||[]).map(t=>String(t.id)));
-  const expToTx={};
-  for(const[txId,expId] of Object.entries(map))expToTx[expId]=txId;
-  let imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').map(String);
-  const before=imp.length;
-  imp=imp.filter(expId=>{
-    const txId=expToTx[expId];
-    if(!txId)return true; // no map entry: keep (old import, no map)
-    return validTxIds.has(txId); // mapped: keep only if tx still exists in DB
-  });
-  if(imp.length<before)localStorage.setItem('vat_imported_exp',JSON.stringify(imp));
+  // Full sync from Supabase: rebuild localStorage from all transactions that have
+  // an expense_id stored — works across browsers and after clears.
+  const{data:rows}=await sb.from('vat_transactions').select('id,expense_id').not('expense_id','is',null);
+  if(!rows)return;
+  const newMap={};const newImp=[];
+  for(const r of rows){
+    const txId=String(r.id);const expId=String(r.expense_id);
+    newMap[txId]=expId;
+    if(!newImp.includes(expId))newImp.push(expId);
+  }
+  localStorage.setItem('vat_tx_exp_map',JSON.stringify(newMap));
+  localStorage.setItem('vat_imported_exp',JSON.stringify(newImp));
 }
 async function openVatReceiptReview(){
   await _vrwReconcileImported();
@@ -12241,7 +12236,7 @@ async function _vrwAddToVat(){
     const vatAmount=_ovr?.vat!==undefined?+parseFloat(_ovr.vat).toFixed(2):+(gross-+(gross/1.2).toFixed(2)).toFixed(2);
     const net=_ovr?.net!==undefined?+parseFloat(_ovr.net).toFixed(2):+(gross-vatAmount).toFixed(2);
     const _dateOverride=(_ovr?.date)||exp.date;
-    const row={type:'purchase',date:_dateOverride,supplier:exp.merchant||'',category:exp.category||'',receipt_no:rcptNo,net,vat_rate:20,vat_amount:vatAmount,gross,file_data:fileData,file_name:fileName};
+    const row={type:'purchase',date:_dateOverride,supplier:exp.merchant||'',category:exp.category||'',receipt_no:rcptNo,net,vat_rate:20,vat_amount:vatAmount,gross,file_data:fileData,file_name:fileName,expense_id:exp.id||null};
     const{data:ins,error}=await sb.from('vat_transactions').insert(row).select().single();
     if(error)throw error;
     const imp2=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]');
