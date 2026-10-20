@@ -11239,14 +11239,25 @@ async function instSave(){
 // VAT RECORDS
 // ═══════════════════════════════════════════════════
 let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set(),_vatImportingExpId=null;
+let _vrwImportedIds=new Set(); // Supabase-sourced; never read from localStorage as source of truth
 let _vatDashP='thisY',_vatDashCFrom='',_vatDashCTo='';
 let _vatLogP='all',_vatLogCFrom='',_vatLogCTo='',_vatLogDups=false;
 
 const _VAT_COLS='id,user_id,type,date,supplier,category,receipt_no,net,vat_rate,vat_amount,gross,file_name,serial_no,serial_frozen,created_at,updated_at,expense_id';
+async function _vrwLoadImported(){
+  // Always query Supabase — this is the ONLY source of truth for "Added" markers.
+  // localStorage is never read back; it is only written as a cache for offline display.
+  const{data}=await sb.from('vat_transactions').select('expense_id').not('expense_id','is',null);
+  _vrwImportedIds=new Set((data||[]).map(r=>String(r.expense_id)));
+  try{localStorage.setItem('vat_imported_exp',JSON.stringify([..._vrwImportedIds]));}catch(_){}
+  return _vrwImportedIds;
+}
 async function renderVatPage(){
-  const{data}=await sb.from('vat_transactions').select(_VAT_COLS).order('date',{ascending:false});
-  _vatTx=data||[];
-  // activate dashboard tab
+  const[txRes]=await Promise.all([
+    sb.from('vat_transactions').select(_VAT_COLS).order('date',{ascending:false}),
+    _vrwLoadImported()
+  ]);
+  _vatTx=txRes.data||[];
   const dashTab=document.querySelector('#page-vat .vat-tab[data-vt="dashboard"]');
   vatTab(dashTab,'dashboard');
 }
@@ -11399,11 +11410,10 @@ function vatTxTable(rows,compact=false,dupIds=null){
 // ─── VAT Expense Drafts ───────────────────────────
 function vatGetPendingDrafts(){
   const dismissed=new Set(JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]'));
-  const imported=new Set(JSON.parse(localStorage.getItem('vat_imported_exp')||'[]'));
   return(expenses||[]).filter(e=>
     e.tags?.includes('VAT')&&
     !dismissed.has(String(e.id))&&
-    !imported.has(String(e.id))
+    !_vrwImportedIds.has(String(e.id))
   ).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
 function vatDraftsHtml(){
@@ -11742,9 +11752,8 @@ async function vatSaveForm(type,forceDup=false){
   _vatEditId=null;_vatFileData=null;_vatFileName=null;
   toast(editingId!==null?'Transaction updated':'Transaction saved','s');
   if(_vatImportingExpId){
-    const imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]');
-    if(!imp.includes(_vatImportingExpId))imp.push(_vatImportingExpId);
-    localStorage.setItem('vat_imported_exp',JSON.stringify(imp));
+    _vrwImportedIds.add(String(_vatImportingExpId));
+    try{localStorage.setItem('vat_imported_exp',JSON.stringify([..._vrwImportedIds]));}catch(_){}
     _vatImportingExpId=null;
   }
   const{data}=await sb.from('vat_transactions').select(_VAT_COLS).order('date',{ascending:false});
@@ -11989,28 +11998,10 @@ async function _vatRcptNav(dir){
 }
 
 // ─── VAT Receipt Review Workflow (from Tags page) ─
-async function _vrwReconcileImported(){
-  // Merge Supabase-backed adds with existing localStorage (preserves old pre-map adds).
-  const{data:rows}=await sb.from('vat_transactions').select('id,expense_id').not('expense_id','is',null);
-  const sbRows=rows||[];
-  const sbTxIds=new Set(sbRows.map(r=>String(r.id)));
-  const sbExpIds=new Set(sbRows.map(r=>String(r.expense_id)));
-  const localMap=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
-  const imp=new Set(JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').map(String));
-  // Remove expenses whose mapped tx was deleted and isn't covered by any other Supabase tx
-  for(const[txId,expId] of Object.entries(localMap)){
-    if(!sbTxIds.has(txId)&&!sbExpIds.has(expId))imp.delete(expId);
-  }
-  // Add all Supabase-backed expense IDs (cross-browser sync of new adds)
-  for(const expId of sbExpIds)imp.add(expId);
-  // Merge maps: keep local entries that are still valid + add all Supabase entries
-  const mergedMap={...localMap};
-  for(const r of sbRows)mergedMap[String(r.id)]=String(r.expense_id);
-  localStorage.setItem('vat_tx_exp_map',JSON.stringify(mergedMap));
-  localStorage.setItem('vat_imported_exp',JSON.stringify([...imp]));
-}
+// _vrwReconcileImported kept as alias — now delegates to _vrwLoadImported (Supabase-only)
+async function _vrwReconcileImported(){return _vrwLoadImported();}
 async function openVatReceiptReview(){
-  await _vrwReconcileImported();
+  await _vrwLoadImported();
   const staffF=document.getElementById('tagsStaff')?.value||'All';
   _vrwList=expenses.filter(r=>{
     if(!r.tags?.includes('VAT')||!r.receipt_url)return false;
@@ -12022,7 +12013,7 @@ async function openVatReceiptReview(){
   _vrwOpen();
 }
 function _vrwFilteredList(){
-  const imp=new Set(JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').map(String));
+  const imp=_vrwImportedIds;
   const rej=new Set(JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]').map(String));
   let list=_vrwMonthFilter?_vrwList.filter(r=>r.date?.slice(0,7)===_vrwMonthFilter):_vrwList;
   if(_vrwStatusFilter==='pending')list=list.filter(r=>!imp.has(String(r.id))&&!rej.has(String(r.id)));
@@ -12095,14 +12086,16 @@ function _vrwClickCell(el,field,expId){
   inp.addEventListener('blur',save);
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();save();}if(e.key==='Escape'){disp.style.display='';inp.remove();}});
 }
-function _vrwUndoAdd(){
+async function _vrwUndoAdd(){
   const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
-  const imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').filter(id=>String(id)!==String(exp.id));
-  localStorage.setItem('vat_imported_exp',JSON.stringify(imp));
-  // also remove from map
-  const map=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
-  for(const[txId,expId] of Object.entries(map)){if(String(expId)===String(exp.id)){delete map[txId];}}
-  localStorage.setItem('vat_tx_exp_map',JSON.stringify(map));
+  // Null out expense_id on the Supabase tx so next hard-refresh doesn't re-import it
+  const tx=_vatTx.find(t=>String(t.expense_id)===String(exp.id));
+  if(tx){
+    await sb.from('vat_transactions').update({expense_id:null}).eq('id',tx.id);
+    _vatTx=_vatTx.map(t=>t.id===tx.id?{...t,expense_id:null}:t);
+  }
+  _vrwImportedIds.delete(String(exp.id));
+  try{localStorage.setItem('vat_imported_exp',JSON.stringify([..._vrwImportedIds]));}catch(_){}
   toast('Marked as pending','i');
   _vrwOpen();
 }
@@ -12129,7 +12122,7 @@ function _vrwReject(){
 }
 function _vrwOpen(){
   document.getElementById('vrwPanel')?.remove();
-  const imp=new Set(JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').map(String));
+  const imp=_vrwImportedIds;
   const rej=new Set(JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]').map(String));
   const list=_vrwFilteredList();
   if(_vrwIdx>=list.length)_vrwIdx=Math.max(0,list.length-1);
@@ -12322,8 +12315,7 @@ function _vrwInteract(){
 }
 async function _vrwAddToVat(){
   const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
-  const imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]');
-  if(imp.includes(exp.id)){toast('Already in VAT Records','i');return;}
+  if(_vrwImportedIds.has(String(exp.id))){toast('Already in VAT Records','i');return;}
   const rcptNo=(document.getElementById('vrwRcptNo')?.value||'').trim();
   const addBtn=document.getElementById('vrwAddBtn');
   if(addBtn){addBtn.disabled=true;addBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Adding...';}
@@ -12345,16 +12337,9 @@ async function _vrwAddToVat(){
     const row={type:'purchase',date:_dateOverride,supplier:exp.merchant||'',category:exp.category||'',receipt_no:rcptNo,net,vat_rate:20,vat_amount:vatAmount,gross,file_data:fileData,file_name:fileName,expense_id:exp.id||null};
     const{data:ins,error}=await sb.from('vat_transactions').insert(row).select().single();
     if(error)throw error;
-    const imp2=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]');
-    if(!imp2.includes(exp.id))imp2.push(exp.id);
-    localStorage.setItem('vat_imported_exp',JSON.stringify(imp2));
-    if(ins){
-      _vatTx.unshift(ins);
-      // store tx→expense mapping so delete can undo the imported marker
-      const map=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
-      map[String(ins.id)]=String(exp.id);
-      localStorage.setItem('vat_tx_exp_map',JSON.stringify(map));
-    }
+    if(ins)_vatTx.unshift(ins);
+    _vrwImportedIds.add(String(exp.id));
+    try{localStorage.setItem('vat_imported_exp',JSON.stringify([..._vrwImportedIds]));}catch(_){}
     exp.vrw_receipt_no=rcptNo;
     toast('Added to VAT Records!','s');
     _vrwOpen();
@@ -12481,16 +12466,18 @@ function vatEditTx(id){
 
 async function vatDeleteTx(id){
   if(!confirm('Delete this transaction? This cannot be undone.'))return;
+  const txToDelete=_vatTx.find(t=>t.id===id);
   const{error}=await sb.from('vat_transactions').delete().eq('id',id);
   if(error){toast(error.message,'e');return;}
   // remove the "imported" marker from the source expense if this tx was from receipt review
-  const map=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
-  const expId=map[String(id)];
+  const expId=txToDelete?.expense_id;
   if(expId){
-    const imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').filter(x=>String(x)!==expId);
-    localStorage.setItem('vat_imported_exp',JSON.stringify(imp));
-    delete map[String(id)];
-    localStorage.setItem('vat_tx_exp_map',JSON.stringify(map));
+    // only remove if no OTHER tx still links to this expense
+    const otherLink=_vatTx.some(t=>t.id!==id&&String(t.expense_id)===String(expId));
+    if(!otherLink){
+      _vrwImportedIds.delete(String(expId));
+      try{localStorage.setItem('vat_imported_exp',JSON.stringify([..._vrwImportedIds]));}catch(_){}
+    }
   }
   toast('Deleted','s');
   _vatTx=_vatTx.filter(t=>t.id!==id);
