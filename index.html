@@ -12729,25 +12729,57 @@ async function vatDoZipExport(){
   if(type)rows=rows.filter(t=>t.type===type);
   if(!rows.length){toast('No transactions for selected months','w');return;}
   const statusEl=document.getElementById('vatExStatus');
-  statusEl.textContent='Building ZIP…';statusEl.style.display='block';
+  statusEl.textContent='Fetching receipts…';statusEl.style.display='block';
   const zip=new JSZip();
   const rf=zip.folder('receipts');
-  // CSV (with receipt filename column)
   const esc=v=>`"${String(v||'').replace(/"/g,'""')}"`;
   const hdr='Date,Type,Supplier/Customer,Category,Receipt No,Net,VAT Rate,VAT Amount,Gross,Receipt File';
-  const seen=new Map();
-  const rowLines=rows.map(t=>{
-    let rfile='';
-    if(t.file_data){
-      const ext=vatExtFromDataUrl(t.file_data);
-      let base=vatSanitizeFName(t.receipt_no||`${t.type}-${t.date}-${t.supplier||'unknown'}`);
-      let fname=base+'.'+ext;
-      if(seen.has(fname)){const n=seen.get(fname)+1;seen.set(fname,n);fname=base+'-'+n+'.'+ext;}else seen.set(fname,1);
-      rf.file(fname,t.file_data.split(',')[1],{base64:true});
-      rfile=fname;
+  // Build expense_id → receipt_url map from loaded expenses
+  const expUrlMap={};
+  for(const e of (expenses||[])){if(e.receipt_url)expUrlMap[String(e.id)]=e.receipt_url;}
+  // For transactions with no expense link but with a stored file, fetch file_data from DB
+  const manualIds=rows.filter(t=>!t.expense_id&&t.file_name).map(t=>t.id);
+  let manualDataMap={};
+  if(manualIds.length){
+    const{data}=await sb.from('vat_transactions').select('id,file_data').in('id',manualIds);
+    for(const r of (data||[])){if(r.file_data)manualDataMap[r.id]=r.file_data;}
+  }
+  // Fetch all receipt files in parallel
+  let done=0;
+  const fileResults=await Promise.all(rows.map(async t=>{
+    const url=t.expense_id?expUrlMap[String(t.expense_id)]:null;
+    if(url){
+      try{
+        const res=await fetch(url);
+        if(!res.ok)throw new Error('HTTP '+res.status);
+        const blob=await res.blob();
+        const ext=blob.type.includes('pdf')?'pdf':blob.type.includes('png')?'png':blob.type.includes('gif')?'gif':blob.type.includes('webp')?'webp':'jpg';
+        done++;statusEl.textContent=`Fetching receipts (${done}/${rows.length})…`;
+        return{id:t.id,blob,ext};
+      }catch(e){done++;statusEl.textContent=`Fetching receipts (${done}/${rows.length})…`;return null;}
     }
-    return[_dmy(t.date),t.type,esc(t.supplier),esc(t.category),esc(t.receipt_no),t.net,t.vat_rate,t.vat_amount,t.gross,esc(rfile)].join(',');
-  });
+    const fd=manualDataMap[t.id];
+    if(fd){
+      done++;statusEl.textContent=`Fetching receipts (${done}/${rows.length})…`;
+      return{id:t.id,base64:fd.split(',')[1],ext:vatExtFromDataUrl(fd)};
+    }
+    done++;statusEl.textContent=`Fetching receipts (${done}/${rows.length})…`;
+    return null;
+  }));
+  // Add fetched files to ZIP
+  const rfileMap=new Map();
+  const seen=new Map();
+  for(let i=0;i<rows.length;i++){
+    const r=fileResults[i];if(!r)continue;
+    const t=rows[i];
+    let base=vatSanitizeFName(t.receipt_no||`${t.type}-${t.date}-${t.supplier||'unknown'}`);
+    let fname=base+'.'+r.ext;
+    if(seen.has(fname)){const n=seen.get(fname)+1;seen.set(fname,n);fname=base+'-'+n+'.'+r.ext;}else seen.set(fname,1);
+    r.blob?rf.file(fname,r.blob):rf.file(fname,r.base64,{base64:true});
+    rfileMap.set(t.id,fname);
+  }
+  statusEl.textContent='Building ZIP…';
+  const rowLines=rows.map(t=>[_dmy(t.date),t.type,esc(t.supplier),esc(t.category),esc(t.receipt_no),t.net,t.vat_rate,t.vat_amount,t.gross,esc(rfileMap.get(t.id)||'')].join(','));
   zip.file('transactions.csv',[hdr,...rowLines].join('\n'));
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},
     m=>{statusEl.textContent=`Building ZIP… ${m.percent.toFixed(0)}%`;});
@@ -12757,7 +12789,8 @@ async function vatDoZipExport(){
   a.download=`vat-${vatExLabel()}${type?'-'+type:''}.zip`;
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),60000);
-  toast('ZIP downloaded','s');
+  const rcptCount=rfileMap.size;
+  toast(`ZIP downloaded — ${rcptCount} receipt${rcptCount===1?'':'s'} included`,'s');
 }
 </script>
 
