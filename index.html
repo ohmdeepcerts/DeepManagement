@@ -11186,6 +11186,7 @@ async function instSave(){
 // VAT RECORDS
 // ═══════════════════════════════════════════════════
 let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set(),_vatImportingExpId=null;
+let _vatDashP='thisQ',_vatDashCFrom='',_vatDashCTo='';
 
 async function renderVatPage(){
   const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
@@ -11210,21 +11211,33 @@ function vatTab(el,name){
 
 // ─── helpers ─────────────────────────────────────
 function _gbp(n){return'£'+(parseFloat(n)||0).toFixed(2);}
-function vatPeriodFilter(p){
+function vatPeriodBounds(p){
   const now=new Date(),y=now.getFullYear(),m=now.getMonth();
-  let from,to;
-  if(p==='thisQ'){const q=Math.floor(m/3);from=new Date(y,q*3,1);to=new Date(y,q*3+3,0);}
-  else if(p==='lastQ'){const pq=Math.floor(m/3)-1;const ry=pq<0?y-1:y;const rq=((pq%4)+4)%4;from=new Date(ry,rq*3,1);to=new Date(ry,rq*3+3,0);}
-  else if(p==='thisY'){from=new Date(y,0,1);to=new Date(y,11,31);}
-  else{return _vatTx;}
-  return _vatTx.filter(t=>{const d=new Date(t.date);return d>=from&&d<=to;});
+  if(p==='thisM')return{from:new Date(y,m,1),to:new Date(y,m+1,0)};
+  if(p==='lastM')return{from:new Date(y,m-1,1),to:new Date(y,m,0)};
+  if(p==='thisQ'){const q=Math.floor(m/3);return{from:new Date(y,q*3,1),to:new Date(y,q*3+3,0)};}
+  if(p==='lastQ'){const pq=Math.floor(m/3)-1,ry=pq<0?y-1:y,rq=((pq%4)+4)%4;return{from:new Date(ry,rq*3,1),to:new Date(ry,rq*3+3,0)};}
+  if(p==='thisY')return{from:new Date(y,0,1),to:new Date(y,11,31)};
+  if(p==='lastY')return{from:new Date(y-1,0,1),to:new Date(y-1,11,31)};
+  if(p==='custom'){const f=_vatDashCFrom?new Date(_vatDashCFrom+'T00:00:00'):null;const t=_vatDashCTo?new Date(_vatDashCTo+'T23:59:59'):null;return(f||t)?{from:f,to:t}:null;}
+  return null;
+}
+function vatPeriodFilter(p){
+  const b=vatPeriodBounds(p);if(!b)return _vatTx;
+  return _vatTx.filter(t=>{const d=new Date((t.date||'')+'T00:00:00');if(b.from&&d<b.from)return false;if(b.to&&d>b.to)return false;return true;});
+}
+function _vatFmtD(d){if(!d)return'';return d.getDate()+' '+MONTHS[d.getMonth()].slice(0,3)+' '+d.getFullYear();}
+function _vatDashSetP(p){_vatDashP=p;if(p!=='custom')vatRenderDash();}
+function _vatDashApplyCustom(){
+  _vatDashCFrom=document.getElementById('vatDashFrom')?.value||'';
+  _vatDashCTo=document.getElementById('vatDashTo')?.value||'';
+  vatRenderDash();
 }
 
 // ─── Dashboard ────────────────────────────────────
 function vatRenderDash(){
   const el=document.getElementById('vp-dashboard');
-  const selP=document.getElementById('vatDashPeriod');
-  const p=selP?selP.value:'thisQ';
+  const p=_vatDashP;
   const tx=vatPeriodFilter(p);
   const pur=tx.filter(t=>t.type==='purchase');
   const sal=tx.filter(t=>t.type==='sale');
@@ -11234,16 +11247,30 @@ function vatRenderDash(){
   const vatPos=sVat-pVat;
   const posLabel=vatPos>=0?'VAT to Pay HMRC':'VAT to Reclaim';
   const posClr=vatPos>=0?'var(--red)':'var(--grn)';
+  const presets=[['thisM','This Month'],['lastM','Last Month'],['thisQ','This Quarter'],['lastQ','Last Quarter'],['thisY','This Year'],['lastY','Last Year'],['all','All Time'],['custom','Custom ⚙']];
+  const chips=presets.map(([v,l])=>{const act=p===v;return`<button onclick="_vatDashSetP('${v}')" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid ${act?'var(--acc)':'var(--bdr)'};background:${act?'var(--acc)':'var(--card)'};color:${act?'#fff':'var(--txt2)'};cursor:pointer;font-family:inherit;font-weight:${act?'700':'400'};white-space:nowrap;">${l}</button>`;}).join('');
+  const b=vatPeriodBounds(p);
+  const rangeStr=b?(_vatFmtD(b.from)+(b.to?' – '+_vatFmtD(b.to):'')):'All time';
+  const subRow=p==='custom'
+    ?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding:8px 12px;border:1px solid var(--bdr);border-radius:8px;background:var(--card);">
+        <span style="font-size:11px;font-weight:600;color:var(--txtm);">From</span>
+        <input type="date" id="vatDashFrom" value="${_vatDashCFrom}" style="font-size:12px;padding:4px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--bg,#fff);color:var(--txt);">
+        <span style="font-size:11px;font-weight:600;color:var(--txtm);">To</span>
+        <input type="date" id="vatDashTo" value="${_vatDashCTo}" style="font-size:12px;padding:4px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--bg,#fff);color:var(--txt);">
+        <button class="btn btn-p" style="font-size:11px;padding:4px 12px;" onclick="_vatDashApplyCustom()"><i class="fa-solid fa-check"></i> Apply</button>
+        ${_vatDashCFrom||_vatDashCTo?`<span style="font-size:11px;color:var(--txtm);"><i class="fa-regular fa-calendar"></i> ${rangeStr} · ${tx.length} tx</span>`:''}
+      </div>`
+    :`<div style="margin-top:6px;font-size:11px;color:var(--txtm);display:flex;align-items:center;gap:5px;">
+        <i class="fa-regular fa-calendar" style="font-size:10px;"></i> <span>${rangeStr}</span>
+        <span style="opacity:.55;">· ${tx.length} transaction${tx.length!==1?'s':''}</span>
+      </div>`;
   el.innerHTML=`
-  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
-    <span style="font-size:12px;font-weight:600;color:var(--txtm);">PERIOD:</span>
-    <select id="vatDashPeriod" onchange="vatRenderDash()" style="font-size:12px;padding:5px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--card);color:var(--txt);">
-      <option value="thisQ"${p==='thisQ'?' selected':''}>This Quarter</option>
-      <option value="lastQ"${p==='lastQ'?' selected':''}>Last Quarter</option>
-      <option value="thisY"${p==='thisY'?' selected':''}>This Year</option>
-      <option value="all"${p==='all'?' selected':''}>All Time</option>
-    </select>
-    <button class="btn btn-o" style="font-size:11px;padding:4px 10px;" onclick="renderVatPage()"><i class="fa-solid fa-rotate-right"></i></button>
+  <div style="margin-bottom:16px;">
+    <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+      ${chips}
+      <button class="btn btn-o" style="margin-left:auto;font-size:11px;padding:4px 9px;" title="Refresh" onclick="renderVatPage()"><i class="fa-solid fa-rotate-right"></i></button>
+    </div>
+    ${subRow}
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px;">
     <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--acc);">${_gbp(pNet)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Purchases Net</div></div>
