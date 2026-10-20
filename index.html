@@ -11189,8 +11189,9 @@ let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=
 let _vatDashP='thisY',_vatDashCFrom='',_vatDashCTo='';
 let _vatLogP='all',_vatLogCFrom='',_vatLogCTo='';
 
+const _VAT_COLS='id,user_id,type,date,supplier,category,receipt_no,net,vat_rate,vat_amount,gross,file_name,serial_no,serial_frozen,created_at,updated_at,expense_id';
 async function renderVatPage(){
-  const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
+  const{data}=await sb.from('vat_transactions').select(_VAT_COLS).order('date',{ascending:false});
   _vatTx=data||[];
   // activate dashboard tab
   const dashTab=document.querySelector('#page-vat .vat-tab[data-vt="dashboard"]');
@@ -11292,7 +11293,7 @@ function vatTxTable(rows,compact=false){
     :`<tr><th>Date</th><th>Type</th><th>Supplier/Customer</th><th>Category</th><th style="text-align:right">Net</th><th>Rate</th><th style="text-align:right">VAT</th><th style="text-align:right">Gross</th><th></th></tr>`;
   const body=rows.map(t=>{
     const tag=`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${t.type==='purchase'?'rgba(var(--acc-rgb,68,138,255),.12)':'rgba(var(--grn-rgb,46,160,67),.12)'};color:${t.type==='purchase'?'var(--acc)':'var(--grn)'};">${t.type==='purchase'?'PUR':'SALE'}</span>`;
-    const rcptIcon=t.file_data?`<i class="fa-solid fa-image" style="color:var(--txtm);cursor:pointer;margin-left:5px;" onclick="vatPreviewReceipt(${t.id})" title="View receipt"></i>`:'';
+    const rcptIcon=t.file_name?`<i class="fa-solid fa-image" style="color:var(--txtm);cursor:pointer;margin-left:5px;" onclick="vatPreviewReceipt(${t.id})" title="View receipt"></i>`:'';
     if(compact){
       return`<tr>
         <td>${_dmy(t.date)}</td><td>${tag}</td><td>${(t.supplier||'-')}${rcptIcon}</td>
@@ -11462,7 +11463,7 @@ function vatRenderForm(type){
   </div>`;
 
   vatScanInit(type);
-  if(ed?.file_data||_vatFileData)_vatFSideUpdate();
+  if(ed?.file_name||_vatFileData)_vatFSideUpdate();
 }
 
 function vatAutoCalc(){
@@ -11654,7 +11655,7 @@ async function vatSaveForm(type){
     localStorage.setItem('vat_imported_exp',JSON.stringify(imp));
     _vatImportingExpId=null;
   }
-  const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
+  const{data}=await sb.from('vat_transactions').select(_VAT_COLS).order('date',{ascending:false});
   _vatTx=data||[];
   vatRenderForm(type);
 }
@@ -11795,14 +11796,20 @@ let _rcptList=[],_rcptIdx=0,_rcptZoom=1,_rcptRot=0,_rcptPanX=0,_rcptPanY=0;
 let _vrwList=[],_vrwIdx=0,_vrwZoom=1,_vrwRot=0,_vrwPanX=0,_vrwPanY=0,_vrwMonthFilter=null,_vrwStatusFilter='pending';
 let _vrwUrlCache=new Map(); // expId → {dataUrl, mimeType} | {error:true} | null (pending)
 let _vatFZoom=1,_vatFRot=0,_vatFPanX=0,_vatFPanY=0;
-function vatPreviewReceipt(id){
-  _rcptList=_vatTx.filter(t=>t.file_data);
+async function vatPreviewReceipt(id){
+  _rcptList=_vatTx.filter(t=>t.file_name);
   const i=_rcptList.findIndex(t=>t.id===id);
   _rcptIdx=i>=0?i:0;_rcptZoom=1;_rcptRot=0;_rcptPanX=0;_rcptPanY=0;
-  _vatRcptOpen();
+  await _vatRcptOpen();
 }
-function _vatRcptOpen(){
+async function _vatRcptOpen(){
   const tx=_rcptList[_rcptIdx];if(!tx)return;
+  if(!tx.file_data){
+    document.getElementById('vatRcptPanel')?.remove();
+    document.body.insertAdjacentHTML('beforeend',`<div id="vatRcptPanel" style="position:fixed;top:0;right:0;width:min(600px,100vw);height:100vh;z-index:10200;background:#0d0d0d;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-spinner fa-spin" style="font-size:32px;color:#666;"></i></div>`);
+    const{data}=await sb.from('vat_transactions').select('file_data').eq('id',tx.id).single();
+    if(data?.file_data)tx.file_data=data.file_data;
+  }
   document.getElementById('vatRcptPanel')?.remove();
   const isPdf=(tx.file_data||'').startsWith('data:application/pdf');
   const n=_rcptList.length,p=_rcptIdx+1;
@@ -11878,14 +11885,15 @@ function _vatRcptApply(){
 function _vatRcptZoom(d){_rcptZoom=Math.max(.1,Math.min(8,_rcptZoom+(d>0?.25:-.25)));_vatRcptApply();}
 function _vatRcptZoomReset(){_rcptZoom=1;_rcptPanX=0;_rcptPanY=0;_vatRcptApply();}
 function _vatRcptRotate(){_rcptRot=(_rcptRot+90)%360;_vatRcptApply();}
-function _vatRcptDownload(){
+async function _vatRcptDownload(){
   const tx=_rcptList[_rcptIdx];if(!tx)return;
+  if(!tx.file_data){const{data}=await sb.from('vat_transactions').select('file_data').eq('id',tx.id).single();if(data?.file_data)tx.file_data=data.file_data;}
   const ext=vatExtFromDataUrl(tx.file_data);
   const a=document.createElement('a');a.href=tx.file_data;a.download=vatSanitizeFName(tx.receipt_no||tx.supplier||'receipt')+'-'+tx.date+'.'+ext;a.click();
 }
-function _vatRcptNav(dir){
+async function _vatRcptNav(dir){
   const ni=_rcptIdx+dir;if(ni<0||ni>=_rcptList.length)return;
-  _rcptIdx=ni;_rcptZoom=1;_rcptRot=0;_rcptPanX=0;_rcptPanY=0;_vatRcptOpen();
+  _rcptIdx=ni;_rcptZoom=1;_rcptRot=0;_rcptPanX=0;_rcptPanY=0;await _vatRcptOpen();
 }
 
 // ─── VAT Receipt Review Workflow (from Tags page) ─
