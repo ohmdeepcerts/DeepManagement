@@ -12116,7 +12116,7 @@ function _vrwOpen(){
         </div>
         <div style="padding:16px;border-bottom:1px solid var(--bdr);">
           <div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Receipt Number <span style="font-size:10px;font-style:italic;font-weight:400;">(used as filename)</span></div>
-          <input id="vrwRcptNo" type="text" placeholder="e.g. INV-2025-001" value="${rcptNoVal}" style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);padding:8px 10px;font-size:13px;outline:none;font-family:inherit;" oninput="_vrwSaveRcptNo()">
+          <input id="vrwRcptNo" type="text" placeholder="e.g. INV-2025-001" value="${rcptNoVal}" style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--bdr);border-radius:6px;color:var(--txt);padding:8px 10px;font-size:13px;outline:none;font-family:inherit;" oninput="_vrwSaveRcptNo()" onkeydown="if(event.key==='Enter'){event.preventDefault();_vrwAddToVat();}">
         </div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
           ${isAdded
