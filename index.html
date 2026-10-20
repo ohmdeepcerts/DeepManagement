@@ -11187,6 +11187,7 @@ async function instSave(){
 // ═══════════════════════════════════════════════════
 let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set(),_vatImportingExpId=null;
 let _vatDashP='thisQ',_vatDashCFrom='',_vatDashCTo='';
+let _vatLogP='all',_vatLogCFrom='',_vatLogCTo='';
 
 async function renderVatPage(){
   const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
@@ -12072,23 +12073,90 @@ async function _vrwDownload(){
 }
 
 // ─── Audit Log ────────────────────────────────────
+function _vatLogSetP(p){_vatLogP=p;vatRenderLog();}
+function _vatLogApplyCustom(){
+  _vatLogCFrom=document.getElementById('vatLogFrom')?.value||'';
+  _vatLogCTo=document.getElementById('vatLogTo')?.value||'';
+  vatRenderLog();
+}
+function _vatLogSetMonth(ym){
+  // set custom range to that full month
+  if(!ym){_vatLogP='all';vatRenderLog();return;}
+  const[y,m]=ym.split('-');
+  const last=new Date(+y,+m,0).getDate();
+  _vatLogCFrom=`${y}-${m}-01`;
+  _vatLogCTo=`${y}-${m}-${String(last).padStart(2,'0')}`;
+  _vatLogP='custom';
+  vatRenderLog();
+}
 function vatRenderLog(){
   const el=document.getElementById('vp-auditlog');
   const fType=document.getElementById('vatLogType')?.value||'';
   const fQ=(document.getElementById('vatLogQ')?.value||'').toLowerCase();
+  const p=_vatLogP;
+
+  // date filter
   let rows=_vatTx;
+  let _lbFrom=null,_lbTo=null;
+  if(p==='custom'){
+    _lbFrom=_vatLogCFrom?new Date(_vatLogCFrom+'T00:00:00'):null;
+    _lbTo=_vatLogCTo?new Date(_vatLogCTo+'T23:59:59'):null;
+  } else if(p!=='all'){
+    const _lb=vatPeriodBounds(p);
+    if(_lb){_lbFrom=_lb.from||null;_lbTo=_lb.to||null;}
+  }
+  if(_lbFrom||_lbTo){
+    rows=rows.filter(t=>{const d=new Date((t.date||'')+'T00:00:00');if(_lbFrom&&d<_lbFrom)return false;if(_lbTo&&d>_lbTo)return false;return true;});
+  }
+
   if(fType)rows=rows.filter(t=>t.type===fType);
   if(fQ)rows=rows.filter(t=>(t.supplier||'').toLowerCase().includes(fQ)||(t.category||'').toLowerCase().includes(fQ)||(t.receipt_no||'').toLowerCase().includes(fQ));
+
+  // period chip bar
+  const presets=[['thisM','This Month'],['lastM','Last Month'],['thisQ','This Quarter'],['lastQ','Last Quarter'],['thisY','This Year'],['lastY','Last Year'],['all','All Time'],['custom','Custom ⚙']];
+  const chips=presets.map(([v,l])=>{
+    const act=p===v;
+    return`<button onclick="_vatLogSetP('${v}')" style="padding:5px 11px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid ${act?'var(--acc)':'var(--bdr)'};background:${act?'var(--acc)':'transparent'};color:${act?'#fff':'var(--txt)'};white-space:nowrap;transition:all .15s;">${l}</button>`;
+  }).join('');
+
+  // date range display
+  const rangeLabel=(_lbFrom||_lbTo)?`<span style="font-size:11px;color:var(--txtm);margin-left:4px;">${_vatFmtD(_lbFrom)}${_lbFrom&&_lbTo?' – ':''}${_vatFmtD(_lbTo)}</span>`:'';
+
+  // custom pickers row
+  const customRow=p==='custom'?`
+  <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:8px;">
+    <div><label style="font-size:10px;color:var(--txtm);display:block;margin-bottom:3px;">From</label>
+      <input type="date" id="vatLogFrom" value="${_vatLogCFrom}" style="font-size:12px;padding:5px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--card);color:var(--txt);"></div>
+    <div><label style="font-size:10px;color:var(--txtm);display:block;margin-bottom:3px;">To</label>
+      <input type="date" id="vatLogTo" value="${_vatLogCTo}" style="font-size:12px;padding:5px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--card);color:var(--txt);"></div>
+    <button class="btn btn-p" onclick="_vatLogApplyCustom()" style="font-size:11px;padding:5px 14px;"><i class="fa-solid fa-check"></i> Apply</button>
+  </div>`:'';
+
+  // month selector
+  const allMonths=[...new Set(_vatTx.map(t=>(t.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthOpts=allMonths.length?`<select id="vatLogMonth" onchange="_vatLogSetMonth(this.value)" style="font-size:12px;padding:5px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--card);color:var(--txt);">
+    <option value="">Month…</option>
+    ${allMonths.map(m=>{const[y,mo]=m.split('-');return`<option value="${m}">${mn[+mo-1]} ${y}</option>`;}).join('')}
+  </select>`:'';
+
   el.innerHTML=`
+  <div style="margin-bottom:12px;">
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;">
+      ${chips}
+    </div>
+    ${rangeLabel}
+    ${customRow}
+  </div>
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
     <select id="vatLogType" onchange="vatRenderLog()" style="font-size:12px;padding:5px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--card);color:var(--txt);">
       <option value="">All Types</option><option value="purchase">Purchases</option><option value="sale">Sales</option>
     </select>
+    ${monthOpts}
     <input type="text" id="vatLogQ" value="${fQ}" oninput="vatRenderLog()" placeholder="Search supplier/category/ref…" style="flex:1;min-width:160px;font-size:12px;padding:5px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--card);color:var(--txt);">
     <span style="font-size:12px;color:var(--txtm);">${rows.length} record${rows.length!==1?'s':''}</span>
   </div>
   <div class="card"><div class="ts" style="overflow-x:auto;">${vatTxTable(rows,false)}</div></div>`;
-  // restore filter values
   if(fType){const sel=document.getElementById('vatLogType');if(sel)sel.value=fType;}
 }
 
