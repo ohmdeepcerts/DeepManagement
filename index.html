@@ -11890,18 +11890,24 @@ function _vatRcptNav(dir){
 
 // ─── VAT Receipt Review Workflow (from Tags page) ─
 async function _vrwReconcileImported(){
-  // Full sync from Supabase: rebuild localStorage from all transactions that have
-  // an expense_id stored — works across browsers and after clears.
+  // Merge Supabase-backed adds with existing localStorage (preserves old pre-map adds).
   const{data:rows}=await sb.from('vat_transactions').select('id,expense_id').not('expense_id','is',null);
-  if(!rows)return;
-  const newMap={};const newImp=[];
-  for(const r of rows){
-    const txId=String(r.id);const expId=String(r.expense_id);
-    newMap[txId]=expId;
-    if(!newImp.includes(expId))newImp.push(expId);
+  const sbRows=rows||[];
+  const sbTxIds=new Set(sbRows.map(r=>String(r.id)));
+  const sbExpIds=new Set(sbRows.map(r=>String(r.expense_id)));
+  const localMap=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
+  const imp=new Set(JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').map(String));
+  // Remove expenses whose mapped tx was deleted and isn't covered by any other Supabase tx
+  for(const[txId,expId] of Object.entries(localMap)){
+    if(!sbTxIds.has(txId)&&!sbExpIds.has(expId))imp.delete(expId);
   }
-  localStorage.setItem('vat_tx_exp_map',JSON.stringify(newMap));
-  localStorage.setItem('vat_imported_exp',JSON.stringify(newImp));
+  // Add all Supabase-backed expense IDs (cross-browser sync of new adds)
+  for(const expId of sbExpIds)imp.add(expId);
+  // Merge maps: keep local entries that are still valid + add all Supabase entries
+  const mergedMap={...localMap};
+  for(const r of sbRows)mergedMap[String(r.id)]=String(r.expense_id);
+  localStorage.setItem('vat_tx_exp_map',JSON.stringify(mergedMap));
+  localStorage.setItem('vat_imported_exp',JSON.stringify([...imp]));
 }
 async function openVatReceiptReview(){
   await _vrwReconcileImported();
