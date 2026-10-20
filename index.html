@@ -12257,6 +12257,7 @@ async function _vrwAddToVat(){
     exp.vrw_receipt_no=rcptNo;
     toast('Added to VAT Records!','s');
     _vrwOpen();
+    setTimeout(()=>{const i=document.getElementById('vrwRcptNo');if(i){i.focus();i.select();}},60);
   }catch(e){
     toast('Error: '+(e.message||'Failed to add'),'e');
     if(addBtn){addBtn.disabled=false;addBtn.innerHTML='<i class="fa-solid fa-file-invoice"></i> Add to VAT Records';}
