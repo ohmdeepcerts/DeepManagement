@@ -11185,13 +11185,13 @@ async function instSave(){
 // ═══════════════════════════════════════════════════
 // VAT RECORDS
 // ═══════════════════════════════════════════════════
-let _vatTx=[],_vatTxLoaded=false,_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set(),_vatImportingExpId=null;
+let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set(),_vatImportingExpId=null;
 let _vatDashP='thisQ',_vatDashCFrom='',_vatDashCTo='';
 let _vatLogP='all',_vatLogCFrom='',_vatLogCTo='';
 
 async function renderVatPage(){
   const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
-  _vatTx=data||[];_vatTxLoaded=true;
+  _vatTx=data||[];
   // activate dashboard tab
   const dashTab=document.querySelector('#page-vat .vat-tab[data-vt="dashboard"]');
   vatTab(dashTab,'dashboard');
@@ -11655,7 +11655,7 @@ async function vatSaveForm(type){
     _vatImportingExpId=null;
   }
   const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
-  _vatTx=data||[];_vatTxLoaded=true;
+  _vatTx=data||[];
   vatRenderForm(type);
 }
 
@@ -11888,28 +11888,27 @@ function _vatRcptNav(dir){
 }
 
 // ─── VAT Receipt Review Workflow (from Tags page) ─
-function _vrwReconcileImported(){
-  // Only run if _vatTx has been loaded from the DB. If it hasn't (user opened
-  // review without visiting VAT Records first), _vatTx is [] and every mapped
-  // expense would be incorrectly flagged as deleted and have its marker cleared.
-  if(!_vatTxLoaded)return;
+async function _vrwReconcileImported(){
+  // Fetch only the mapped tx IDs from Supabase so we always have fresh data,
+  // regardless of whether the user has visited the VAT Records page.
   const map=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
-  const validTxIds=new Set((_vatTx||[]).map(t=>String(t.id)));
-  let imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').map(String);
+  const txIds=Object.keys(map);
+  if(!txIds.length)return;
+  const{data:existing}=await sb.from('vat_transactions').select('id').in('id',txIds);
+  const validTxIds=new Set((existing||[]).map(t=>String(t.id)));
   const expToTx={};
   for(const[txId,expId] of Object.entries(map))expToTx[expId]=txId;
+  let imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').map(String);
   const before=imp.length;
   imp=imp.filter(expId=>{
     const txId=expToTx[expId];
-    if(!txId)return true; // no map entry: can't verify, keep
-    return validTxIds.has(txId); // mapped: keep only if tx still exists
+    if(!txId)return true; // no map entry: keep (old import, no map)
+    return validTxIds.has(txId); // mapped: keep only if tx still exists in DB
   });
-  if(imp.length<before){
-    localStorage.setItem('vat_imported_exp',JSON.stringify(imp));
-  }
+  if(imp.length<before)localStorage.setItem('vat_imported_exp',JSON.stringify(imp));
 }
-function openVatReceiptReview(){
-  _vrwReconcileImported();
+async function openVatReceiptReview(){
+  await _vrwReconcileImported();
   const staffF=document.getElementById('tagsStaff')?.value||'All';
   _vrwList=expenses.filter(r=>{
     if(!r.tags?.includes('VAT')||!r.receipt_url)return false;
