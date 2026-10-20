@@ -12335,6 +12335,7 @@ function _vrwOpen(){
     else if(e.key==='r')_vrwRotate();
     else if(e.key==='ArrowLeft'){e.preventDefault();_vrwNav(-1);}
     else if(e.key==='ArrowRight'){e.preventDefault();_vrwNav(1);}
+    else if(e.key==='Delete'){e.preventDefault();_vrwReject();}
   };
   document.addEventListener('keydown',onKey);
 }
