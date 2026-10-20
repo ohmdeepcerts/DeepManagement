@@ -11887,7 +11887,27 @@ function _vatRcptNav(dir){
 }
 
 // ─── VAT Receipt Review Workflow (from Tags page) ─
+function _vrwReconcileImported(){
+  // Remove "imported" markers whose linked VAT transaction no longer exists.
+  // Uses vat_tx_exp_map {txId→expId}. Entries with no map entry are left alone
+  // (added before the map feature existed) — user can use "Undo Add" for those.
+  const map=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
+  const validTxIds=new Set((_vatTx||[]).map(t=>String(t.id)));
+  let imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').map(String);
+  const expToTx={};
+  for(const[txId,expId] of Object.entries(map))expToTx[expId]=txId;
+  const before=imp.length;
+  imp=imp.filter(expId=>{
+    const txId=expToTx[expId];
+    if(!txId)return true; // no map entry: can't verify, keep
+    return validTxIds.has(txId); // mapped: keep only if tx still exists
+  });
+  if(imp.length<before){
+    localStorage.setItem('vat_imported_exp',JSON.stringify(imp));
+  }
+}
 function openVatReceiptReview(){
+  _vrwReconcileImported();
   const staffF=document.getElementById('tagsStaff')?.value||'All';
   _vrwList=expenses.filter(r=>{
     if(!r.tags?.includes('VAT')||!r.receipt_url)return false;
@@ -11912,6 +11932,17 @@ function _vrwUnreject(){
   const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
   const rej=JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]').filter(id=>id!==String(exp.id));
   localStorage.setItem('vat_dismissed_exp',JSON.stringify(rej));
+  _vrwOpen();
+}
+function _vrwUndoAdd(){
+  const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
+  const imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').filter(id=>String(id)!==String(exp.id));
+  localStorage.setItem('vat_imported_exp',JSON.stringify(imp));
+  // also remove from map
+  const map=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
+  for(const[txId,expId] of Object.entries(map)){if(String(expId)===String(exp.id)){delete map[txId];}}
+  localStorage.setItem('vat_tx_exp_map',JSON.stringify(map));
+  toast('Marked as pending','i');
   _vrwOpen();
 }
 function _vrwReject(){
@@ -12017,9 +12048,12 @@ function _vrwOpen(){
           <input id="vrwRcptNo" type="text" placeholder="e.g. INV-2025-001" value="${rcptNoVal}" style="width:100%;box-sizing:border-box;background:#1c1c1c;border:1px solid rgba(255,255,255,.12);border-radius:5px;color:#e0e0e0;padding:6px 9px;font-size:12px;outline:none;font-family:inherit;" oninput="_vrwSaveRcptNo()">
         </div>
         <div style="padding:13px;display:flex;flex-direction:column;gap:8px;">
-          <button id="vrwAddBtn" onclick="${isAdded?'':'_vrwAddToVat()'}" ${isAdded?'disabled':''} style="background:${isAdded?'rgba(34,197,94,.08)':'var(--acc)'};border:1px solid ${isAdded?'rgba(34,197,94,.22)':'transparent'};color:${isAdded?'#86efac':'#fff'};border-radius:6px;padding:8px;font-size:12px;font-weight:600;cursor:${isAdded?'default':'pointer'};width:100%;font-family:inherit;">
-            ${isAdded?'<i class="fa-solid fa-circle-check"></i> Added':'<i class="fa-solid fa-file-invoice"></i> Add to VAT Records'}
-          </button>
+          ${isAdded
+            ?`<div style="display:flex;gap:6px;">
+                <button disabled style="flex:1;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.22);color:#86efac;border-radius:6px;padding:8px;font-size:12px;font-weight:600;cursor:default;font-family:inherit;"><i class="fa-solid fa-circle-check"></i> Added</button>
+                <button onclick="_vrwUndoAdd()" style="background:none;border:1px solid rgba(255,255,255,.13);color:#888;border-radius:6px;padding:7px 10px;font-size:11px;cursor:pointer;font-family:inherit;" title="Remove added marker — use if the VAT transaction was deleted"><i class="fa-solid fa-rotate-left"></i></button>
+              </div>`
+            :`<button id="vrwAddBtn" onclick="_vrwAddToVat()" style="background:var(--acc);border:1px solid transparent;color:#fff;border-radius:6px;padding:8px;font-size:12px;font-weight:600;cursor:pointer;width:100%;font-family:inherit;"><i class="fa-solid fa-file-invoice"></i> Add to VAT Records</button>`}
           <div style="display:flex;gap:6px;">
             <button onclick="_vrwDownload()" style="flex:1;background:none;border:1px solid rgba(255,255,255,.13);color:#ccc;border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit;"><i class="fa-solid fa-download"></i> Download</button>
             ${!isAdded?`<button onclick="_vrwReject()" style="flex:1;background:${isRejected?'rgba(239,68,68,.1)':'none'};border:1px solid ${isRejected?'rgba(239,68,68,.4)':'rgba(255,255,255,.13)'};color:${isRejected?'#fca5a5':'#888'};border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit;" title="${isRejected?'Already rejected':'Mark as not applicable'}"><i class="fa-solid fa-ban"></i> ${isRejected?'Rejected':'Reject'}</button>`:''}
