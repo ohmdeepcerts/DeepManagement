@@ -11187,7 +11187,7 @@ async function instSave(){
 // ═══════════════════════════════════════════════════
 let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set(),_vatImportingExpId=null;
 let _vatDashP='thisY',_vatDashCFrom='',_vatDashCTo='';
-let _vatLogP='all',_vatLogCFrom='',_vatLogCTo='';
+let _vatLogP='all',_vatLogCFrom='',_vatLogCTo='',_vatLogDups=false;
 
 const _VAT_COLS='id,user_id,type,date,supplier,category,receipt_no,net,vat_rate,vat_amount,gross,file_name,serial_no,serial_frozen,created_at,updated_at,expense_id';
 async function renderVatPage(){
@@ -11230,6 +11230,25 @@ function vatPeriodFilter(p){
   return _vatTx.filter(t=>{const d=new Date((t.date||'')+'T00:00:00');if(b.from&&d<b.from)return false;if(b.to&&d>b.to)return false;return true;});
 }
 function _vatFmtD(d){if(!d)return'';return d.getDate()+' '+MONTHS[d.getMonth()].slice(0,3)+' '+d.getFullYear();}
+function _vatDupIds(){
+  const m={};
+  for(const t of _vatTx){
+    const k=`${t.date}|${(t.supplier||'').toLowerCase().trim()}|${parseFloat(t.gross).toFixed(2)}`;
+    if(!m[k])m[k]=[];m[k].push(t.id);
+  }
+  const s=new Set();
+  for(const ids of Object.values(m))if(ids.length>1)ids.forEach(id=>s.add(id));
+  const r={};
+  for(const t of _vatTx){
+    if(!(t.receipt_no||'').trim())continue;
+    const k=t.receipt_no.trim().toLowerCase();
+    if(!r[k])r[k]=[];r[k].push(t.id);
+  }
+  for(const ids of Object.values(r))if(ids.length>1)ids.forEach(id=>s.add(id));
+  return s;
+}
+function _vatLogToggleDups(){_vatLogDups=!_vatLogDups;vatRenderLog();}
+function _vatGoDupeAudit(){_vatLogDups=true;vatTab(document.querySelector('#page-vat .vat-tab[data-vt="auditlog"]'),'auditlog');}
 function _vatDashSetP(p){_vatDashP=p;vatRenderDash();}
 function _vatDashApplyCustom(){
   _vatDashCFrom=document.getElementById('vatDashFrom')?.value||'';
@@ -11267,6 +11286,9 @@ function vatRenderDash(){
         <i class="fa-regular fa-calendar" style="font-size:10px;"></i> <span>${rangeStr}</span>
         <span style="opacity:.55;">· ${tx.length} transaction${tx.length!==1?'s':''}</span>
       </div>`;
+  const allDupIds=_vatDupIds();
+  const totalDups=allDupIds.size;
+  const dupBanner=totalDups?`<div onclick="_vatGoDupeAudit()" style="cursor:pointer;background:rgba(251,146,60,.1);border:1px solid var(--amb);border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:8px;margin-bottom:12px;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--amb);"></i><span style="font-size:13px;font-weight:600;color:var(--amb);">${totalDups} possible duplicate${totalDups>1?'s':''} detected</span><span style="font-size:11px;color:var(--txtm);margin-left:4px;">— click to review</span></div>`:'';
   el.innerHTML=`
   <div style="margin-bottom:16px;">
     <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
@@ -11275,6 +11297,7 @@ function vatRenderDash(){
     </div>
     ${subRow}
   </div>
+  ${dupBanner}
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px;">
     <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--acc);">${_gbp(pNet)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Purchases Net</div></div>
     <div class="card" style="padding:14px;text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--amb);">${_gbp(pVat)}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">Purchases VAT</div></div>
@@ -11283,27 +11306,30 @@ function vatRenderDash(){
     <div class="card" style="padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:${posClr};">${_gbp(Math.abs(vatPos))}</div><div style="font-size:11px;color:var(--txtm);margin-top:3px;">${posLabel}</div></div>
   </div>
   ${vatDraftsHtml()}
-  <div class="card"><div class="ch"><div class="ct">Recent Transactions (${Math.min(tx.length,20)} of ${tx.length})</div></div><div class="ts" style="overflow-x:auto;">${vatTxTable(tx.slice(0,20),true)}</div></div>`;
+  <div class="card"><div class="ch"><div class="ct">Recent Transactions (${Math.min(tx.length,20)} of ${tx.length})</div></div><div class="ts" style="overflow-x:auto;">${vatTxTable(tx.slice(0,20),true,allDupIds)}</div></div>`;
 }
 
-function vatTxTable(rows,compact=false){
+function vatTxTable(rows,compact=false,dupIds=null){
   if(!rows.length)return`<div style="padding:30px;text-align:center;color:var(--txtm);">No transactions in this period</div>`;
   const head=compact
     ?`<tr><th>Date</th><th>Type</th><th>Supplier/Customer</th><th style="text-align:right">Net</th><th style="text-align:right">VAT</th><th style="text-align:right">Gross</th></tr>`
     :`<tr><th>Date</th><th>Type</th><th>Supplier/Customer</th><th>Category</th><th style="text-align:right">Net</th><th>Rate</th><th style="text-align:right">VAT</th><th style="text-align:right">Gross</th><th></th></tr>`;
   const body=rows.map(t=>{
+    const isDup=dupIds?.has(t.id);
+    const rowSt=isDup?'background:rgba(251,146,60,.07);':'';
     const tag=`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:${t.type==='purchase'?'rgba(var(--acc-rgb,68,138,255),.12)':'rgba(var(--grn-rgb,46,160,67),.12)'};color:${t.type==='purchase'?'var(--acc)':'var(--grn)'};">${t.type==='purchase'?'PUR':'SALE'}</span>`;
     const rcptIcon=t.file_name?`<i class="fa-solid fa-image" style="color:var(--txtm);cursor:pointer;margin-left:5px;" onclick="vatPreviewReceipt(${t.id})" title="View receipt"></i>`:'';
+    const dupBadge=isDup?` <i class="fa-solid fa-triangle-exclamation" style="color:var(--amb);font-size:11px;margin-left:4px;" title="Possible duplicate"></i>`:'';
     if(compact){
-      return`<tr>
-        <td>${_dmy(t.date)}</td><td>${tag}</td><td>${(t.supplier||'-')}${rcptIcon}</td>
+      return`<tr style="${rowSt}">
+        <td>${_dmy(t.date)}</td><td>${tag}</td><td>${(t.supplier||'-')}${rcptIcon}${dupBadge}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.net)}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.vat_amount)}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.gross)}</td>
       </tr>`;
     }
-    return`<tr>
-      <td>${_dmy(t.date)}</td><td>${tag}</td><td>${(t.supplier||'-')}${rcptIcon}</td><td>${t.category||''}</td>
+    return`<tr style="${rowSt}">
+      <td>${_dmy(t.date)}</td><td>${tag}</td><td>${(t.supplier||'-')}${rcptIcon}${dupBadge}</td><td>${t.category||''}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.net)}</td>
       <td style="text-align:right;">${t.vat_rate}%</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.vat_amount)}</td>
@@ -11625,7 +11651,7 @@ function vatScanFillForm(id,type){
   toast('Form filled from scan — review &amp; save','s');
 }
 
-async function vatSaveForm(type){
+async function vatSaveForm(type,forceDup=false){
   const errEl=document.getElementById('vatFErr');
   errEl.style.display='none';
   const date=document.getElementById('vatFDate').value;
@@ -11640,6 +11666,19 @@ async function vatSaveForm(type){
   const payload={type,date,supplier,category:cat,receipt_no:recNo,net,vat_rate:vatRate,vat_amount:vatAmt,gross};
   if(_vatFileData){payload.file_data=_vatFileData;payload.file_name=_vatFileName;}
   const editingId=_vatEditId;
+  if(editingId===null&&!forceDup){
+    const dups=_vatTx.filter(t=>{
+      const matchRcpt=recNo&&t.receipt_no&&t.receipt_no.trim().toLowerCase()===recNo.toLowerCase();
+      const matchAll=t.date===date&&(t.supplier||'').toLowerCase().trim()===(supplier||'').toLowerCase().trim()&&Math.abs((parseFloat(t.gross)||0)-gross)<0.01;
+      return matchRcpt||matchAll;
+    });
+    if(dups.length){
+      const info=dups.slice(0,2).map(t=>`${_dmy(t.date)} · ${t.supplier} · ${_gbp(t.gross)}`).join('<br>');
+      errEl.innerHTML=`<i class="fa-solid fa-triangle-exclamation" style="color:var(--amb);"></i> <strong>Possible duplicate${dups.length>1?'s':''} detected:</strong><br><span style="font-size:11px;opacity:.75;">${info}</span><br><button onclick="vatSaveForm('${type}',true)" style="margin-top:6px;padding:4px 12px;background:var(--red);border:none;border-radius:5px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Save Anyway</button>`;
+      errEl.style.display='block';
+      return;
+    }
+  }
   let r;
   if(editingId!==null){
     r=await sb.from('vat_transactions').update({...payload,updated_at:new Date().toISOString()}).eq('id',editingId);
@@ -12324,6 +12363,9 @@ function vatRenderLog(){
 
   if(fType)rows=rows.filter(t=>t.type===fType);
   if(fQ)rows=rows.filter(t=>(t.supplier||'').toLowerCase().includes(fQ)||(t.category||'').toLowerCase().includes(fQ)||(t.receipt_no||'').toLowerCase().includes(fQ));
+  const allDupIds=_vatDupIds();
+  const dupCount=allDupIds.size;
+  if(_vatLogDups)rows=rows.filter(t=>allDupIds.has(t.id));
 
   // period chip bar
   const presets=[['thisM','This Month'],['lastM','Last Month'],['thisQ','This Quarter'],['lastQ','Last Quarter'],['thisY','This Year'],['lastY','Last Year'],['all','All Time'],['custom','Custom ⚙']];
@@ -12367,9 +12409,10 @@ function vatRenderLog(){
     </select>
     ${monthOpts}
     <input type="text" id="vatLogQ" value="${fQ}" oninput="vatRenderLog()" placeholder="Search supplier/category/ref…" style="flex:1;min-width:160px;font-size:12px;padding:5px 8px;border:1px solid var(--bdr);border-radius:6px;background:var(--card);color:var(--txt);">
+    ${dupCount?`<button onclick="_vatLogToggleDups()" style="font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid ${_vatLogDups?'var(--amb)':'var(--bdr)'};background:${_vatLogDups?'rgba(251,146,60,.15)':'transparent'};color:${_vatLogDups?'var(--amb)':'var(--txtm)'};cursor:pointer;font-family:inherit;white-space:nowrap;"><i class="fa-solid fa-triangle-exclamation"></i> Dupes (${dupCount})</button>`:''}
     <span style="font-size:12px;color:var(--txtm);">${rows.length} record${rows.length!==1?'s':''}</span>
   </div>
-  <div class="card"><div class="ts" style="overflow-x:auto;">${vatTxTable(rows,false)}</div></div>`;
+  <div class="card"><div class="ts" style="overflow-x:auto;">${vatTxTable(rows,false,allDupIds)}</div></div>`;
   if(fType){const sel=document.getElementById('vatLogType');if(sel)sel.value=fType;}
 }
 
