@@ -5253,9 +5253,12 @@ function renderTags(){
     ${vatExps.length>0?`<div style="background:var(--ambl);border:1px solid rgba(217,119,6,0.2);border-radius:var(--r);padding:13px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
         <div style="font-size:13px;font-weight:700;color:var(--amb);">VAT Receipts (${vatExps.length} attached)</div>
-        <button class="btn btn-a btn-sm" onclick="downloadVATReceipts(this)"><i class="fa-solid fa-download"></i>Download All</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-a btn-sm" onclick="downloadVATReceipts(this)"><i class="fa-solid fa-download"></i>Download All</button>
+          <button class="btn btn-p btn-sm" onclick="openVatReceiptReview()"><i class="fa-solid fa-magnifying-glass"></i>Review &amp; Import</button>
+        </div>
       </div>
-      <div style="font-size:12px;color:var(--txt2);">These expenses have VAT tags and file attachments. Download for your accountant.</div>
+      <div style="font-size:12px;color:var(--txt2);">These expenses have VAT tags and file attachments. Review one by one to set receipt numbers and add to VAT Records.</div>
     </div>`:'<p style="font-size:12px;color:var(--txtm);">No VAT receipts with attachments found for this period.</p>'}`;
 }
 
@@ -11706,6 +11709,7 @@ async function vatLinkExpense(expId){
 
 // ─── Receipt preview panel ────────────────────────
 let _rcptList=[],_rcptIdx=0,_rcptZoom=1,_rcptRot=0,_rcptPanX=0,_rcptPanY=0;
+let _vrwList=[],_vrwIdx=0,_vrwZoom=1,_vrwRot=0,_vrwPanX=0,_vrwPanY=0,_vrwMonthFilter=null;
 function vatPreviewReceipt(id){
   _rcptList=_vatTx.filter(t=>t.file_data);
   const i=_rcptList.findIndex(t=>t.id===id);
@@ -11797,6 +11801,192 @@ function _vatRcptDownload(){
 function _vatRcptNav(dir){
   const ni=_rcptIdx+dir;if(ni<0||ni>=_rcptList.length)return;
   _rcptIdx=ni;_rcptZoom=1;_rcptRot=0;_rcptPanX=0;_rcptPanY=0;_vatRcptOpen();
+}
+
+// ─── VAT Receipt Review Workflow (from Tags page) ─
+function openVatReceiptReview(){
+  const staffF=document.getElementById('tagsStaff')?.value||'All';
+  _vrwList=expenses.filter(r=>{
+    if(!r.tags?.includes('VAT')||!r.receipt_url)return false;
+    if(staffF!=='All'&&r.employee_id!==staffF)return false;
+    return true;
+  }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(!_vrwList.length){toast('No VAT receipts with attachments found','e');return;}
+  _vrwIdx=0;_vrwZoom=1;_vrwRot=0;_vrwPanX=0;_vrwPanY=0;_vrwMonthFilter=null;
+  _vrwOpen();
+}
+function _vrwFilteredList(){
+  return _vrwMonthFilter?_vrwList.filter(r=>r.date?.slice(0,7)===_vrwMonthFilter):_vrwList;
+}
+function _vrwOpen(){
+  document.getElementById('vrwPanel')?.remove();
+  const list=_vrwFilteredList();
+  if(_vrwIdx>=list.length)_vrwIdx=Math.max(0,list.length-1);
+  const exp=list.length?list[_vrwIdx]:null;
+  const n=list.length,p=_vrwIdx+1;
+  const months=[...new Set(_vrwList.map(r=>r.date?.slice(0,7)).filter(Boolean))].sort().reverse();
+  const imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]');
+  const isAdded=!!(exp&&imp.includes(exp.id));
+  const isPdf=!!(exp&&(exp.receipt_url||'').split('?')[0].toLowerCase().endsWith('.pdf'));
+  const bs='background:none;border:1px solid rgba(255,255,255,.14);color:#ccc;border-radius:6px;cursor:pointer;';
+  const monthTabs=months.map(m=>{
+    const [yr,mo]=m.split('-');const lbl=MONTHS[parseInt(mo)-1].slice(0,3)+' '+yr;
+    const act=_vrwMonthFilter===m;
+    const cnt=_vrwList.filter(r=>r.date?.slice(0,7)===m).length;
+    const addedCnt=_vrwList.filter(r=>r.date?.slice(0,7)===m&&imp.includes(r.id)).length;
+    return `<button onclick="_vrwSetMonth('${m}')" style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid ${act?'var(--acc)':'rgba(255,255,255,.13)'};background:${act?'var(--acc)':'rgba(255,255,255,.04)'};color:${act?'#fff':'#bbb'};font-size:11px;cursor:pointer;">${lbl}<span style="opacity:.6;margin-left:4px;">${addedCnt}/${cnt}</span></button>`;
+  }).join('');
+  const mediaHtml=!exp
+    ?`<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#444;font-size:14px;">No receipts in this period</div>`
+    :isPdf
+    ?`<iframe src="${exp.receipt_url}" style="width:100%;height:100%;border:none;"></iframe>`
+    :`<div id="vrwWrap" style="width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;">
+        <img id="vrwImg" src="${exp.receipt_url}" draggable="false" style="max-width:none;max-height:none;transform-origin:center;transform:scale(${_vrwZoom}) rotate(${_vrwRot}deg) translate(${_vrwPanX}px,${_vrwPanY}px);pointer-events:none;">
+      </div>`;
+  const rcptNoVal=(exp?.vrw_receipt_no||'').replace(/"/g,'&quot;');
+  document.body.insertAdjacentHTML('beforeend',`
+  <div id="vrwPanel" style="position:fixed;inset:0;z-index:10300;background:#0c0c0c;display:flex;flex-direction:column;font-family:inherit;">
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;min-height:44px;">
+      <button onclick="document.getElementById('vrwPanel').remove()" style="${bs}padding:3px 10px;font-size:12px;flex-shrink:0;"><i class="fa-solid fa-xmark"></i> Close</button>
+      <span style="font-size:12px;font-weight:700;color:#ddd;flex-shrink:0;white-space:nowrap;">VAT Review</span>
+      <div style="display:flex;gap:5px;flex:1;overflow-x:auto;padding:2px 0;scrollbar-width:none;">
+        <button onclick="_vrwSetMonth(null)" style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid ${!_vrwMonthFilter?'var(--acc)':'rgba(255,255,255,.13)'};background:${!_vrwMonthFilter?'var(--acc)':'rgba(255,255,255,.04)'};color:${!_vrwMonthFilter?'#fff':'#bbb'};font-size:11px;cursor:pointer;">All<span style="opacity:.6;margin-left:4px;">${imp.filter(id=>_vrwList.some(r=>r.id===id)).length}/${_vrwList.length}</span></button>
+        ${monthTabs}
+      </div>
+      <span style="font-size:11px;color:#666;flex-shrink:0;white-space:nowrap;">${exp?p+' / '+n:'—'}</span>
+    </div>
+    <div style="flex:1;display:flex;overflow:hidden;">
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;flex-wrap:wrap;">
+          <button onclick="_vrwNav(-1)" ${!exp||_vrwIdx<=0?'disabled':''} style="${bs}padding:3px 9px;font-size:12px;" title="Prev (←)"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+          <button onclick="_vrwNav(1)" ${!exp||_vrwIdx>=n-1?'disabled':''} style="${bs}padding:3px 9px;font-size:12px;" title="Next (→)">Next <i class="fa-solid fa-chevron-right"></i></button>
+          <div style="flex:1;"></div>
+          ${exp&&!isPdf?`<button onclick="_vrwZoomBtn(-1)" style="${bs}width:26px;height:26px;font-size:11px;"><i class="fa-solid fa-minus"></i></button>
+          <span id="vrwZL" style="color:#666;font-size:10px;min-width:36px;text-align:center;">${Math.round(_vrwZoom*100)}%</span>
+          <button onclick="_vrwZoomBtn(1)" style="${bs}width:26px;height:26px;font-size:11px;"><i class="fa-solid fa-plus"></i></button>
+          <button onclick="_vrwZoomReset()" style="${bs}padding:0 8px;height:26px;font-size:10px;">Fit</button>
+          <button onclick="_vrwRotate()" style="${bs}width:26px;height:26px;font-size:11px;" title="Rotate 90°"><i class="fa-solid fa-rotate-right"></i></button>`:''}
+        </div>
+        <div style="flex:1;overflow:hidden;">${mediaHtml}</div>
+      </div>
+      <div style="width:260px;flex-shrink:0;border-left:1px solid rgba(255,255,255,.07);background:#111;display:flex;flex-direction:column;overflow-y:auto;">
+        ${exp?`<div style="padding:13px;border-bottom:1px solid rgba(255,255,255,.06);">
+          ${isAdded?`<div style="background:rgba(34,197,94,.09);border:1px solid rgba(34,197,94,.22);border-radius:6px;padding:6px 10px;margin-bottom:10px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;font-size:12px;"></i><span style="color:#86efac;font-size:11px;font-weight:600;">Added to VAT Records</span></div>`:''}
+          <div style="margin-bottom:8px;"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Merchant</div><div style="font-size:13px;color:#e0e0e0;font-weight:600;word-break:break-word;">${exp.merchant||'—'}</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">
+            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Date</div><div style="font-size:12px;color:#ccc;">${exp.date||'—'}</div></div>
+            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Amount</div><div style="font-size:12px;color:#ccc;font-weight:600;">£${(parseFloat(exp.amount)||0).toFixed(2)}</div></div>
+          </div>
+          ${exp.category?`<div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Category</div><div style="font-size:11px;color:#aaa;">${exp.category}</div></div>`:''}
+        </div>
+        <div style="padding:13px;border-bottom:1px solid rgba(255,255,255,.06);">
+          <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Receipt Number <span style="color:#444;font-size:9px;font-style:italic;">(used as filename)</span></div>
+          <input id="vrwRcptNo" type="text" placeholder="e.g. INV-2025-001" value="${rcptNoVal}" style="width:100%;box-sizing:border-box;background:#1c1c1c;border:1px solid rgba(255,255,255,.12);border-radius:5px;color:#e0e0e0;padding:6px 9px;font-size:12px;outline:none;font-family:inherit;" oninput="_vrwSaveRcptNo()">
+        </div>
+        <div style="padding:13px;display:flex;flex-direction:column;gap:8px;">
+          <button id="vrwAddBtn" onclick="${isAdded?'':'_vrwAddToVat()'}" ${isAdded?'disabled':''} style="background:${isAdded?'rgba(34,197,94,.08)':'var(--acc)'};border:1px solid ${isAdded?'rgba(34,197,94,.22)':'transparent'};color:${isAdded?'#86efac':'#fff'};border-radius:6px;padding:8px;font-size:12px;font-weight:600;cursor:${isAdded?'default':'pointer'};width:100%;font-family:inherit;">
+            ${isAdded?'<i class="fa-solid fa-circle-check"></i> Added':'<i class="fa-solid fa-file-invoice"></i> Add to VAT Records'}
+          </button>
+          <button onclick="_vrwDownload()" style="background:none;border:1px solid rgba(255,255,255,.13);color:#ccc;border-radius:6px;padding:7px;font-size:12px;cursor:pointer;width:100%;font-family:inherit;"><i class="fa-solid fa-download"></i> Download</button>
+        </div>`:`<div style="padding:24px;color:#444;font-size:13px;text-align:center;">No receipts in this period</div>`}
+      </div>
+    </div>
+  </div>`);
+  if(exp&&!isPdf)_vrwInteract();
+  const onKey=e=>{
+    const panel=document.getElementById('vrwPanel');if(!panel){document.removeEventListener('keydown',onKey);return;}
+    if(document.activeElement?.id==='vrwRcptNo')return;
+    if(e.key==='Escape')panel.remove();
+    else if(e.key==='='||e.key==='+')_vrwZoomBtn(1);
+    else if(e.key==='-')_vrwZoomBtn(-1);
+    else if(e.key==='0')_vrwZoomReset();
+    else if(e.key==='r')_vrwRotate();
+    else if(e.key==='ArrowLeft'){e.preventDefault();_vrwNav(-1);}
+    else if(e.key==='ArrowRight'){e.preventDefault();_vrwNav(1);}
+  };
+  document.addEventListener('keydown',onKey);
+}
+function _vrwSetMonth(m){_vrwMonthFilter=m;_vrwIdx=0;_vrwZoom=1;_vrwRot=0;_vrwPanX=0;_vrwPanY=0;_vrwOpen();}
+function _vrwNav(dir){
+  const list=_vrwFilteredList();const ni=_vrwIdx+dir;
+  if(ni<0||ni>=list.length)return;
+  _vrwIdx=ni;_vrwZoom=1;_vrwRot=0;_vrwPanX=0;_vrwPanY=0;_vrwOpen();
+}
+function _vrwSaveRcptNo(){
+  const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
+  exp.vrw_receipt_no=document.getElementById('vrwRcptNo')?.value||'';
+}
+function _vrwZoomBtn(d){_vrwZoom=Math.max(.1,Math.min(8,_vrwZoom+(d>0?.25:-.25)));_vrwApply();}
+function _vrwZoomReset(){_vrwZoom=1;_vrwPanX=0;_vrwPanY=0;_vrwApply();}
+function _vrwRotate(){_vrwRot=(_vrwRot+90)%360;_vrwApply();}
+function _vrwApply(){
+  const img=document.getElementById('vrwImg');
+  if(img)img.style.transform=`scale(${_vrwZoom}) rotate(${_vrwRot}deg) translate(${_vrwPanX}px,${_vrwPanY}px)`;
+  const lbl=document.getElementById('vrwZL');if(lbl)lbl.textContent=Math.round(_vrwZoom*100)+'%';
+}
+function _vrwInteract(){
+  const wrap=document.getElementById('vrwWrap');if(!wrap)return;
+  wrap.addEventListener('wheel',e=>{e.preventDefault();_vrwZoom=Math.max(.1,Math.min(8,_vrwZoom+(e.deltaY>0?-.18:.18)));_vrwApply();},{passive:false});
+  let drag=false,sx=0,sy=0,ox=0,oy=0;
+  wrap.addEventListener('mousedown',e=>{drag=true;sx=e.clientX;sy=e.clientY;ox=_vrwPanX;oy=_vrwPanY;wrap.style.cursor='grabbing';e.preventDefault();});
+  const mm=e=>{if(!drag)return;_vrwPanX=ox+(e.clientX-sx)/_vrwZoom;_vrwPanY=oy+(e.clientY-sy)/_vrwZoom;_vrwApply();};
+  const mu=()=>{drag=false;const w=document.getElementById('vrwWrap');if(w)w.style.cursor='grab';};
+  document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
+  let ld=0,ltx=0,lty=0;
+  wrap.addEventListener('touchstart',e=>{
+    if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;ld=Math.hypot(dx,dy);}
+    else{ltx=e.touches[0].clientX;lty=e.touches[0].clientY;}
+  },{passive:true});
+  wrap.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;const d=Math.hypot(dx,dy);if(ld){_vrwZoom=Math.max(.1,Math.min(8,_vrwZoom*(d/ld)));_vrwApply();}ld=d;}
+    else{const nx=e.touches[0].clientX,ny=e.touches[0].clientY;_vrwPanX+=(nx-ltx)/_vrwZoom;_vrwPanY+=(ny-lty)/_vrwZoom;_vrwApply();ltx=nx;lty=ny;}
+  },{passive:false});
+}
+async function _vrwAddToVat(){
+  const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
+  const imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]');
+  if(imp.includes(exp.id)){toast('Already in VAT Records','i');return;}
+  const rcptNo=(document.getElementById('vrwRcptNo')?.value||'').trim();
+  const addBtn=document.getElementById('vrwAddBtn');
+  if(addBtn){addBtn.disabled=true;addBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Adding...';}
+  try{
+    let fileData=null,fileName=null;
+    try{
+      const res=await fetch(exp.receipt_url);const blob=await res.blob();
+      const ext=(exp.receipt_url.split('?')[0].split('.').pop()||'jpg').slice(0,4);
+      fileName=(rcptNo?vatSanitizeFName(rcptNo):(vatSanitizeFName(exp.merchant||'receipt')+'-'+(exp.date||'')))+'.'+ext;
+      fileData=await new Promise(resolve=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.readAsDataURL(blob);});
+    }catch(fe){/* proceed without file */}
+    const gross=parseFloat(exp.amount)||0;
+    const net=+(gross/1.2).toFixed(2);
+    const vatAmount=+(gross-net).toFixed(2);
+    const row={type:'purchase',date:exp.date,supplier:exp.merchant||'',category:exp.category||'',receipt_no:rcptNo,net,vat_rate:20,vat_amount:vatAmount,gross,file_data:fileData,file_name:fileName};
+    const{data:ins,error}=await sb.from('vat_transactions').insert(row).select().single();
+    if(error)throw error;
+    const imp2=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]');
+    if(!imp2.includes(exp.id))imp2.push(exp.id);
+    localStorage.setItem('vat_imported_exp',JSON.stringify(imp2));
+    if(ins)_vatTx.unshift(ins);
+    exp.vrw_receipt_no=rcptNo;
+    toast('Added to VAT Records!','s');
+    _vrwOpen();
+  }catch(e){
+    toast('Error: '+(e.message||'Failed to add'),'e');
+    if(addBtn){addBtn.disabled=false;addBtn.innerHTML='<i class="fa-solid fa-file-invoice"></i> Add to VAT Records';}
+  }
+}
+async function _vrwDownload(){
+  const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp?.receipt_url)return;
+  const rcptNo=(document.getElementById('vrwRcptNo')?.value||exp.vrw_receipt_no||'').trim();
+  const ext=(exp.receipt_url.split('?')[0].split('.').pop()||'jpg').slice(0,4);
+  const base=rcptNo?vatSanitizeFName(rcptNo):(vatSanitizeFName(exp.merchant||'receipt')+'-'+(exp.date||''));
+  try{
+    const res=await fetch(exp.receipt_url);const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=base+'.'+ext;a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }catch(e){toast('Download failed','e');}
 }
 
 // ─── Audit Log ────────────────────────────────────
