@@ -11212,6 +11212,7 @@ function vatTab(el,name){
 
 // ─── helpers ─────────────────────────────────────
 function _gbp(n){return'£'+(parseFloat(n)||0).toFixed(2);}
+function _dmy(d){if(!d)return'—';const p=String(d).slice(0,10).split('-');return p.length===3&&p[0].length===4?p[2]+'/'+p[1]+'/'+p[0]:'—';}
 function vatPeriodBounds(p){
   const now=new Date(),y=now.getFullYear(),m=now.getMonth();
   if(p==='thisM')return{from:new Date(y,m,1),to:new Date(y,m+1,0)};
@@ -11294,14 +11295,14 @@ function vatTxTable(rows,compact=false){
     const rcptIcon=t.file_data?`<i class="fa-solid fa-image" style="color:var(--txtm);cursor:pointer;margin-left:5px;" onclick="vatPreviewReceipt(${t.id})" title="View receipt"></i>`:'';
     if(compact){
       return`<tr>
-        <td>${t.date}</td><td>${tag}</td><td>${(t.supplier||'-')}${rcptIcon}</td>
+        <td>${_dmy(t.date)}</td><td>${tag}</td><td>${(t.supplier||'-')}${rcptIcon}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.net)}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.vat_amount)}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.gross)}</td>
       </tr>`;
     }
     return`<tr>
-      <td>${t.date}</td><td>${tag}</td><td>${(t.supplier||'-')}${rcptIcon}</td><td>${t.category||''}</td>
+      <td>${_dmy(t.date)}</td><td>${tag}</td><td>${(t.supplier||'-')}${rcptIcon}</td><td>${t.category||''}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.net)}</td>
       <td style="text-align:right;">${t.vat_rate}%</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;">${_gbp(t.vat_amount)}</td>
@@ -11337,7 +11338,7 @@ function vatDraftsHtml(){
       ${thumb}
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.merchant||'Unknown'}</div>
-        <div style="font-size:11px;color:var(--txtm);">${e.date||''} · ${_gbp(gross)} · ${e.category||''}</div>
+        <div style="font-size:11px;color:var(--txtm);">${_dmy(e.date)} · ${_gbp(gross)} · ${e.category||''}</div>
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0;">
         <button class="btn btn-p" style="font-size:11px;padding:3px 9px;" onclick="vatImportExpDraft('${e.id}')"><i class="fa-solid fa-file-import"></i> Import</button>
@@ -11675,7 +11676,7 @@ function vatPickExpense(){
           <img src="${e.receipt_url}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;background:var(--bdr);" onerror="this.style.display='none'">
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.merchant||'Unknown'}</div>
-            <div style="font-size:11px;color:var(--txtm);">${e.date||''} · ${_gbp(e.amount)} · ${e.category||''}</div>
+            <div style="font-size:11px;color:var(--txtm);">${_dmy(e.date)} · ${_gbp(e.amount)} · ${e.category||''}</div>
           </div>
         </div>`).join('')}
       </div>
@@ -12048,7 +12049,7 @@ function _vrwOpen(){
           ${(!isAdded&&isRejected)?`<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:6px;padding:6px 10px;margin-bottom:10px;display:flex;align-items:center;gap:6px;justify-content:space-between;"><span style="display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-ban" style="color:#ef4444;font-size:12px;"></i><span style="color:#fca5a5;font-size:11px;font-weight:600;">Rejected</span></span><button onclick="_vrwUnreject()" style="background:none;border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;font-family:inherit;">Undo</button></div>`:''}
           <div style="margin-bottom:8px;"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Merchant</div><div style="font-size:13px;color:#e0e0e0;font-weight:600;word-break:break-word;">${exp.merchant||'—'}</div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Date</div><div style="font-size:12px;color:#ccc;">${exp.date||'—'}</div></div>
+            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Date</div><div style="font-size:12px;color:#ccc;">${_dmy(exp.date)}</div></div>
             <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Gross</div><div style="font-size:12px;color:#e0e0e0;font-weight:600;">£${(parseFloat(exp.amount)||0).toFixed(2)}</div></div>
           </div>
           ${(()=>{const empObj=employeeMap?.get(exp.employee_id);const empName=empObj?.name||exp.employee_id||null;return empName?`<div style="margin-bottom:8px;">
@@ -12430,7 +12431,7 @@ function vatDoExport(){
   if(!rows.length){toast('No transactions for selected months','w');return;}
   const esc=v=>`"${String(v||'').replace(/"/g,'""')}"`;
   const hdr='Date,Type,Supplier/Customer,Category,Receipt No,Net,VAT Rate,VAT Amount,Gross';
-  const csv=[hdr,...rows.map(t=>[t.date,t.type,esc(t.supplier),esc(t.category),esc(t.receipt_no),t.net,t.vat_rate,t.vat_amount,t.gross].join(','))].join('\n');
+  const csv=[hdr,...rows.map(t=>[_dmy(t.date),t.type,esc(t.supplier),esc(t.category),esc(t.receipt_no),t.net,t.vat_rate,t.vat_amount,t.gross].join(','))].join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download=`vat-${vatExLabel()}${type?'-'+type:''}.csv`;
@@ -12447,8 +12448,7 @@ function vatDoExport1(){
   const totalNet=rows.reduce((s,t)=>s+(parseFloat(t.net)||0),0);
   const totalVat=rows.reduce((s,t)=>s+(parseFloat(t.vat_amount)||0),0);
   const totalGross=rows.reduce((s,t)=>s+(parseFloat(t.gross)||0),0);
-  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const fmtDate=d=>{if(!d)return'';const dt=new Date(d+'T00:00:00');return String(dt.getDate()).padStart(2,'0')+' '+MN[dt.getMonth()]+' '+dt.getFullYear();};
+  const fmtDate=d=>_dmy(d);
   const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const label=(typeVal==='sale'?'SALES':'PURCHASES');
   const colHdr=(txt,w)=>`<td style="background:#C6EFCE;color:#1a5c1a;font-weight:bold;border:1px solid #a0c0a0;padding:5px 8px;text-align:center;${w?'width:'+w+';':''}">${txt}</td>`;
@@ -12510,7 +12510,7 @@ async function vatDoZipExport(){
       rf.file(fname,t.file_data.split(',')[1],{base64:true});
       rfile=fname;
     }
-    return[t.date,t.type,esc(t.supplier),esc(t.category),esc(t.receipt_no),t.net,t.vat_rate,t.vat_amount,t.gross,esc(rfile)].join(',');
+    return[_dmy(t.date),t.type,esc(t.supplier),esc(t.category),esc(t.receipt_no),t.net,t.vat_rate,t.vat_amount,t.gross,esc(rfile)].join(',');
   });
   zip.file('transactions.csv',[hdr,...rowLines].join('\n'));
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},
