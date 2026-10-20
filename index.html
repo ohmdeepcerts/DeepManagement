@@ -11185,13 +11185,13 @@ async function instSave(){
 // ═══════════════════════════════════════════════════
 // VAT RECORDS
 // ═══════════════════════════════════════════════════
-let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set(),_vatImportingExpId=null;
+let _vatTx=[],_vatTxLoaded=false,_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set(),_vatImportingExpId=null;
 let _vatDashP='thisQ',_vatDashCFrom='',_vatDashCTo='';
 let _vatLogP='all',_vatLogCFrom='',_vatLogCTo='';
 
 async function renderVatPage(){
   const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
-  _vatTx=data||[];
+  _vatTx=data||[];_vatTxLoaded=true;
   // activate dashboard tab
   const dashTab=document.querySelector('#page-vat .vat-tab[data-vt="dashboard"]');
   vatTab(dashTab,'dashboard');
@@ -11655,7 +11655,7 @@ async function vatSaveForm(type){
     _vatImportingExpId=null;
   }
   const{data}=await sb.from('vat_transactions').select('*').order('date',{ascending:false});
-  _vatTx=data||[];
+  _vatTx=data||[];_vatTxLoaded=true;
   vatRenderForm(type);
 }
 
@@ -11889,9 +11889,10 @@ function _vatRcptNav(dir){
 
 // ─── VAT Receipt Review Workflow (from Tags page) ─
 function _vrwReconcileImported(){
-  // Remove "imported" markers whose linked VAT transaction no longer exists.
-  // Uses vat_tx_exp_map {txId→expId}. Entries with no map entry are left alone
-  // (added before the map feature existed) — user can use "Undo Add" for those.
+  // Only run if _vatTx has been loaded from the DB. If it hasn't (user opened
+  // review without visiting VAT Records first), _vatTx is [] and every mapped
+  // expense would be incorrectly flagged as deleted and have its marker cleared.
+  if(!_vatTxLoaded)return;
   const map=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
   const validTxIds=new Set((_vatTx||[]).map(t=>String(t.id)));
   let imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').map(String);
