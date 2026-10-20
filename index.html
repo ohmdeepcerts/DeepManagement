@@ -12044,8 +12044,17 @@ async function _vrwFetchAndCache(expId,url){
     const res=await fetch(url);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const blob=await res.blob();
-    const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(blob);});
-    _vrwUrlCache.set(expId,{dataUrl,mimeType:blob.type});
+    let entry;
+    if(blob.type.includes('pdf')){
+      // PDFs: use blob URL + <iframe> (frame-src blob: is allowed by CSP;
+      // object-src is not, so <embed> with data: or blob: is blocked)
+      const blobUrl=URL.createObjectURL(blob);
+      entry={blobUrl,mimeType:blob.type};
+    } else {
+      const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(blob);});
+      entry={dataUrl,mimeType:blob.type};
+    }
+    _vrwUrlCache.set(expId,entry);
     const cur=_vrwFilteredList()[_vrwIdx];
     if(cur?.id===expId)_vrwOpen();
   }catch(e){
@@ -12172,7 +12181,7 @@ function _vrwOpen(){
   const isRejected=!!(exp&&rej.has(String(exp?.id)));
   const _rclean=(exp?.receipt_url||'').split('?')[0].toLowerCase();
   const _cached=exp?_vrwUrlCache.get(exp.id):undefined;
-  const _cachedUrl=(_cached&&_cached.dataUrl)?_cached.dataUrl:null;
+  const _cachedUrl=(_cached?.blobUrl||_cached?.dataUrl)||null;
   const _srcUrl=_cachedUrl||exp?.receipt_url||'';
   const _urlExt=_rclean.match(/\.(pdf|jpg|jpeg|png|gif|webp|heic|heif|bmp|avif)$/)?.[1]||'';
   // use mimeType from cache if available; fall back to URL extension (covers error state)
@@ -12229,7 +12238,7 @@ function _vrwOpen(){
         </div>
       </div>`
     :isPdf
-    ?`<embed src="${_srcUrl}" type="application/pdf" style="width:100%;height:calc(100vh - 42px);min-height:380px;border:none;">`
+    ?`<iframe src="${_srcUrl}" style="width:100%;height:calc(100vh - 42px);min-height:380px;border:none;background:#fff;" title="PDF receipt"></iframe>`
     :isImg
     ?`<div id="vrwWrap" style="width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;">
         <img id="vrwImg" src="${_srcUrl}" draggable="false" style="max-width:none;max-height:none;transform-origin:center;transform:scale(${_vrwZoom}) rotate(${_vrwRot}deg) translate(${_vrwPanX}px,${_vrwPanY}px);pointer-events:none;">
