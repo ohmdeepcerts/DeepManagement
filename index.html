@@ -12103,7 +12103,13 @@ async function _vrwAddToVat(){
     const imp2=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]');
     if(!imp2.includes(exp.id))imp2.push(exp.id);
     localStorage.setItem('vat_imported_exp',JSON.stringify(imp2));
-    if(ins)_vatTx.unshift(ins);
+    if(ins){
+      _vatTx.unshift(ins);
+      // store tx→expense mapping so delete can undo the imported marker
+      const map=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
+      map[String(ins.id)]=String(exp.id);
+      localStorage.setItem('vat_tx_exp_map',JSON.stringify(map));
+    }
     exp.vrw_receipt_no=rcptNo;
     toast('Added to VAT Records!','s');
     _vrwOpen();
@@ -12227,6 +12233,15 @@ async function vatDeleteTx(id){
   if(!confirm('Delete this transaction? This cannot be undone.'))return;
   const{error}=await sb.from('vat_transactions').delete().eq('id',id);
   if(error){toast(error.message,'e');return;}
+  // remove the "imported" marker from the source expense if this tx was from receipt review
+  const map=JSON.parse(localStorage.getItem('vat_tx_exp_map')||'{}');
+  const expId=map[String(id)];
+  if(expId){
+    const imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').filter(x=>String(x)!==expId);
+    localStorage.setItem('vat_imported_exp',JSON.stringify(imp));
+    delete map[String(id)];
+    localStorage.setItem('vat_tx_exp_map',JSON.stringify(map));
+  }
   toast('Deleted','s');
   _vatTx=_vatTx.filter(t=>t.id!==id);
   vatRenderLog();
