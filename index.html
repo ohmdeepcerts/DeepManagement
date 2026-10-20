@@ -11361,8 +11361,7 @@ async function vatImportExpDraft(expId){
       reader.onload=ev=>{
         _vatFileData=ev.target.result;
         _vatFileName='receipt_'+String(expId).slice(0,8)+'.jpg';
-        const prev=document.getElementById('vatFPreview'),img=document.getElementById('vatFImg');
-        if(prev)prev.style.display='block';if(img)img.src=_vatFileData;
+        _vatFZoom=1;_vatFRot=0;_vatFPanX=0;_vatFPanY=0;_vatFSideUpdate();
       };
       reader.readAsDataURL(blob);
     }catch(_){}
@@ -11381,60 +11380,60 @@ function vatRenderForm(type){
   const rateOpts=['20','5','0','Exempt'].map(r=>`<option value="${r}"${(ed?.vat_rate||'20')===r?' selected':''}>${r==='Exempt'?'Exempt':r+'%'}</option>`).join('');
   const supplierLabel=type==='purchase'?'Supplier':'Customer';
 
+  _vatFZoom=1;_vatFRot=0;_vatFPanX=0;_vatFPanY=0;
   panel.innerHTML=`
-  ${vatScanQueueHtml(type)}
-  <div class="card" style="max-width:600px;">
-    <div class="ch">
-      <div class="ct">${isEdit?'Edit':'Log New'} ${type==='purchase'?'Purchase':'Sale'}</div>
-      ${isEdit?`<button class="btn btn-o" style="font-size:11px;" onclick="_vatEditId=null;_vatFileData=null;_vatFileName=null;vatRenderForm('${type}')"><i class="fa-solid fa-xmark"></i> Cancel</button>`:''}
-    </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:11px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Date *</label>
-          <input type="date" id="vatFDate" value="${ed?.date||today}" class="vinp"></div>
-        <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">${supplierLabel} *</label>
-          <input type="text" id="vatFSupplier" value="${(ed?.supplier||'').replace(/"/g,'&quot;')}" placeholder="${supplierLabel} name" class="vinp"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Category</label>
-          <select id="vatFCat" class="vinp">${catOpts}</select></div>
-        <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Receipt / Invoice No.</label>
-          <input type="text" id="vatFRecNo" value="${(ed?.receipt_no||'').replace(/"/g,'&quot;')}" placeholder="Ref / invoice #" class="vinp"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-        <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Net (ex-VAT) *</label>
-          <input type="number" step="0.01" min="0" id="vatFNet" value="${ed?.net||''}" placeholder="0.00" class="vinp" oninput="vatAutoCalc()"></div>
-        <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">VAT Rate</label>
-          <select id="vatFRate" class="vinp" onchange="vatAutoCalc()">${rateOpts}</select></div>
-        <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">VAT Amount</label>
-          <input type="number" step="0.01" id="vatFVat" value="${ed?.vat_amount||''}" placeholder="0.00" class="vinp" readonly></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;align-items:end;">
-        <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Gross (inc-VAT)</label>
-          <input type="number" step="0.01" id="vatFGross" value="${ed?.gross||''}" placeholder="0.00" class="vinp" readonly></div>
-        <div style="display:flex;gap:8px;padding-bottom:1px;">
-          <button class="btn btn-o" style="font-size:12px;" onclick="vatPickExpense()"><i class="fa-solid fa-link"></i> From Expense</button>
-          <label class="btn btn-o" style="font-size:12px;cursor:pointer;"><i class="fa-solid fa-camera"></i> Receipt<input type="file" id="vatFFile" accept="image/*,application/pdf" style="display:none;" onchange="vatFileLoad(this)"></label>
+  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+    <div style="flex:1;min-width:280px;max-width:600px;">
+      ${vatScanQueueHtml(type)}
+      <div class="card">
+        <div class="ch">
+          <div class="ct">${isEdit?'Edit':'Log New'} ${type==='purchase'?'Purchase':'Sale'}</div>
+          ${isEdit?`<button class="btn btn-o" style="font-size:11px;" onclick="_vatEditId=null;_vatFileData=null;_vatFileName=null;vatRenderForm('${type}')"><i class="fa-solid fa-xmark"></i> Cancel</button>`:''}
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:11px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Date *</label>
+              <input type="date" id="vatFDate" value="${ed?.date||today}" class="vinp"></div>
+            <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">${supplierLabel} *</label>
+              <input type="text" id="vatFSupplier" value="${(ed?.supplier||'').replace(/"/g,'&quot;')}" placeholder="${supplierLabel} name" class="vinp"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Category</label>
+              <select id="vatFCat" class="vinp">${catOpts}</select></div>
+            <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Receipt / Invoice No.</label>
+              <input type="text" id="vatFRecNo" value="${(ed?.receipt_no||'').replace(/"/g,'&quot;')}" placeholder="Ref / invoice #" class="vinp"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+            <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Net (ex-VAT) *</label>
+              <input type="number" step="0.01" min="0" id="vatFNet" value="${ed?.net||''}" placeholder="0.00" class="vinp" oninput="vatAutoCalc()"></div>
+            <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">VAT Rate</label>
+              <select id="vatFRate" class="vinp" onchange="vatAutoCalc()">${rateOpts}</select></div>
+            <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">VAT Amount</label>
+              <input type="number" step="0.01" id="vatFVat" value="${ed?.vat_amount||''}" placeholder="0.00" class="vinp" readonly></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;align-items:end;">
+            <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Gross (inc-VAT)</label>
+              <input type="number" step="0.01" id="vatFGross" value="${ed?.gross||''}" placeholder="0.00" class="vinp" readonly></div>
+            <div style="display:flex;gap:8px;padding-bottom:1px;">
+              <button class="btn btn-o" style="font-size:12px;" onclick="vatPickExpense()"><i class="fa-solid fa-link"></i> From Expense</button>
+              <label class="btn btn-o" style="font-size:12px;cursor:pointer;"><i class="fa-solid fa-camera"></i> Receipt<input type="file" id="vatFFile" accept="image/*,application/pdf" style="display:none;" onchange="vatFileLoad(this)"></label>
+            </div>
+          </div>
+          <div id="vatFErr" style="display:none;color:var(--red);font-size:12px;padding:6px 10px;border-radius:6px;background:rgba(200,30,30,.08);"></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-p" onclick="vatSaveForm('${type}')">${isEdit?'Update':'Save'} Transaction</button>
+            ${!isEdit?`<button class="btn btn-o" onclick="_vatFileData=null;_vatFileName=null;vatRenderForm('${type}')"><i class="fa-solid fa-rotate-left"></i> Clear</button>`:''}
+          </div>
         </div>
       </div>
-      <div id="vatFPreview" style="${(ed?.file_data||_vatFileData)?'':'display:none;'}position:relative;">
-        <img id="vatFImg" src="${ed?.file_data||_vatFileData||''}" style="max-width:100%;max-height:180px;border-radius:8px;border:1px solid var(--bdr);display:block;">
-        <button onclick="vatClearFile()" style="position:absolute;top:4px;right:4px;background:var(--red);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;">×</button>
-      </div>
-      <div id="vatFErr" style="display:none;color:var(--red);font-size:12px;padding:6px 10px;border-radius:6px;background:rgba(200,30,30,.08);"></div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-p" onclick="vatSaveForm('${type}')">${isEdit?'Update':'Save'} Transaction</button>
-        ${!isEdit?`<button class="btn btn-o" onclick="_vatFileData=null;_vatFileName=null;vatRenderForm('${type}')"><i class="fa-solid fa-rotate-left"></i> Clear</button>`:''}
-      </div>
+    </div>
+    <div id="vatFSide" style="width:380px;flex-shrink:0;position:sticky;top:0;">
+      ${_vatFSideHtml()}
     </div>
   </div>`;
 
   vatScanInit(type);
-  // restore in-memory file if any
-  if(_vatFileData&&!ed?.file_data){
-    document.getElementById('vatFPreview').style.display='block';
-    document.getElementById('vatFImg').src=_vatFileData;
-  }
+  if(ed?.file_data||_vatFileData)_vatFSideUpdate();
 }
 
 function vatAutoCalc(){
@@ -11451,18 +11450,13 @@ function vatFileLoad(input){
   const f=input.files[0];if(!f)return;
   _vatFileName=f.name;
   const reader=new FileReader();
-  reader.onload=e=>{
-    _vatFileData=e.target.result;
-    document.getElementById('vatFPreview').style.display='block';
-    document.getElementById('vatFImg').src=_vatFileData;
-  };
+  reader.onload=e=>{_vatFileData=e.target.result;_vatFZoom=1;_vatFRot=0;_vatFPanX=0;_vatFPanY=0;_vatFSideUpdate();};
   reader.readAsDataURL(f);
 }
 function vatClearFile(){
-  _vatFileData=null;_vatFileName=null;
-  document.getElementById('vatFPreview').style.display='none';
-  document.getElementById('vatFImg').src='';
+  _vatFileData=null;_vatFileName=null;_vatFZoom=1;_vatFRot=0;_vatFPanX=0;_vatFPanY=0;
   const fi=document.getElementById('vatFFile');if(fi)fi.value='';
+  _vatFSideUpdate();
 }
 
 // ─── Gemini Scan Queue ────────────────────────────
@@ -11601,8 +11595,7 @@ function vatScanFillForm(id,type){
   if(rn&&r.receipt_no)rn.value=r.receipt_no||'';
   vatAutoCalc();
   _vatFileData=item.dataUrl;_vatFileName=item.fileName;
-  const prev=document.getElementById('vatFPreview'),img=document.getElementById('vatFImg');
-  if(prev)prev.style.display='block';if(img)img.src=item.dataUrl;
+  _vatFZoom=1;_vatFRot=0;_vatFPanX=0;_vatFPanY=0;_vatFSideUpdate();
   item.status='used';
   vatScanQueueReRender(type);
   document.getElementById('vatFSupplier')?.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -11697,19 +11690,88 @@ async function vatLinkExpense(expId){
       reader.onload=e=>{
         _vatFileData=e.target.result;
         _vatFileName='receipt_'+expId.slice(0,8)+'.jpg';
-        const prev=document.getElementById('vatFPreview');
-        const img=document.getElementById('vatFImg');
-        if(prev){prev.style.display='block';}
-        if(img){img.src=_vatFileData;}
+        _vatFZoom=1;_vatFRot=0;_vatFPanX=0;_vatFPanY=0;_vatFSideUpdate();
       };
       reader.readAsDataURL(blob);
     }catch(_){}
   }
 }
 
+// ─── Form receipt side-panel ─────────────────────
+function _vatFSideHtml(){
+  const src=_vatFileData;
+  if(!src){return`<div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:420px;text-align:center;padding:30px 20px;">
+    <i class="fa-regular fa-file-image" style="font-size:48px;opacity:.18;margin-bottom:14px;color:var(--txtm);"></i>
+    <div style="font-size:14px;font-weight:600;color:var(--txtm);margin-bottom:6px;">Receipt Preview</div>
+    <div style="font-size:12px;color:var(--txtm);opacity:.7;line-height:1.6;">Drop a file into the scan queue,<br>paste from clipboard, or click<br><strong>Receipt</strong> to attach one</div>
+  </div>`;}
+  const isPdf=src.startsWith('data:application/pdf');
+  const bs='background:var(--card);border:1px solid var(--bdr);color:var(--txt2);border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-family:inherit;';
+  const viewerHtml=isPdf
+    ?`<embed src="${src}" type="application/pdf" style="width:100%;height:calc(100vh - 230px);min-height:380px;border:none;">`
+    :`<div id="vatFSideWrap" style="height:calc(100vh - 230px);min-height:380px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;background:#111;">
+        <img id="vatFSideImg" src="${src}" draggable="false" style="max-width:none;max-height:none;transform-origin:center;transform:scale(${_vatFZoom}) rotate(${_vatFRot}deg) translate(${_vatFPanX}px,${_vatFPanY}px);pointer-events:none;">
+      </div>`;
+  return`<div class="card" style="padding:0;overflow:hidden;">
+    <div style="display:flex;align-items:center;gap:4px;padding:8px 10px;border-bottom:1px solid var(--bdr);flex-wrap:wrap;">
+      <span style="font-size:11px;color:var(--txtm);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(_vatFileName||'').replace(/"/g,'&quot;')}">${_vatFileName||'receipt'}</span>
+      ${!isPdf?`<button onclick="_vatFZoomBtn(-1)" style="${bs}width:27px;height:27px;font-size:12px;" title="Zoom out"><i class="fa-solid fa-minus"></i></button>
+      <span id="vatFZL" style="font-size:10px;color:var(--txtm);min-width:36px;text-align:center;">${Math.round(_vatFZoom*100)}%</span>
+      <button onclick="_vatFZoomBtn(1)" style="${bs}width:27px;height:27px;font-size:12px;" title="Zoom in"><i class="fa-solid fa-plus"></i></button>
+      <button onclick="_vatFZoomReset()" style="${bs}padding:0 8px;height:27px;font-size:10px;font-weight:600;" title="Fit to view">Fit</button>
+      <button onclick="_vatFRotate()" style="${bs}width:27px;height:27px;font-size:12px;" title="Rotate 90°"><i class="fa-solid fa-rotate-right"></i></button>`:''}
+      <button onclick="_vatFDownload()" style="${bs}width:27px;height:27px;font-size:12px;" title="Download"><i class="fa-solid fa-download"></i></button>
+      <button onclick="vatClearFile()" style="background:none;border:1px solid rgba(220,38,38,.3);color:var(--red);border-radius:5px;cursor:pointer;width:27px;height:27px;font-size:13px;display:inline-flex;align-items:center;justify-content:center;" title="Remove receipt"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    ${viewerHtml}
+  </div>`;
+}
+function _vatFSideUpdate(){
+  const panel=document.getElementById('vatFSide');
+  if(!panel)return;
+  panel.innerHTML=_vatFSideHtml();
+  const src=_vatFileData;
+  if(src&&!src.startsWith('data:application/pdf'))_vatFSideInteract();
+}
+function _vatFZoomBtn(d){_vatFZoom=Math.max(.1,Math.min(8,_vatFZoom+(d>0?.25:-.25)));_vatFApply();}
+function _vatFZoomReset(){_vatFZoom=1;_vatFPanX=0;_vatFPanY=0;_vatFApply();}
+function _vatFRotate(){_vatFRot=(_vatFRot+90)%360;_vatFApply();}
+function _vatFApply(){
+  const img=document.getElementById('vatFSideImg');
+  if(img)img.style.transform=`scale(${_vatFZoom}) rotate(${_vatFRot}deg) translate(${_vatFPanX}px,${_vatFPanY}px)`;
+  const lbl=document.getElementById('vatFZL');if(lbl)lbl.textContent=Math.round(_vatFZoom*100)+'%';
+}
+function _vatFSideInteract(){
+  const wrap=document.getElementById('vatFSideWrap');if(!wrap)return;
+  wrap.addEventListener('wheel',e=>{e.preventDefault();_vatFZoom=Math.max(.1,Math.min(8,_vatFZoom+(e.deltaY>0?-.18:.18)));_vatFApply();},{passive:false});
+  let drag=false,sx=0,sy=0,ox=0,oy=0;
+  wrap.addEventListener('mousedown',e=>{drag=true;sx=e.clientX;sy=e.clientY;ox=_vatFPanX;oy=_vatFPanY;wrap.style.cursor='grabbing';e.preventDefault();});
+  const mm=e=>{if(!drag)return;_vatFPanX=ox+(e.clientX-sx)/_vatFZoom;_vatFPanY=oy+(e.clientY-sy)/_vatFZoom;_vatFApply();};
+  const mu=()=>{drag=false;const w=document.getElementById('vatFSideWrap');if(w)w.style.cursor='grab';};
+  document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
+  let ld=0,ltx=0,lty=0;
+  wrap.addEventListener('touchstart',e=>{
+    if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;ld=Math.hypot(dx,dy);}
+    else{ltx=e.touches[0].clientX;lty=e.touches[0].clientY;}
+  },{passive:true});
+  wrap.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;const d=Math.hypot(dx,dy);if(ld){_vatFZoom=Math.max(.1,Math.min(8,_vatFZoom*(d/ld)));_vatFApply();}ld=d;}
+    else{const nx=e.touches[0].clientX,ny=e.touches[0].clientY;_vatFPanX+=(nx-ltx)/_vatFZoom;_vatFPanY+=(ny-lty)/_vatFZoom;_vatFApply();ltx=nx;lty=ny;}
+  },{passive:false});
+}
+function _vatFDownload(){
+  if(!_vatFileData)return;
+  const recNo=(document.getElementById('vatFRecNo')?.value||'').trim();
+  const base=recNo?vatSanitizeFName(recNo):vatSanitizeFName((_vatFileName||'receipt').replace(/\.[^.]+$/,''));
+  const ext=vatExtFromDataUrl(_vatFileData);
+  const a=document.createElement('a');a.href=_vatFileData;a.download=base+'.'+ext;a.click();
+}
+
 // ─── Receipt preview panel ────────────────────────
 let _rcptList=[],_rcptIdx=0,_rcptZoom=1,_rcptRot=0,_rcptPanX=0,_rcptPanY=0;
 let _vrwList=[],_vrwIdx=0,_vrwZoom=1,_vrwRot=0,_vrwPanX=0,_vrwPanY=0,_vrwMonthFilter=null;
+let _vatFZoom=1,_vatFRot=0,_vatFPanX=0,_vatFPanY=0;
 function vatPreviewReceipt(id){
   _rcptList=_vatTx.filter(t=>t.file_data);
   const i=_rcptList.findIndex(t=>t.id===id);
