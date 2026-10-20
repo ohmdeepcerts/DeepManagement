@@ -11704,14 +11704,99 @@ async function vatLinkExpense(expId){
   }
 }
 
-// ─── Receipt preview overlay ─────────────────────
+// ─── Receipt preview panel ────────────────────────
+let _rcptList=[],_rcptIdx=0,_rcptZoom=1,_rcptRot=0,_rcptPanX=0,_rcptPanY=0;
 function vatPreviewReceipt(id){
-  const t=_vatTx.find(x=>x.id===id);
-  if(!t?.file_data)return;
+  _rcptList=_vatTx.filter(t=>t.file_data);
+  const i=_rcptList.findIndex(t=>t.id===id);
+  _rcptIdx=i>=0?i:0;_rcptZoom=1;_rcptRot=0;_rcptPanX=0;_rcptPanY=0;
+  _vatRcptOpen();
+}
+function _vatRcptOpen(){
+  const tx=_rcptList[_rcptIdx];if(!tx)return;
+  document.getElementById('vatRcptPanel')?.remove();
+  const isPdf=(tx.file_data||'').startsWith('data:application/pdf');
+  const n=_rcptList.length,p=_rcptIdx+1;
+  const btnStyle='background:none;border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+  const btn=(sz,icn,fn,tip)=>`<button onclick="${fn}" title="${tip}" style="${btnStyle}width:${sz}px;height:28px;font-size:${sz<32?'11':'13'}px;">${icn}</button>`;
+  const navRow=n>1?btn(28,'<i class="fa-solid fa-chevron-left"></i>','_vatRcptNav(-1)','Prev')+btn(28,'<i class="fa-solid fa-chevron-right"></i>','_vatRcptNav(1)','Next'):'';
+  const imgTools=!isPdf?`
+    ${btn(28,'<i class="fa-solid fa-minus"></i>','_vatRcptZoom(-1)','Zoom Out')}
+    <span id="vatRcptZL" style="color:#888;font-size:10px;min-width:34px;text-align:center;">${Math.round(_rcptZoom*100)}%</span>
+    ${btn(28,'<i class="fa-solid fa-plus"></i>','_vatRcptZoom(1)','Zoom In')}
+    ${btn(40,'Fit','_vatRcptZoomReset()','Reset Zoom')}
+    ${btn(28,'<i class="fa-solid fa-rotate-right"></i>','_vatRcptRotate()','Rotate 90°')}`:''
+  ;
+  const mediaEl=isPdf
+    ?`<embed src="${tx.file_data}" type="application/pdf" style="width:100%;height:100%;border:none;">`
+    :`<div id="vatRcptWrap" style="width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;">
+        <img id="vatRcptImg" src="${tx.file_data}" draggable="false" style="max-width:none;max-height:none;transform-origin:center;transform:scale(${_rcptZoom}) rotate(${_rcptRot}deg) translate(${_rcptPanX}px,${_rcptPanY}px);pointer-events:none;">
+      </div>`;
   document.body.insertAdjacentHTML('beforeend',`
-  <div onclick="this.remove()" style="position:fixed;inset:0;z-index:10200;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;cursor:zoom-out;">
-    <img src="${t.file_data}" style="max-width:92vw;max-height:90vh;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+  <div id="vatRcptPanel" style="position:fixed;top:0;right:0;width:min(600px,100vw);height:100vh;z-index:10200;background:#0d0d0d;display:flex;flex-direction:column;box-shadow:-8px 0 60px rgba(0,0,0,.8);">
+    <div style="display:flex;align-items:center;gap:5px;padding:8px 12px;background:rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;flex-wrap:wrap;">
+      <div style="flex:1;min-width:0;margin-right:4px;">
+        <div style="color:#f0f0f0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tx.supplier||'Receipt'}</div>
+        <div style="color:#666;font-size:10px;">${tx.date||''}${tx.gross?' · '+_gbp(tx.gross):''}${n>1?' · '+p+'/'+n:''}</div>
+      </div>
+      ${navRow}
+      <div style="width:1px;height:20px;background:rgba(255,255,255,.12);flex-shrink:0;"></div>
+      ${imgTools}
+      ${btn(28,'<i class="fa-solid fa-download"></i>','_vatRcptDownload()','Download')}
+      ${btn(28,'<i class="fa-solid fa-xmark"></i>','document.getElementById(\'vatRcptPanel\').remove()','Close (Esc)')}
+    </div>
+    <div style="flex:1;overflow:hidden;">${mediaEl}</div>
   </div>`);
+  if(!isPdf)_vatRcptInteract();
+  // keyboard
+  const onKey=e=>{
+    const p=document.getElementById('vatRcptPanel');if(!p)return document.removeEventListener('keydown',onKey);
+    if(e.key==='Escape')p.remove();
+    else if(e.key==='='||e.key==='+')_vatRcptZoom(1);
+    else if(e.key==='-')_vatRcptZoom(-1);
+    else if(e.key==='0')_vatRcptZoomReset();
+    else if(e.key==='r')_vatRcptRotate();
+    else if(e.key==='ArrowLeft')_vatRcptNav(-1);
+    else if(e.key==='ArrowRight')_vatRcptNav(1);
+  };
+  document.addEventListener('keydown',onKey);
+}
+function _vatRcptInteract(){
+  const wrap=document.getElementById('vatRcptWrap');if(!wrap)return;
+  wrap.addEventListener('wheel',e=>{e.preventDefault();_rcptZoom=Math.max(.1,Math.min(8,_rcptZoom+(e.deltaY>0?-.18:.18)));_vatRcptApply();},{passive:false});
+  let drag=false,sx=0,sy=0,ox=0,oy=0;
+  wrap.addEventListener('mousedown',e=>{drag=true;sx=e.clientX;sy=e.clientY;ox=_rcptPanX;oy=_rcptPanY;wrap.style.cursor='grabbing';e.preventDefault();});
+  const mm=e=>{if(!drag)return;_rcptPanX=ox+(e.clientX-sx)/_rcptZoom;_rcptPanY=oy+(e.clientY-sy)/_rcptZoom;_vatRcptApply();};
+  const mu=()=>{drag=false;const w=document.getElementById('vatRcptWrap');if(w)w.style.cursor='grab';};
+  document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
+  // touch pinch+pan
+  let ld=0,ltx=0,lty=0;
+  wrap.addEventListener('touchstart',e=>{
+    if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;ld=Math.hypot(dx,dy);}
+    else{ltx=e.touches[0].clientX;lty=e.touches[0].clientY;}
+  },{passive:true});
+  wrap.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;const d=Math.hypot(dx,dy);if(ld){_rcptZoom=Math.max(.1,Math.min(8,_rcptZoom*(d/ld)));_vatRcptApply();}ld=d;}
+    else{const nx=e.touches[0].clientX,ny=e.touches[0].clientY;_rcptPanX+=(nx-ltx)/_rcptZoom;_rcptPanY+=(ny-lty)/_rcptZoom;_vatRcptApply();ltx=nx;lty=ny;}
+  },{passive:false});
+}
+function _vatRcptApply(){
+  const img=document.getElementById('vatRcptImg');
+  if(img)img.style.transform=`scale(${_rcptZoom}) rotate(${_rcptRot}deg) translate(${_rcptPanX}px,${_rcptPanY}px)`;
+  const lbl=document.getElementById('vatRcptZL');if(lbl)lbl.textContent=Math.round(_rcptZoom*100)+'%';
+}
+function _vatRcptZoom(d){_rcptZoom=Math.max(.1,Math.min(8,_rcptZoom+(d>0?.25:-.25)));_vatRcptApply();}
+function _vatRcptZoomReset(){_rcptZoom=1;_rcptPanX=0;_rcptPanY=0;_vatRcptApply();}
+function _vatRcptRotate(){_rcptRot=(_rcptRot+90)%360;_vatRcptApply();}
+function _vatRcptDownload(){
+  const tx=_rcptList[_rcptIdx];if(!tx)return;
+  const ext=vatExtFromDataUrl(tx.file_data);
+  const a=document.createElement('a');a.href=tx.file_data;a.download=vatSanitizeFName(tx.receipt_no||tx.supplier||'receipt')+'-'+tx.date+'.'+ext;a.click();
+}
+function _vatRcptNav(dir){
+  const ni=_rcptIdx+dir;if(ni<0||ni>=_rcptList.length)return;
+  _rcptIdx=ni;_rcptZoom=1;_rcptRot=0;_rcptPanX=0;_rcptPanY=0;_vatRcptOpen();
 }
 
 // ─── Audit Log ────────────────────────────────────
@@ -11763,17 +11848,42 @@ function vatRenderExport(){
   const chips=months.map(m=>{
     const sel=_vatExSelMonths.has(m);
     const[y,mo]=m.split('-');
-    return`<span onclick="vatExToggle('${m}')" style="display:inline-block;padding:4px 11px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid ${sel?'var(--acc)':'var(--bdr)'};background:${sel?'var(--acc)':'transparent'};color:${sel?'#fff':'var(--txt)'};user-select:none;transition:all .1s;">${mn[+mo-1]} ${y}</span>`;
+    return`<span onclick="vatExToggle('${m}')" style="display:inline-block;padding:5px 12px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid ${sel?'var(--acc)':'var(--bdr)'};background:${sel?'var(--acc)':'transparent'};color:${sel?'#fff':'var(--txt)'};user-select:none;transition:all .1s;">${mn[+mo-1]} ${y}</span>`;
   }).join('');
   const selN=_vatExSelMonths.size;
   const rcptN=_vatTx.filter(t=>t.file_data&&_vatExSelMonths.has(t.date.slice(0,7))).length;
+  // build From/To options (newest first for From, oldest first for To)
+  const moOptsDesc=months.map(m=>{const[y,mo]=m.split('-');return`<option value="${m}">${mn[+mo-1]} ${y}</option>`;}).join('');
+  const moOptsAsc=[...months].reverse().map(m=>{const[y,mo]=m.split('-');return`<option value="${m}">${mn[+mo-1]} ${y}</option>`;}).join('');
   el.innerHTML=`
-  <div class="card" style="max-width:520px;">
+  <div class="card" style="max-width:580px;">
     <div class="ch"><div class="ct">Export Transactions</div></div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+    <div style="padding:16px;display:flex;flex-direction:column;gap:16px;">
+
       <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
-          <label style="font-size:11px;color:var(--txtm);font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Select Months</label>
+        <label style="font-size:11px;color:var(--txtm);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:8px;">Quick Presets</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-o" style="font-size:11px;padding:4px 11px;" onclick="vatExPreset('thisQ')"><i class="fa-solid fa-calendar-days"></i> This Quarter</button>
+          <button class="btn btn-o" style="font-size:11px;padding:4px 11px;" onclick="vatExPreset('lastQ')">Last Quarter</button>
+          <button class="btn btn-o" style="font-size:11px;padding:4px 11px;" onclick="vatExPreset('thisY')">This Year</button>
+          <button class="btn btn-o" style="font-size:11px;padding:4px 11px;" onclick="vatExPreset('lastY')">Last Year</button>
+          <button class="btn btn-o" style="font-size:11px;padding:4px 11px;" onclick="vatExPreset('all')">All Time</button>
+          <button class="btn btn-o" style="font-size:11px;padding:4px 11px;color:var(--txtm);" onclick="vatExSelAll(false)">Clear</button>
+        </div>
+      </div>
+
+      ${months.length>=2?`<div>
+        <label style="font-size:11px;color:var(--txtm);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:8px;">Custom Range</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div style="flex:1;min-width:100px;"><label style="font-size:10px;color:var(--txtm);display:block;margin-bottom:3px;">From</label><select id="vatExRFrom" class="vinp">${moOptsAsc}</select></div>
+          <div style="flex:1;min-width:100px;"><label style="font-size:10px;color:var(--txtm);display:block;margin-bottom:3px;">To</label><select id="vatExRTo" class="vinp">${moOptsDesc}</select></div>
+          <div style="padding-top:17px;"><button class="btn btn-p" style="font-size:11px;padding:5px 14px;white-space:nowrap;" onclick="vatExApplyRange()"><i class="fa-solid fa-check"></i> Apply Range</button></div>
+        </div>
+      </div>`:''}
+
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <label style="font-size:11px;color:var(--txtm);font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Months <span style="font-size:10px;font-weight:400;">${selN?'('+selN+' selected)':'(none)'}</span></label>
           <div style="display:flex;gap:5px;">
             <button class="btn btn-o" style="font-size:10px;padding:2px 8px;" onclick="vatExSelAll(true)">All</button>
             <button class="btn btn-o" style="font-size:10px;padding:2px 8px;" onclick="vatExSelAll(false)">None</button>
@@ -11781,6 +11891,7 @@ function vatRenderExport(){
         </div>
         ${months.length?`<div style="display:flex;flex-wrap:wrap;gap:5px;">${chips}</div>`:`<div style="font-size:12px;color:var(--txtm);">No transactions yet</div>`}
       </div>
+
       <div><label style="font-size:11px;color:var(--txtm);display:block;margin-bottom:3px;">Type</label>
         <select id="vatExType" class="vinp"><option value="">All</option><option value="purchase">Purchases Only</option><option value="sale">Sales Only</option></select></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--bdr);">
@@ -11798,6 +11909,29 @@ function vatExToggle(ym){
 function vatExSelAll(on){
   const months=[...new Set(_vatTx.map(t=>t.date.slice(0,7)))];
   if(on)months.forEach(m=>_vatExSelMonths.add(m));else _vatExSelMonths.clear();
+  vatRenderExport();
+}
+function vatExPreset(p){
+  const now=new Date(),y=now.getFullYear(),mo=now.getMonth();
+  const all=[...new Set(_vatTx.map(t=>t.date.slice(0,7)))].sort();
+  _vatExSelMonths.clear();
+  if(p==='all'){all.forEach(m=>_vatExSelMonths.add(m));vatRenderExport();return;}
+  let from,to;
+  if(p==='thisQ'){const q=Math.floor(mo/3);from=`${y}-${String(q*3+1).padStart(2,'0')}`;to=`${y}-${String(q*3+3).padStart(2,'0')}`;}
+  else if(p==='lastQ'){let pq=Math.floor(mo/3)-1,ry=y;if(pq<0){pq=3;ry=y-1;}from=`${ry}-${String(pq*3+1).padStart(2,'0')}`;to=`${ry}-${String(pq*3+3).padStart(2,'0')}`;}
+  else if(p==='thisY'){from=`${y}-01`;to=`${y}-12`;}
+  else if(p==='lastY'){from=`${y-1}-01`;to=`${y-1}-12`;}
+  all.filter(m=>m>=from&&m<=to).forEach(m=>_vatExSelMonths.add(m));
+  vatRenderExport();
+}
+function vatExApplyRange(){
+  const fv=document.getElementById('vatExRFrom')?.value;
+  const tv=document.getElementById('vatExRTo')?.value;
+  if(!fv||!tv)return;
+  const[f,t]=[fv,tv].sort();
+  const all=[...new Set(_vatTx.map(t=>t.date.slice(0,7)))].sort();
+  _vatExSelMonths.clear();
+  all.filter(m=>m>=f&&m<=t).forEach(m=>_vatExSelMonths.add(m));
   vatRenderExport();
 }
 function vatExLabel(){
