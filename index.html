@@ -11935,6 +11935,27 @@ function _vrwUnreject(){
   localStorage.setItem('vat_dismissed_exp',JSON.stringify(rej));
   _vrwOpen();
 }
+function _vrwClickDate(el,expId,isoDate){
+  if(el.querySelector('input'))return;
+  const disp=el.querySelector('[data-vrwdate]');if(!disp)return;
+  const inp=document.createElement('input');
+  inp.type='date';inp.value=isoDate||'';
+  inp.style.cssText='background:none;border:none;border-bottom:1.5px solid var(--acc);color:var(--txt);font-size:14px;font-weight:500;outline:none;font-family:inherit;padding:1px 0 0;width:130px;cursor:pointer;';
+  disp.style.display='none';el.appendChild(inp);inp.focus();try{inp.showPicker();}catch(_){}
+  const save=()=>{
+    const d=inp.value;
+    if(d){
+      const map=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');
+      if(!map[expId]||typeof map[expId]!=='object')map[expId]={};
+      map[expId].date=d;localStorage.setItem('vat_vat_override',JSON.stringify(map));
+      disp.textContent=_dmy(d);
+    }
+    disp.style.display='';inp.remove();
+  };
+  inp.addEventListener('blur',save);
+  inp.addEventListener('change',()=>{save();});
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();save();}if(e.key==='Escape'){disp.style.display='';inp.remove();}});
+}
 function _vrwClickCell(el,field,expId){
   if(el.querySelector('input'))return;
   const disp=el.querySelector('[data-vrwval]');if(!disp)return;
@@ -12073,7 +12094,7 @@ function _vrwOpen(){
           ${(!isAdded&&isRejected)?`<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;gap:7px;justify-content:space-between;"><span style="display:flex;align-items:center;gap:7px;"><i class="fa-solid fa-ban" style="color:#ef4444;font-size:14px;"></i><span style="color:#ef4444;font-size:13px;font-weight:600;">Rejected</span></span><button onclick="_vrwUnreject()" style="background:none;border:1px solid rgba(239,68,68,.35);color:#ef4444;border-radius:5px;font-size:11px;padding:3px 9px;cursor:pointer;font-family:inherit;">Undo</button></div>`:''}
           <div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Merchant</div><div style="font-size:16px;color:var(--txt);font-weight:700;word-break:break-word;">${exp.merchant||'—'}</div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-            <div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Date</div><div style="font-size:14px;color:var(--txt);font-weight:500;">${_dmy(exp.date)}</div></div>
+            ${(()=>{const _od=(JSON.parse(localStorage.getItem('vat_vat_override')||'{}')[String(exp.id)]||{}).date||exp.date;return`<div onclick="_vrwClickDate(this,'${exp.id}','${_od}')" style="cursor:text;border-radius:5px;padding:4px 2px;transition:background .15s;" onmouseenter="this.style.background='var(--bdr)'" onmouseleave="this.style.background='none'" title="Click to edit date"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;pointer-events:none;">Date</div><div data-vrwdate style="font-size:14px;color:var(--txt);font-weight:500;pointer-events:none;">${_dmy(_od)}</div></div>`;})()}
             <div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Gross</div><div style="font-size:14px;color:var(--txt);font-weight:700;">£${(parseFloat(exp.amount)||0).toFixed(2)}</div></div>
           </div>
           ${(()=>{const empObj=employeeMap?.get(exp.employee_id);const empName=empObj?.name||exp.employee_id||null;return empName?`<div style="margin-bottom:10px;">
@@ -12184,7 +12205,8 @@ async function _vrwAddToVat(){
     const gross=_ovr?.gross!==undefined?+parseFloat(_ovr.gross).toFixed(2):_baseGross;
     const vatAmount=_ovr?.vat!==undefined?+parseFloat(_ovr.vat).toFixed(2):+(gross-+(gross/1.2).toFixed(2)).toFixed(2);
     const net=_ovr?.net!==undefined?+parseFloat(_ovr.net).toFixed(2):+(gross-vatAmount).toFixed(2);
-    const row={type:'purchase',date:exp.date,supplier:exp.merchant||'',category:exp.category||'',receipt_no:rcptNo,net,vat_rate:20,vat_amount:vatAmount,gross,file_data:fileData,file_name:fileName};
+    const _dateOverride=(_ovr?.date)||exp.date;
+    const row={type:'purchase',date:_dateOverride,supplier:exp.merchant||'',category:exp.category||'',receipt_no:rcptNo,net,vat_rate:20,vat_amount:vatAmount,gross,file_data:fileData,file_name:fileName};
     const{data:ins,error}=await sb.from('vat_transactions').insert(row).select().single();
     if(error)throw error;
     const imp2=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]');
