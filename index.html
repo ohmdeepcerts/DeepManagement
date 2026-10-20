@@ -12042,13 +12042,23 @@ async function _vrwFetchAndCache(expId,url){
   _vrwUrlCache.set(expId,null); // mark pending
   try{
     const res=await fetch(url);
+    if(!res.ok)throw new Error('HTTP '+res.status);
     const blob=await res.blob();
     const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(blob);});
     _vrwUrlCache.set(expId,{dataUrl,mimeType:blob.type});
-    // re-render only if still on this receipt
     const cur=_vrwFilteredList()[_vrwIdx];
     if(cur?.id===expId)_vrwOpen();
-  }catch(_){_vrwUrlCache.set(expId,{error:true});}
+  }catch(e){
+    _vrwUrlCache.set(expId,{error:true,msg:e?.message||'Failed to load'});
+    // re-render so error state is shown (not stuck on spinner)
+    const cur=_vrwFilteredList()[_vrwIdx];
+    if(cur?.id===expId)_vrwOpen();
+  }
+}
+function _vrwRetryFetch(expId){
+  _vrwUrlCache.delete(expId);
+  const cur=_vrwFilteredList()[_vrwIdx];
+  if(cur?.id===expId){_vrwFetchAndCache(expId,cur.receipt_url);_vrwOpen();}
 }
 function _vrwClickDate(el,expId,isoDate){
   if(el.querySelector('input'))return;
@@ -12164,8 +12174,10 @@ function _vrwOpen(){
   const _cached=exp?_vrwUrlCache.get(exp.id):undefined;
   const _cachedUrl=(_cached&&_cached.dataUrl)?_cached.dataUrl:null;
   const _srcUrl=_cachedUrl||exp?.receipt_url||'';
-  const isPdf=_cached?(_cached.mimeType||'').includes('pdf'):_rclean.endsWith('.pdf');
-  const isImg=_cached?(_cached.mimeType||'').startsWith('image/'):(/\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|avif)$/.test(_rclean));
+  const _urlExt=_rclean.match(/\.(pdf|jpg|jpeg|png|gif|webp|heic|heif|bmp|avif)$/)?.[1]||'';
+  // use mimeType from cache if available; fall back to URL extension (covers error state)
+  const isPdf=_cached?.dataUrl?(_cached.mimeType||'').includes('pdf'):_urlExt==='pdf';
+  const isImg=_cached?.dataUrl?(_cached.mimeType||'').startsWith('image/'):(/^(jpg|jpeg|png|gif|webp|heic|heif|bmp|avif)$/.test(_urlExt));
   const isViewable=isPdf||isImg;
   // trigger background fetch if not yet cached (will re-render when ready)
   if(exp&&!_vrwUrlCache.has(exp.id))_vrwFetchAndCache(exp.id,exp.receipt_url);
@@ -12197,12 +12209,24 @@ function _vrwOpen(){
     const mTotal=mBase.length;
     return `<button onclick="_vrwSetMonth('${m}')" style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid ${act?'var(--acc)':'rgba(255,255,255,.13)'};background:${act?'var(--acc)':'rgba(255,255,255,.04)'};color:${act?'#fff':'#bbb'};font-size:11px;cursor:pointer;">${lbl}<span style="opacity:.6;margin-left:4px;">${mPending}/${mTotal}</span></button>`;
   }).join('');
+  const _isErr=_cached?.error===true;
   const mediaHtml=!exp
     ?`<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#444;font-size:14px;">No receipts in this period</div>`
-    :(!_cachedUrl&&_cached===null)
+    // show spinner while fetch not started (undefined) OR in progress (null)
+    :(!_cachedUrl&&!_isErr&&_cached==null)
     ?`<div style="height:calc(100vh - 42px);min-height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#555;">
         <i class="fa-solid fa-spinner fa-spin" style="font-size:28px;"></i>
         <div style="font-size:13px;">Loading receipt…</div>
+      </div>`
+    :_isErr
+    // fetch failed — show direct-link fallback + retry button
+    ?`<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#1a1a1a;">
+        <i class="fa-solid fa-circle-exclamation" style="font-size:38px;color:#ef4444;opacity:.8;"></i>
+        <div style="color:#aaa;font-size:13px;text-align:center;max-width:260px;">${_cached.msg||'Failed to load'}<br><span style="font-size:11px;opacity:.6;">${isPdf?'PDF':'File'} · tap below to open directly</span></div>
+        <div style="display:flex;gap:10px;">
+          <button onclick="_vrwRetryFetch('${exp.id}')" style="background:#374151;color:#e5e7eb;padding:9px 18px;border-radius:7px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;"><i class="fa-solid fa-rotate-right"></i> Retry</button>
+          <a href="${exp.receipt_url}" target="_blank" style="background:#1d4ed8;color:#fff;padding:9px 18px;border-radius:7px;text-decoration:none;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open PDF</a>
+        </div>
       </div>`
     :isPdf
     ?`<embed src="${_srcUrl}" type="application/pdf" style="width:100%;height:calc(100vh - 42px);min-height:380px;border:none;">`
