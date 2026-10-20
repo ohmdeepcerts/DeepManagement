@@ -11240,10 +11240,18 @@ async function instSave(){
 // ═══════════════════════════════════════════════════
 let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=[],_vatExSelMonths=new Set(),_vatImportingExpId=null;
 let _vrwImportedIds=new Set(); // Supabase-sourced; never read from localStorage as source of truth
+let _vrwDismissedIds=new Set(); // Supabase-sourced; replaces vat_dismissed_exp localStorage
+let _vrwOverrides={}; // Supabase-sourced; replaces vat_vat_override localStorage; keyed by expense_id
 let _vatDashP='thisY',_vatDashCFrom='',_vatDashCTo='';
 let _vatLogP='all',_vatLogCFrom='',_vatLogCTo='',_vatLogDups=false;
 
 const _VAT_COLS='id,user_id,type,date,supplier,category,receipt_no,net,vat_rate,vat_amount,gross,file_name,serial_no,serial_frozen,created_at,updated_at,expense_id';
+async function _vrwLoadMeta(){
+  const{data}=await sb.from('vat_expense_meta').select('expense_id,dismissed,vat_override');
+  _vrwDismissedIds=new Set((data||[]).filter(r=>r.dismissed).map(r=>String(r.expense_id)));
+  _vrwOverrides={};
+  for(const r of (data||[])){if(r.vat_override)_vrwOverrides[String(r.expense_id)]=r.vat_override;}
+}
 async function _vrwLoadImported(){
   // Always query Supabase — this is the ONLY source of truth for "Added" markers.
   // localStorage is never read back; it is only written as a cache for offline display.
@@ -11255,7 +11263,8 @@ async function _vrwLoadImported(){
 async function renderVatPage(){
   const[txRes]=await Promise.all([
     sb.from('vat_transactions').select(_VAT_COLS).order('date',{ascending:false}),
-    _vrwLoadImported()
+    _vrwLoadImported(),
+    _vrwLoadMeta()
   ]);
   _vatTx=txRes.data||[];
   const dashTab=document.querySelector('#page-vat .vat-tab[data-vt="dashboard"]');
@@ -11409,7 +11418,7 @@ function vatTxTable(rows,compact=false,dupIds=null){
 
 // ─── VAT Expense Drafts ───────────────────────────
 function vatGetPendingDrafts(){
-  const dismissed=new Set(JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]'));
+  const dismissed=_vrwDismissedIds;
   return(expenses||[]).filter(e=>
     e.tags?.includes('VAT')&&
     !dismissed.has(String(e.id))&&
@@ -11445,10 +11454,9 @@ function vatDraftsHtml(){
     <div style="padding:4px 0 0;">${rows}${more}</div>
   </div>`;
 }
-function vatDismissExpDraft(expId){
-  const list=JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]');
-  if(!list.includes(String(expId)))list.push(String(expId));
-  localStorage.setItem('vat_dismissed_exp',JSON.stringify(list));
+async function vatDismissExpDraft(expId){
+  _vrwDismissedIds.add(String(expId));
+  await sb.from('vat_expense_meta').upsert({expense_id:String(expId),dismissed:true},{onConflict:'expense_id'});
   vatRenderDash();
 }
 async function vatImportExpDraft(expId){
@@ -12001,7 +12009,7 @@ async function _vatRcptNav(dir){
 // _vrwReconcileImported kept as alias — now delegates to _vrwLoadImported (Supabase-only)
 async function _vrwReconcileImported(){return _vrwLoadImported();}
 async function openVatReceiptReview(){
-  await _vrwLoadImported();
+  await Promise.all([_vrwLoadImported(),_vrwLoadMeta()]);
   const staffF=document.getElementById('tagsStaff')?.value||'All';
   _vrwList=expenses.filter(r=>{
     if(!r.tags?.includes('VAT')||!r.receipt_url)return false;
@@ -12014,7 +12022,7 @@ async function openVatReceiptReview(){
 }
 function _vrwFilteredList(){
   const imp=_vrwImportedIds;
-  const rej=new Set(JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]').map(String));
+  const rej=_vrwDismissedIds;
   let list=_vrwMonthFilter?_vrwList.filter(r=>r.date?.slice(0,7)===_vrwMonthFilter):_vrwList;
   if(_vrwStatusFilter==='pending')list=list.filter(r=>!imp.has(String(r.id))&&!rej.has(String(r.id)));
   else if(_vrwStatusFilter==='added')list=list.filter(r=>imp.has(String(r.id)));
@@ -12022,10 +12030,10 @@ function _vrwFilteredList(){
   return list;
 }
 function _vrwSetStatus(s){_vrwStatusFilter=s;_vrwIdx=0;_vrwZoom=1;_vrwRot=0;_vrwPanX=0;_vrwPanY=0;_vrwOpen();}
-function _vrwUnreject(){
+async function _vrwUnreject(){
   const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
-  const rej=JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]').filter(id=>id!==String(exp.id));
-  localStorage.setItem('vat_dismissed_exp',JSON.stringify(rej));
+  _vrwDismissedIds.delete(String(exp.id));
+  await sb.from('vat_expense_meta').upsert({expense_id:String(exp.id),dismissed:false},{onConflict:'expense_id'});
   _vrwOpen();
 }
 async function _vrwFetchAndCache(expId,url){
@@ -12048,12 +12056,12 @@ function _vrwClickDate(el,expId,isoDate){
   inp.type='date';inp.value=isoDate||'';
   inp.style.cssText='background:none;border:none;border-bottom:1.5px solid var(--acc);color:var(--txt);font-size:14px;font-weight:500;outline:none;font-family:inherit;padding:1px 0 0;width:130px;cursor:pointer;';
   disp.style.display='none';el.appendChild(inp);inp.focus();try{inp.showPicker();}catch(_){}
-  const save=()=>{
+  const save=async()=>{
     const d=inp.value;
     if(d){
-      const map=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');
-      if(!map[expId]||typeof map[expId]!=='object')map[expId]={};
-      map[expId].date=d;localStorage.setItem('vat_vat_override',JSON.stringify(map));
+      if(!_vrwOverrides[expId]||typeof _vrwOverrides[expId]!=='object')_vrwOverrides[expId]={};
+      _vrwOverrides[expId].date=d;
+      await sb.from('vat_expense_meta').upsert({expense_id:String(expId),vat_override:_vrwOverrides[expId]},{onConflict:'expense_id'});
       disp.textContent=_dmy(d);
     }
     disp.style.display='';inp.remove();
@@ -12079,8 +12087,9 @@ function _vrwClickCell(el,field,expId){
     else if(field==='net'){net=Math.min(v,g);vat=+(g-net).toFixed(2);}
     const setAmt=(id,val)=>{const e=document.getElementById(id);if(e)e.textContent='£'+val.toFixed(2);};
     setAmt('vrwGrossAmt',g);setAmt('vrwVatAmt',vat);setAmt('vrwNetAmt',net);
-    const map=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');
-    map[expId]={net,vat,gross:g};localStorage.setItem('vat_vat_override',JSON.stringify(map));
+    const prevOvr=_vrwOverrides[expId]||{};
+    _vrwOverrides[expId]={...prevOvr,net,vat,gross:g};
+    sb.from('vat_expense_meta').upsert({expense_id:String(expId),vat_override:_vrwOverrides[expId]},{onConflict:'expense_id'});
     disp.style.display='';inp.remove();
   };
   inp.addEventListener('blur',save);
@@ -12099,31 +12108,35 @@ async function _vrwUndoAdd(){
   toast('Marked as pending','i');
   _vrwOpen();
 }
-function _vrwReject(){
+async function _vrwReject(){
   const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
-  let rej=JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]');
-  if(rej.includes(String(exp.id))){
+  if(_vrwDismissedIds.has(String(exp.id))){
     // toggle off — undo rejection
-    rej=rej.filter(id=>id!==String(exp.id));
-    localStorage.setItem('vat_dismissed_exp',JSON.stringify(rej));
+    _vrwDismissedIds.delete(String(exp.id));
+    await sb.from('vat_expense_meta').upsert({expense_id:String(exp.id),dismissed:false},{onConflict:'expense_id'});
     toast('Rejection undone','i');
     _vrwOpen();
     return;
   }
-  rej.push(String(exp.id));
-  localStorage.setItem('vat_dismissed_exp',JSON.stringify(rej));
+  _vrwDismissedIds.add(String(exp.id));
+  await sb.from('vat_expense_meta').upsert({expense_id:String(exp.id),dismissed:true},{onConflict:'expense_id'});
   toast('Rejected','i');
   // in pending view: advance to next; otherwise just re-render
   if(_vrwStatusFilter==='pending'){
-    const newList=_vrwFilteredList().filter(r=>!rej.includes(String(r.id)));
+    const newList=_vrwFilteredList();
     if(_vrwIdx>=newList.length)_vrwIdx=Math.max(0,newList.length-1);
   }
+  _vrwOpen();
+}
+async function _vrwResetOverride(expId){
+  delete _vrwOverrides[String(expId)];
+  await sb.from('vat_expense_meta').upsert({expense_id:String(expId),vat_override:null},{onConflict:'expense_id'});
   _vrwOpen();
 }
 function _vrwOpen(){
   document.getElementById('vrwPanel')?.remove();
   const imp=_vrwImportedIds;
-  const rej=new Set(JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]').map(String));
+  const rej=_vrwDismissedIds;
   const list=_vrwFilteredList();
   if(_vrwIdx>=list.length)_vrwIdx=Math.max(0,list.length-1);
   const exp=list.length?list[_vrwIdx]:null;
@@ -12223,7 +12236,7 @@ function _vrwOpen(){
           ${(!isAdded&&isRejected)?`<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;gap:7px;justify-content:space-between;"><span style="display:flex;align-items:center;gap:7px;"><i class="fa-solid fa-ban" style="color:#ef4444;font-size:14px;"></i><span style="color:#ef4444;font-size:13px;font-weight:600;">Rejected</span></span><button onclick="_vrwUnreject()" style="background:none;border:1px solid rgba(239,68,68,.35);color:#ef4444;border-radius:5px;font-size:11px;padding:3px 9px;cursor:pointer;font-family:inherit;">Undo</button></div>`:''}
           <div style="margin-bottom:10px;"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Merchant</div><div style="font-size:16px;color:var(--txt);font-weight:700;word-break:break-word;">${exp.merchant||'—'}</div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-            ${(()=>{const _od=(JSON.parse(localStorage.getItem('vat_vat_override')||'{}')[String(exp.id)]||{}).date||exp.date;return`<div onclick="_vrwClickDate(this,'${exp.id}','${_od}')" style="cursor:text;border-radius:5px;padding:4px 2px;transition:background .15s;" onmouseenter="this.style.background='var(--bdr)'" onmouseleave="this.style.background='none'" title="Click to edit date"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;pointer-events:none;">Date</div><div data-vrwdate style="font-size:14px;color:var(--txt);font-weight:500;pointer-events:none;">${_dmy(_od)}</div></div>`;})()}
+            ${(()=>{const _od=(_vrwOverrides[String(exp.id)]||{}).date||exp.date;return`<div onclick="_vrwClickDate(this,'${exp.id}','${_od}')" style="cursor:text;border-radius:5px;padding:4px 2px;transition:background .15s;" onmouseenter="this.style.background='var(--bdr)'" onmouseleave="this.style.background='none'" title="Click to edit date"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;pointer-events:none;">Date</div><div data-vrwdate style="font-size:14px;color:var(--txt);font-weight:500;pointer-events:none;">${_dmy(_od)}</div></div>`;})()}
             <div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Gross</div><div style="font-size:14px;color:var(--txt);font-weight:700;">£${(parseFloat(exp.amount)||0).toFixed(2)}</div></div>
           </div>
           ${(()=>{const empObj=employeeMap?.get(exp.employee_id);const empName=empObj?.name||exp.employee_id||null;return empName?`<div style="margin-bottom:10px;">
@@ -12236,11 +12249,11 @@ function _vrwOpen(){
               </div>
             </button>
           </div>`:'';})()}
-          ${(()=>{const _g=parseFloat(exp.amount)||0;const _ovrRaw=JSON.parse(localStorage.getItem('vat_vat_override')||'{}')[String(exp.id)];const _ovr=(_ovrRaw&&typeof _ovrRaw==='object')?_ovrRaw:(_ovrRaw!==undefined?{vat:parseFloat(_ovrRaw)||0,gross:_g,net:+(_g-(parseFloat(_ovrRaw)||0)).toFixed(2)}:null);const _v=_ovr?+(_ovr.vat||0).toFixed(2):+(_g/6).toFixed(2);const _n=_ovr?+(_ovr.net||0).toFixed(2):+(_g-_v).toFixed(2);const _gd=_ovr?+(_ovr.gross||_g).toFixed(2):_g;const _cellSt='cursor:text;border-radius:5px;padding:4px 2px;transition:background .15s;';const _hov='onmouseenter="this.style.background=\'var(--bdr)\'" onmouseleave="this.style.background=\'none\'"';return`<div style="background:var(--bdr);border:1px solid var(--bdr);border-radius:8px;padding:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px;text-align:center;">
+          ${(()=>{const _g=parseFloat(exp.amount)||0;const _ovr=_vrwOverrides[String(exp.id)]||null;const _v=_ovr?+(_ovr.vat||0).toFixed(2):+(_g/6).toFixed(2);const _n=_ovr?+(_ovr.net||0).toFixed(2):+(_g-_v).toFixed(2);const _gd=_ovr?+(_ovr.gross||_g).toFixed(2):_g;const _cellSt='cursor:text;border-radius:5px;padding:4px 2px;transition:background .15s;';const _hov='onmouseenter="this.style.background=\'var(--bdr)\'" onmouseleave="this.style.background=\'none\'"';return`<div style="background:var(--bdr);border:1px solid var(--bdr);border-radius:8px;padding:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px;text-align:center;">
             <div onclick="_vrwClickCell(this,'net','${exp.id}')" style="${_cellSt}" ${_hov} title="Click to edit NET"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;pointer-events:none;">NET</div><div data-vrwval id="vrwNetAmt" style="font-size:14px;color:var(--txt);font-weight:700;pointer-events:none;">£${_n.toFixed(2)}</div></div>
             <div onclick="_vrwClickCell(this,'vat','${exp.id}')" style="${_cellSt};border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);" ${_hov} title="Click to edit VAT"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;pointer-events:none;">VAT</div><div data-vrwval id="vrwVatAmt" style="font-size:14px;color:#d97706;font-weight:700;pointer-events:none;">£${_v.toFixed(2)}</div></div>
             <div onclick="_vrwClickCell(this,'gross','${exp.id}')" style="${_cellSt}" ${_hov} title="Click to edit GROSS"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;pointer-events:none;">GROSS</div><div data-vrwval id="vrwGrossAmt" style="font-size:14px;color:var(--txt);font-weight:700;pointer-events:none;">£${_gd.toFixed(2)}</div></div>
-          </div><div style="font-size:10px;color:var(--txtm);text-align:center;margin-bottom:10px;">Click any value to edit &nbsp;·&nbsp; <button onclick="(function(){const m=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');delete m['${exp.id}'];localStorage.setItem('vat_vat_override',JSON.stringify(m));_vrwOpen();})()" style="background:none;border:none;color:var(--txtm);font-size:10px;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;">Reset to 20%</button></div>`;})()}
+          </div><div style="font-size:10px;color:var(--txtm);text-align:center;margin-bottom:10px;">Click any value to edit &nbsp;·&nbsp; <button onclick="_vrwResetOverride('${exp.id}')" style="background:none;border:none;color:var(--txtm);font-size:10px;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;">Reset to 20%</button></div>`;})()}
           ${exp.category?`<div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Category</div><div style="font-size:13px;color:var(--txt);">${exp.category}</div></div>`:''}
         </div>
         <div style="padding:16px;border-bottom:1px solid var(--bdr);">
@@ -12328,8 +12341,7 @@ async function _vrwAddToVat(){
       fileData=await new Promise(resolve=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.readAsDataURL(blob);});
     }catch(fe){/* proceed without file */}
     const _baseGross=parseFloat(exp.amount)||0;
-    const _ovrRaw=JSON.parse(localStorage.getItem('vat_vat_override')||'{}')[String(exp.id)];
-    const _ovr=(_ovrRaw&&typeof _ovrRaw==='object')?_ovrRaw:(_ovrRaw!==undefined?{vat:parseFloat(_ovrRaw)||0,gross:_baseGross,net:+(_baseGross-(parseFloat(_ovrRaw)||0)).toFixed(2)}:null);
+    const _ovr=_vrwOverrides[String(exp.id)]||null;
     const gross=_ovr?.gross!==undefined?+parseFloat(_ovr.gross).toFixed(2):_baseGross;
     const vatAmount=_ovr?.vat!==undefined?+parseFloat(_ovr.vat).toFixed(2):+(gross-+(gross/1.2).toFixed(2)).toFixed(2);
     const net=_ovr?.net!==undefined?+parseFloat(_ovr.net).toFixed(2):+(gross-vatAmount).toFixed(2);
