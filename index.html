@@ -11935,6 +11935,30 @@ function _vrwUnreject(){
   localStorage.setItem('vat_dismissed_exp',JSON.stringify(rej));
   _vrwOpen();
 }
+function _vrwClickCell(el,field,expId){
+  if(el.querySelector('input'))return;
+  const disp=el.querySelector('[data-vrwval]');if(!disp)return;
+  const cur=parseFloat(disp.textContent.replace('£',''))||0;
+  const inp=document.createElement('input');
+  inp.type='number';inp.min='0';inp.step='0.01';inp.value=cur.toFixed(2);
+  inp.style.cssText='width:62px;background:none;border:none;border-bottom:1.5px solid var(--acc);color:var(--txt);font-size:14px;font-weight:700;text-align:center;outline:none;font-family:inherit;padding:1px 0 0;display:block;margin:0 auto;';
+  disp.style.display='none';el.appendChild(inp);inp.focus();inp.select();
+  const save=()=>{
+    const v=Math.max(0,parseFloat(inp.value)||0);
+    const getAmt=id=>{const e=document.getElementById(id);return e?parseFloat(e.textContent.replace('£',''))||0:0;};
+    let g=getAmt('vrwGrossAmt'),vat=getAmt('vrwVatAmt'),net=getAmt('vrwNetAmt');
+    if(field==='gross'){g=v;net=+(g-vat).toFixed(2);if(net<0){vat=g;net=0;}}
+    else if(field==='vat'){vat=Math.min(v,g);net=+(g-vat).toFixed(2);}
+    else if(field==='net'){net=Math.min(v,g);vat=+(g-net).toFixed(2);}
+    const setAmt=(id,val)=>{const e=document.getElementById(id);if(e)e.textContent='£'+val.toFixed(2);};
+    setAmt('vrwGrossAmt',g);setAmt('vrwVatAmt',vat);setAmt('vrwNetAmt',net);
+    const map=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');
+    map[expId]={net,vat,gross:g};localStorage.setItem('vat_vat_override',JSON.stringify(map));
+    disp.style.display='';inp.remove();
+  };
+  inp.addEventListener('blur',save);
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();save();}if(e.key==='Escape'){disp.style.display='';inp.remove();}});
+}
 function _vrwUndoAdd(){
   const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
   const imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').filter(id=>String(id)!==String(exp.id));
@@ -12062,17 +12086,11 @@ function _vrwOpen(){
               </div>
             </button>
           </div>`:'';})()}
-          ${(()=>{const _g=parseFloat(exp.amount)||0;const _ovrMap=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');const _ovr=_ovrMap[String(exp.id)];const _v=_ovr!==undefined?+(parseFloat(_ovr)||0).toFixed(2):+(_g/6).toFixed(2);const _n=+(_g-_v).toFixed(2);const _isCust=_ovr!==undefined;return`<div style="background:var(--bdr);border:1px solid var(--bdr);border-radius:8px;padding:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:10px;text-align:center;">
-            <div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">NET</div><div id="vrwNetAmt" style="font-size:14px;color:var(--txt);font-weight:600;">£${_n.toFixed(2)}</div></div>
-            <div style="border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);">
-              <div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">VAT ${_isCust?'<span style="font-size:9px;color:#d97706;font-weight:700;">CUSTOM</span>':'20%'}</div>
-              <div style="display:flex;align-items:center;justify-content:center;gap:1px;">
-                <span style="font-size:14px;color:#d97706;font-weight:600;line-height:1;">£</span>
-                <input id="vrwVatInput" type="number" min="0" max="${_g.toFixed(2)}" step="0.01" value="${_v.toFixed(2)}" style="width:54px;background:none;border:none;border-bottom:1.5px solid #d97706;color:#d97706;font-size:14px;font-weight:600;text-align:center;outline:none;font-family:inherit;padding:1px 0 0;" title="Type to override VAT amount" oninput="(function(el){const g=${_g.toFixed(2)};const v=Math.max(0,Math.min(g,parseFloat(el.value)||0));const net=+(g-v).toFixed(2);const netEl=document.getElementById('vrwNetAmt');if(netEl)netEl.textContent='£'+net.toFixed(2);const m=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');if(Math.abs(v-+(g/6).toFixed(2))<0.005){delete m['${exp.id}'];}else{m['${exp.id}']=v;}localStorage.setItem('vat_vat_override',JSON.stringify(m));})(this)">
-              </div>
-            </div>
-            <div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">GROSS</div><div style="font-size:14px;color:var(--txt);font-weight:700;">£${_g.toFixed(2)}</div></div>
-          </div>`;})()}
+          ${(()=>{const _g=parseFloat(exp.amount)||0;const _ovrRaw=JSON.parse(localStorage.getItem('vat_vat_override')||'{}')[String(exp.id)];const _ovr=(_ovrRaw&&typeof _ovrRaw==='object')?_ovrRaw:(_ovrRaw!==undefined?{vat:parseFloat(_ovrRaw)||0,gross:_g,net:+(_g-(parseFloat(_ovrRaw)||0)).toFixed(2)}:null);const _v=_ovr?+(_ovr.vat||0).toFixed(2):+(_g/6).toFixed(2);const _n=_ovr?+(_ovr.net||0).toFixed(2):+(_g-_v).toFixed(2);const _gd=_ovr?+(_ovr.gross||_g).toFixed(2):_g;const _cellSt='cursor:text;border-radius:5px;padding:4px 2px;transition:background .15s;';const _hov='onmouseenter="this.style.background=\'var(--bdr)\'" onmouseleave="this.style.background=\'none\'"';return`<div style="background:var(--bdr);border:1px solid var(--bdr);border-radius:8px;padding:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px;text-align:center;">
+            <div onclick="_vrwClickCell(this,'net','${exp.id}')" style="${_cellSt}" ${_hov} title="Click to edit NET"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;pointer-events:none;">NET</div><div data-vrwval id="vrwNetAmt" style="font-size:14px;color:var(--txt);font-weight:700;pointer-events:none;">£${_n.toFixed(2)}</div></div>
+            <div onclick="_vrwClickCell(this,'vat','${exp.id}')" style="${_cellSt};border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);" ${_hov} title="Click to edit VAT"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;pointer-events:none;">VAT</div><div data-vrwval id="vrwVatAmt" style="font-size:14px;color:#d97706;font-weight:700;pointer-events:none;">£${_v.toFixed(2)}</div></div>
+            <div onclick="_vrwClickCell(this,'gross','${exp.id}')" style="${_cellSt}" ${_hov} title="Click to edit GROSS"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;pointer-events:none;">GROSS</div><div data-vrwval id="vrwGrossAmt" style="font-size:14px;color:var(--txt);font-weight:700;pointer-events:none;">£${_gd.toFixed(2)}</div></div>
+          </div><div style="font-size:10px;color:var(--txtm);text-align:center;margin-bottom:10px;">Click any value to edit &nbsp;·&nbsp; <button onclick="(function(){const m=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');delete m['${exp.id}'];localStorage.setItem('vat_vat_override',JSON.stringify(m));_vrwOpen();})()" style="background:none;border:none;color:var(--txtm);font-size:10px;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;">Reset to 20%</button></div>`;})()}
           ${exp.category?`<div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Category</div><div style="font-size:13px;color:var(--txt);">${exp.category}</div></div>`:''}
         </div>
         <div style="padding:16px;border-bottom:1px solid var(--bdr);">
@@ -12160,11 +12178,12 @@ async function _vrwAddToVat(){
       fileName=(rcptNo?vatSanitizeFName(rcptNo):(vatSanitizeFName(exp.merchant||'receipt')+'-'+(exp.date||'')))+'.'+ext;
       fileData=await new Promise(resolve=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.readAsDataURL(blob);});
     }catch(fe){/* proceed without file */}
-    const gross=parseFloat(exp.amount)||0;
-    const _ovrMap=JSON.parse(localStorage.getItem('vat_vat_override')||'{}');
-    const _ovr=_ovrMap[String(exp.id)];
-    const vatAmount=_ovr!==undefined?+(parseFloat(_ovr)||0).toFixed(2):+(gross-+(gross/1.2).toFixed(2)).toFixed(2);
-    const net=+(gross-vatAmount).toFixed(2);
+    const _baseGross=parseFloat(exp.amount)||0;
+    const _ovrRaw=JSON.parse(localStorage.getItem('vat_vat_override')||'{}')[String(exp.id)];
+    const _ovr=(_ovrRaw&&typeof _ovrRaw==='object')?_ovrRaw:(_ovrRaw!==undefined?{vat:parseFloat(_ovrRaw)||0,gross:_baseGross,net:+(_baseGross-(parseFloat(_ovrRaw)||0)).toFixed(2)}:null);
+    const gross=_ovr?.gross!==undefined?+parseFloat(_ovr.gross).toFixed(2):_baseGross;
+    const vatAmount=_ovr?.vat!==undefined?+parseFloat(_ovr.vat).toFixed(2):+(gross-+(gross/1.2).toFixed(2)).toFixed(2);
+    const net=_ovr?.net!==undefined?+parseFloat(_ovr.net).toFixed(2):+(gross-vatAmount).toFixed(2);
     const row={type:'purchase',date:exp.date,supplier:exp.merchant||'',category:exp.category||'',receipt_no:rcptNo,net,vat_rate:20,vat_amount:vatAmount,gross,file_data:fileData,file_name:fileName};
     const{data:ins,error}=await sb.from('vat_transactions').insert(row).select().single();
     if(error)throw error;
