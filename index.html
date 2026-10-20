@@ -11461,14 +11461,8 @@ function vatClearFile(){
 
 // ─── Gemini Scan Queue ────────────────────────────
 function vatScanQueueHtml(type){
-  const key=localStorage.getItem('vat_gemini_key')||'';
   const items=_vatScanQueue.filter(i=>i.status!=='used');
   const pending=items.filter(i=>i.status==='pending').length;
-  const keyRow=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
-    <input id="vatGKey" type="password" placeholder="Gemini API key (stored in browser only)" value="${key.replace(/"/g,'&quot;')}"
-      class="vinp" style="flex:1;font-size:12px;" oninput="localStorage.setItem('vat_gemini_key',this.value)">
-    <a href="https://aistudio.google.com/app/apikey" target="_blank" style="font-size:11px;color:var(--acc);white-space:nowrap;text-decoration:none;">Get key ↗</a>
-  </div>`;
   const compact=items.length>0;
   const dropZone=`<div id="vatDropZone" style="border:2px dashed var(--bdr);border-radius:8px;padding:${compact?'7px 12px':'18px'};text-align:center;cursor:pointer;color:var(--txtm);font-size:12px;transition:background .15s;"
     onclick="document.getElementById('vatBulkFile').click()"
@@ -11478,7 +11472,7 @@ function vatScanQueueHtml(type){
     <i class="fa-solid fa-cloud-arrow-up" style="font-size:${compact?'13':'18'}px;${compact?'margin-right:5px;':'display:block;margin-bottom:5px;'}"></i>${compact?'Drop / paste more files':'Drop receipts &amp; invoices here · paste from clipboard · or click to browse'}
     <input id="vatBulkFile" type="file" accept="image/*,application/pdf" multiple style="display:none;" onchange="vatQueueAdd(this.files,'${type}');this.value=''">
   </div>`;
-  if(!items.length)return`<div id="vatScanSec" style="max-width:600px;margin-bottom:12px;"><div class="card" style="padding:10px 12px;">${keyRow}${dropZone}</div></div>`;
+  if(!items.length)return`<div id="vatScanSec" style="max-width:600px;margin-bottom:12px;"><div class="card" style="padding:10px 12px;">${dropZone}</div></div>`;
   const qRows=items.map(i=>{
     const isImg=i.mimeType.startsWith('image/');
     const thumb=isImg?`<img src="${i.dataUrl}" style="width:38px;height:38px;object-fit:cover;border-radius:5px;flex-shrink:0;">`
@@ -11506,9 +11500,8 @@ function vatScanQueueHtml(type){
       <div style="display:flex;gap:4px;flex-shrink:0;">${actions}<button class="btn btn-o" style="font-size:10px;padding:2px 6px;color:var(--red);border-color:var(--red);" onclick="vatScanRemove('${i.id}','${type}')"><i class="fa-solid fa-xmark"></i></button></div>
     </div>`;
   }).join('');
-  const scanAll=pending>0&&key?`<button class="btn btn-p" style="font-size:11px;padding:3px 9px;" onclick="vatScanAll('${type}')"><i class="fa-solid fa-wand-magic-sparkles"></i> Scan All (${pending})</button>`:'';
+  const scanAll=pending>0&&cfg?.gemini_key?`<button class="btn btn-p" style="font-size:11px;padding:3px 9px;" onclick="vatScanAll('${type}')"><i class="fa-solid fa-wand-magic-sparkles"></i> Scan All (${pending})</button>`:'';
   return`<div id="vatScanSec" style="max-width:600px;margin-bottom:12px;"><div class="card" style="padding:10px 12px;">
-    ${keyRow}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
       <span style="font-size:12px;font-weight:600;">Scan Queue <span style="font-size:10px;color:var(--txtm);font-weight:400;">(${items.length} file${items.length!==1?'s':''})</span></span>
       ${scanAll}
@@ -11551,8 +11544,8 @@ function vatScanRemove(id,type){
   vatScanQueueReRender(type);
 }
 async function vatScanItem(id,type){
-  const key=localStorage.getItem('vat_gemini_key');
-  if(!key){toast('Enter your Gemini API key above first','w');return;}
+  const key=cfg?.gemini_key;
+  if(!key){toast('Add a Gemini key in Settings → AI first','w');return;}
   const item=_vatScanQueue.find(i=>i.id===id);
   if(!item)return;
   item.status='scanning';item.error=null;
