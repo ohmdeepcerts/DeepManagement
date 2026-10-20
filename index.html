@@ -964,6 +964,7 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
         <div class="pill-row" id="staffPills"></div>
         <div class="pill-row" id="monthPills"></div>
       </div>
+      <div id="ledDupBar" style="display:none;padding:0 14px 0;"></div>
       <div class="qe-bar" id="qeBar" style="display:none;">
         <i class="fa-solid fa-bolt" style="opacity:0.8;"></i>
         <input id="qeInput" placeholder='Type: "Costa Coffee | Travel | 4.50" then press Enter' onkeydown="handleQE(event)">
@@ -1976,6 +1977,7 @@ let employeeDocuments=[];
 let salaryHistory=[]; // salary_history rows from DB // all docs loaded
 let markDate=new Date(), dailyDate=new Date();
 let ledgerYear=new Date().getFullYear(), ledgerStaff=null, ledgerMonth=String(new Date().getMonth()+1).padStart(2,'0');
+let _ledDupsOnly=false;
 let aprTab='pending', empTabFilter='Active';
 let _touched=new Set(), _activeTagPicker=null;
 document.addEventListener('paste',function(e){
@@ -4692,9 +4694,29 @@ function _doRenderLedger(){
   const emp=employeeMap?.get(ledgerStaff);if(!emp)return;
   const isEx=emp.status==='ex';
   const C=cur();
+  const expDupIds=_expDupIds();
+  const totalExpDups=expDupIds.size;
+  const dupBarEl=document.getElementById('ledDupBar');
+  if(dupBarEl){
+    if(totalExpDups){
+      dupBarEl.style.display='block';
+      dupBarEl.innerHTML=`<div style="margin:8px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:0;background:rgba(251,146,60,.1);border:1px solid var(--amb);border-radius:8px;padding:7px 12px;display:flex;align-items:center;gap:8px;">
+          <i class="fa-solid fa-triangle-exclamation" style="color:var(--amb);"></i>
+          <span style="font-size:13px;font-weight:600;color:var(--amb);">${totalExpDups} possible duplicate expense${totalExpDups>1?'s':''}</span>
+          <span style="font-size:11px;color:var(--txtm);">— same merchant, amount &amp; date (or within 7 days)</span>
+        </div>
+        <button onclick="_ledToggleDups()" style="font-size:12px;padding:6px 12px;border-radius:20px;border:1px solid ${_ledDupsOnly?'var(--amb)':'var(--bdr)'};background:${_ledDupsOnly?'rgba(251,146,60,.15)':'transparent'};color:${_ledDupsOnly?'var(--amb)':'var(--txtm)'};cursor:pointer;font-family:inherit;white-space:nowrap;font-weight:${_ledDupsOnly?'700':'400'};">
+          <i class="fa-solid fa-triangle-exclamation"></i> ${_ledDupsOnly?'Show All':'Show Dupes Only'}
+        </button>
+      </div>`;
+    } else {
+      dupBarEl.style.display='none';dupBarEl.innerHTML='';
+    }
+  }
   // Filter expenses for this employee/month/year — blank rows always sorted last
   const isBlank=function(r){return !r.merchant&&!r.description&&(!r.amount||parseFloat(r.amount)===0)&&!r.category&&!r.receipt_url;};
-  const data=expenses.filter(e=>{
+  let data=expenses.filter(e=>{
     const d=new Date(e.date+'T00:00:00');
     return e.employee_id===ledgerStaff&&d.getFullYear()===ledgerYear&&String(d.getMonth()+1).padStart(2,'0')===ledgerMonth;
   }).sort((a,b)=>{
@@ -4703,6 +4725,7 @@ function _doRenderLedger(){
     if(!aB&&bB)return -1;
     return a.date.localeCompare(b.date); // real rows by date
   });
+  if(_ledDupsOnly)data=data.filter(r=>expDupIds.has(r.id));
   const realData=data.filter(function(r){return !isBlank(r);});
   const total=realData.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
   document.getElementById('ledTitle').innerHTML=`${escapeHtml(emp.name)}${isEx?` <span style="color:var(--red);font-size:0.7em;background:var(--redl);padding:1px 6px;border-radius:4px;">EX</span>`:''} | ${MONTHS[parseInt(ledgerMonth)-1]} ${ledgerYear}`;
@@ -4723,7 +4746,7 @@ function _doRenderLedger(){
     tbody.innerHTML=data.map((row,i)=>{
       const blank=isBlank(row);
       if(!blank)running+=(parseFloat(row.amount)||0);
-      return buildLedRow(row,blank?-1:realIdx++,running,C,isEx,totalRows,blank);
+      return buildLedRow(row,blank?-1:realIdx++,running,C,isEx,totalRows,blank,expDupIds.has(row.id));
     }).join('');
     // Ensure exactly ONE blank row exists — never accumulate blanks
     const blanks=data.filter(isBlank);
@@ -4752,7 +4775,7 @@ function _doRenderLedger(){
   }
   renderLedRight(realData,C);
 }
-function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
+function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow,isDup=false){
   const tagsHtml=buildTagsCell(row.tags||[],row.id);
   const catStyle=getCatStyle(row.category);
   const st=row.status||'draft';
@@ -4782,12 +4805,13 @@ function buildLedRow(row,i,running,C,isEx,totalRows,isBlankRow){
   }
   // Rows with a negative amount (advances, refunds, deductions) get a red
   // tint instead of the usual blue glass tint, so they stand out at a glance.
-  const rowTint=parseFloat(row.amount)<0?'rgba(220,38,38,0.07)':'rgba(37,99,235,0.06)';
+  const rowTint=isDup?'rgba(251,146,60,.09)':parseFloat(row.amount)<0?'rgba(220,38,38,0.07)':'rgba(37,99,235,0.06)';
+  const dupBadge=isDup?`<span title="Possible duplicate expense" style="display:inline-block;font-size:10px;color:var(--amb);margin-left:5px;vertical-align:middle;"><i class="fa-solid fa-triangle-exclamation"></i></span>`:'';
   return`<tr id="ledrow-${row.id}" data-exp-id="${row.id}" style="--rowbg:${rowTint};" ondragover="event.preventDefault();event.stopPropagation();this.style.outline='2px dashed #2563eb'" ondragleave="this.style.outline=''" ondrop="event.preventDefault();event.stopPropagation();this.style.outline='';handleLedRowDrop(event,'${row.id}')">
     <td style="text-align:center;width:24px;"><span style="font-size:11px;color:var(--txtm);">${i+1}</span>${stBadge}</td>
     <td><input type="date" class="shi" value="${row.date||''}" ${isEx?'disabled':''} onchange="checkExpDateChange('${row.id}',this.value)"></td>
     <td>
-      <input type="text" class="shi" placeholder="Merchant / Supplier..." value="${(row.merchant||'').replace(/"/g,'&quot;')}" ${isEx?'disabled':''} autocomplete="off" oninput="updateExp('${row.id}','merchant',this.value);checkAutoNextRow('${row.id}',${i},${totalRows||1});ledMerchantAC(this,'${row.id}')" onblur="setTimeout(hideLedAC,200)">
+      <input type="text" class="shi" placeholder="Merchant / Supplier..." value="${(row.merchant||'').replace(/"/g,'&quot;')}" ${isEx?'disabled':''} autocomplete="off" oninput="updateExp('${row.id}','merchant',this.value);checkAutoNextRow('${row.id}',${i},${totalRows||1});ledMerchantAC(this,'${row.id}')" onblur="setTimeout(hideLedAC,200)">${dupBadge}
       <div style="display:flex;align-items:center;gap:4px;margin-top:3px;">${row.receipt_url?`<div onclick="openLightbox('${row.receipt_url}')" style="width:30px;height:30px;border-radius:5px;border:1px solid var(--bdr);overflow:hidden;cursor:pointer;flex-shrink:0;background:var(--card2);display:flex;align-items:center;justify-content:center;position:relative;"><img src="${row.receipt_url}" style="width:100%;height:100%;object-fit:cover;position:absolute;" onerror="this.style.display='none'"><i class="fa-solid fa-file-image" style="font-size:14px;color:var(--acc);"></i></div><a href="${row.receipt_url}" target="_blank" title="Open receipt" style="font-size:10px;color:var(--acc);"><i class="fa-solid fa-eye"></i></a>`:''}<label title="${row.receipt_url?'Replace receipt':'Attach receipt'}" style="width:22px;height:22px;border-radius:5px;border:1px dashed ${row.receipt_url?'var(--acc)':'var(--bdr)'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:${row.receipt_url?'var(--acc)':'var(--txtm)'};font-size:10px;"><i class="fa-solid fa-paperclip"></i><input type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx" style="display:none;" onchange="uploadLedReceipt('${row.id}',this)"></label>${row.receipt_url?`<button type="button" id="ledScanBtn-${row.id}" title="Auto-fill from Receipt (AI)" onclick="scanLedReceiptWithAI('${row.id}')" style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);border-radius:6px;padding:3px 7px;cursor:pointer;color:#7c3aed;font-size:11px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>`:''}</div>
       ${row.items?`<div onclick="editLedItems('${row.id}','${(row.items||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" title="Click to edit items" style="font-size:10px;color:var(--acc);margin-top:1px;cursor:pointer;"><i class="fa-solid fa-list" style="font-size:9px;margin-right:2px;"></i>${row.items}</div>`:!isEx?`<div onclick="editLedItems('${row.id}','')" style="font-size:10px;color:var(--txtm);margin-top:1px;cursor:pointer;opacity:0.6;"><i class="fa-solid fa-plus" style="font-size:8px;"></i> Add items</div>`:''}
       ${row.notes?`<div style="font-size:10px;color:var(--txtm);margin-top:1px;font-style:italic;">"${row.notes}"</div>`:''}
@@ -4924,15 +4948,13 @@ function checkExpDateChange(expId,newDate){
 async function updateExp(id,field,val){
   const exp=expenses.find(e=>e.id===id);if(!exp)return;
   if(field==='amount'&&parseFloat(val)===0){toast('Amount cannot be zero','e');return;}
-  // Duplicate warning (non-blocking): fires once per row, when both merchant
-  // and amount are in place. findSimilarExpense() existed for ages but was
-  // never actually called from anywhere.
-  if((field==='merchant'||field==='amount')&&!exp._dupWarned){
+  // Duplicate warning: fires each time merchant or amount changes (row re-renders with amber highlight automatically via _expDupIds)
+  if(field==='merchant'||field==='amount'){
     const _m=field==='merchant'?val:exp.merchant;
     const _a=field==='amount'?parseFloat(val):parseFloat(exp.amount);
     if(_m&&_a){
       const _dupes=findSimilarExpense(_m,_a,exp.date).filter(x=>x.id!==id&&x.employee_id===exp.employee_id);
-      if(_dupes.length){exp._dupWarned=true;toast(`⚠️ Possible duplicate — "${_m}" for ${fmt(_a)} already exists on ${fmtDateS(_dupes[0].date)}`,'e');}
+      if(_dupes.length)toast(`⚠️ Possible duplicate — "${_m}" for ${fmt(_a)} already exists on ${fmtDateS(_dupes[0].date)}`,'e');
     }
   }
   // Hard block amount/date changes on locked months
@@ -9229,6 +9251,37 @@ function findSimilarExpense(merchant,amount,date){
     return (e.merchant||'').trim().toLowerCase()===m&&Math.abs(parseFloat(e.amount)-parseFloat(amount))<0.01&&Math.abs(new Date(e.date)-new Date(date))<604800000;
   });
 }
+function _expDupIds(){
+  const s=new Set();
+  // Exact: same employee + same merchant + same amount + same date
+  const me={};
+  for(const e of expenses||[]){
+    if(!e.merchant||!(parseFloat(e.amount)>0))continue;
+    const k=`${e.employee_id}|${(e.merchant||'').toLowerCase().trim()}|${parseFloat(e.amount).toFixed(2)}|${e.date}`;
+    if(!me[k])me[k]=[];me[k].push(e.id);
+  }
+  for(const ids of Object.values(me))if(ids.length>1)ids.forEach(id=>s.add(id));
+  // Near-dup: same employee + merchant + amount within 7 days
+  const m7={};
+  for(const e of expenses||[]){
+    if(!e.merchant||!(parseFloat(e.amount)>0))continue;
+    const k=`${e.employee_id}|${(e.merchant||'').toLowerCase().trim()}|${parseFloat(e.amount).toFixed(2)}`;
+    if(!m7[k])m7[k]=[];m7[k].push(e);
+  }
+  for(const rows of Object.values(m7)){
+    if(rows.length<2)continue;
+    rows.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    for(let i=0;i<rows.length;i++){
+      for(let j=i+1;j<rows.length;j++){
+        if(Math.abs(new Date(rows[i].date+'T00:00:00')-new Date(rows[j].date+'T00:00:00'))<=604800000){
+          s.add(rows[i].id);s.add(rows[j].id);
+        } else break;
+      }
+    }
+  }
+  return s;
+}
+function _ledToggleDups(){_ledDupsOnly=!_ledDupsOnly;renderLedger();}
 
 // KEYBOARD SHORTCUTS
 // ═══════════════════════════════════════════════════
