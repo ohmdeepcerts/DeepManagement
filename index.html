@@ -12339,6 +12339,7 @@ function vatRenderExport(){
       <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--bdr);">
         <button class="btn btn-p" onclick="vatDoExport()" style="flex:1;min-width:130px;"><i class="fa-solid fa-file-csv"></i> Export CSV${selN?' ('+selN+' mo)':''}</button>
         <button class="btn btn-s" onclick="vatDoZipExport()" style="flex:1;min-width:160px;background:var(--acc);color:#fff;border-color:var(--acc);"><i class="fa-solid fa-file-zipper"></i> Download ZIP${rcptN?' + '+rcptN+' receipts':''}</button>
+        <button class="btn btn-o" onclick="vatDoExport1()" style="flex:1;min-width:160px;border-color:#70AD47;color:#3a7a1a;" title="Formatted Excel sheet — SR NO / Date / Merchant / Invoice / Net / VAT / Gross"><i class="fa-solid fa-file-excel" style="color:#70AD47;"></i> Export 1 (Excel)</button>
       </div>
       <div id="vatExStatus" style="display:none;font-size:12px;color:var(--txtm);text-align:center;padding:6px;"></div>
     </div>
@@ -12406,6 +12407,55 @@ function vatDoExport(){
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download=`vat-${vatExLabel()}${type?'-'+type:''}.csv`;
   a.click();
+}
+
+function vatDoExport1(){
+  const typeVal=document.getElementById('vatExType').value;
+  let rows=_vatTx.filter(t=>_vatExSelMonths.has((t.date||'').slice(0,7)));
+  if(typeVal)rows=rows.filter(t=>t.type===typeVal);
+  rows=rows.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  if(!rows.length){toast('No transactions for selected months','w');return;}
+  const fmt2=n=>parseFloat(n||0).toFixed(2);
+  const totalNet=rows.reduce((s,t)=>s+(parseFloat(t.net)||0),0);
+  const totalVat=rows.reduce((s,t)=>s+(parseFloat(t.vat_amount)||0),0);
+  const totalGross=rows.reduce((s,t)=>s+(parseFloat(t.gross)||0),0);
+  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const fmtDate=d=>{if(!d)return'';const dt=new Date(d+'T00:00:00');return String(dt.getDate()).padStart(2,'0')+' '+MN[dt.getMonth()]+' '+dt.getFullYear();};
+  const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const label=(typeVal==='sale'?'SALES':'PURCHASES');
+  const colHdr=(txt,w)=>`<td style="background:#C6EFCE;color:#1a5c1a;font-weight:bold;border:1px solid #a0c0a0;padding:5px 8px;text-align:center;${w?'width:'+w+';':''}">${txt}</td>`;
+  const colData=(txt,align,bold)=>`<td style="border:1px solid #d4d4d4;padding:4px 8px;text-align:${align||'left'};${bold?'font-weight:bold;':''}">${esc(txt)}</td>`;
+  const dataRows=rows.map((t,i)=>`<tr style="background:${i%2===0?'#ffffff':'#f7faf7'};">
+    ${colData(String(i+1),'center')}
+    ${colData(fmtDate(t.date))}
+    ${colData(t.supplier||'')}
+    ${colData(t.receipt_no||'','center')}
+    ${colData(fmt2(t.net),'right')}
+    ${colData(fmt2(t.vat_amount),'right')}
+    ${colData(fmt2(t.gross),'right',true)}
+  </tr>`).join('');
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${label}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+</head><body>
+<table style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11pt;">
+  <tr>
+    <td colspan="4" style="background:#70AD47;color:#fff;font-weight:bold;font-size:14pt;padding:7px 12px;border:1px solid #4a7a2a;">${label}/ Total</td>
+    <td style="background:#70AD47;color:#fff;font-weight:bold;font-size:12pt;text-align:right;padding:7px 10px;border:1px solid #4a7a2a;">${fmt2(totalNet)}</td>
+    <td style="background:#70AD47;color:#fff;font-weight:bold;font-size:12pt;text-align:right;padding:7px 10px;border:1px solid #4a7a2a;">${fmt2(totalVat)}</td>
+    <td style="background:#70AD47;color:#fff;font-weight:bold;font-size:12pt;text-align:right;padding:7px 10px;border:1px solid #4a7a2a;">${fmt2(totalGross)}</td>
+  </tr>
+  <tr>
+    ${colHdr('SR NO','60px')}${colHdr('DATE','140px')}${colHdr('MERCHANT NAME','200px')}${colHdr('INVOICE NO','90px')}${colHdr('NET Amount','100px')}${colHdr('VAT','100px')}${colHdr('GROSS Amount','110px')}
+  </tr>
+  ${dataRows}
+</table>
+</body></html>`;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'}));
+  a.download=`vat-${label.toLowerCase()}-${vatExLabel()}.xls`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 }
 
 async function vatDoZipExport(){
