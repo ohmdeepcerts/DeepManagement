@@ -11947,13 +11947,23 @@ function _vrwUndoAdd(){
 }
 function _vrwReject(){
   const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
-  const rej=JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]');
-  if(!rej.includes(String(exp.id)))rej.push(String(exp.id));
+  let rej=JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]');
+  if(rej.includes(String(exp.id))){
+    // toggle off — undo rejection
+    rej=rej.filter(id=>id!==String(exp.id));
+    localStorage.setItem('vat_dismissed_exp',JSON.stringify(rej));
+    toast('Rejection undone','i');
+    _vrwOpen();
+    return;
+  }
+  rej.push(String(exp.id));
   localStorage.setItem('vat_dismissed_exp',JSON.stringify(rej));
   toast('Rejected','i');
-  // advance to next or re-render
-  const newList=_vrwFilteredList().filter(r=>!rej.includes(String(r.id)));
-  if(_vrwIdx>=newList.length)_vrwIdx=Math.max(0,newList.length-1);
+  // in pending view: advance to next; otherwise just re-render
+  if(_vrwStatusFilter==='pending'){
+    const newList=_vrwFilteredList().filter(r=>!rej.includes(String(r.id)));
+    if(_vrwIdx>=newList.length)_vrwIdx=Math.max(0,newList.length-1);
+  }
   _vrwOpen();
 }
 function _vrwOpen(){
@@ -12037,9 +12047,16 @@ function _vrwOpen(){
           ${isAdded?`<div style="background:rgba(34,197,94,.09);border:1px solid rgba(34,197,94,.22);border-radius:6px;padding:6px 10px;margin-bottom:10px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;font-size:12px;"></i><span style="color:#86efac;font-size:11px;font-weight:600;">Added to VAT Records</span></div>`:''}
           ${(!isAdded&&isRejected)?`<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:6px;padding:6px 10px;margin-bottom:10px;display:flex;align-items:center;gap:6px;justify-content:space-between;"><span style="display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-ban" style="color:#ef4444;font-size:12px;"></i><span style="color:#fca5a5;font-size:11px;font-weight:600;">Rejected</span></span><button onclick="_vrwUnreject()" style="background:none;border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;font-family:inherit;">Undo</button></div>`:''}
           <div style="margin-bottom:8px;"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Merchant</div><div style="font-size:13px;color:#e0e0e0;font-weight:600;word-break:break-word;">${exp.merchant||'—'}</div></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Date</div><div style="font-size:12px;color:#ccc;">${exp.date||'—'}</div></div>
-            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Amount</div><div style="font-size:12px;color:#ccc;font-weight:600;">£${(parseFloat(exp.amount)||0).toFixed(2)}</div></div>
+            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Gross</div><div style="font-size:12px;color:#e0e0e0;font-weight:600;">£${(parseFloat(exp.amount)||0).toFixed(2)}</div></div>
+          </div>
+          <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:6px;padding:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px;text-align:center;">
+            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">NET</div><div style="font-size:12px;color:#ccc;font-weight:500;">£${(+(parseFloat(exp.amount)||0)/1.2).toFixed(2)}</div></div>
+            <div style="border-left:1px solid rgba(255,255,255,.06);border-right:1px solid rgba(255,255,255,.06);">
+              <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">VAT 20%</div><div style="font-size:12px;color:#f59e0b;font-weight:500;">£${((parseFloat(exp.amount)||0)-(+(parseFloat(exp.amount)||0)/1.2)).toFixed(2)}</div>
+            </div>
+            <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;">GROSS</div><div style="font-size:12px;color:#e0e0e0;font-weight:600;">£${(parseFloat(exp.amount)||0).toFixed(2)}</div></div>
           </div>
           ${exp.category?`<div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Category</div><div style="font-size:11px;color:#aaa;">${exp.category}</div></div>`:''}
         </div>
@@ -12056,7 +12073,7 @@ function _vrwOpen(){
             :`<button id="vrwAddBtn" onclick="_vrwAddToVat()" style="background:var(--acc);border:1px solid transparent;color:#fff;border-radius:6px;padding:8px;font-size:12px;font-weight:600;cursor:pointer;width:100%;font-family:inherit;"><i class="fa-solid fa-file-invoice"></i> Add to VAT Records</button>`}
           <div style="display:flex;gap:6px;">
             <button onclick="_vrwDownload()" style="flex:1;background:none;border:1px solid rgba(255,255,255,.13);color:#ccc;border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit;"><i class="fa-solid fa-download"></i> Download</button>
-            ${!isAdded?`<button onclick="_vrwReject()" style="flex:1;background:${isRejected?'rgba(239,68,68,.1)':'none'};border:1px solid ${isRejected?'rgba(239,68,68,.4)':'rgba(255,255,255,.13)'};color:${isRejected?'#fca5a5':'#888'};border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit;" title="${isRejected?'Already rejected':'Mark as not applicable'}"><i class="fa-solid fa-ban"></i> ${isRejected?'Rejected':'Reject'}</button>`:''}
+            ${!isAdded?`<button onclick="_vrwReject()" style="flex:1;background:${isRejected?'#ef4444':'rgba(239,68,68,.08)'};border:1px solid ${isRejected?'#ef4444':'rgba(239,68,68,.35)'};color:${isRejected?'#fff':'#f87171'};border-radius:6px;padding:7px;font-size:12px;font-weight:${isRejected?'600':'400'};cursor:pointer;font-family:inherit;" title="${isRejected?'Already rejected — click to undo':'Mark as not applicable'}"><i class="fa-solid fa-ban"></i> ${isRejected?'Rejected':'Reject'}</button>`:''}
           </div>
         </div>`:`<div style="padding:24px;color:#444;font-size:13px;text-align:center;">No receipts in this period</div>`}
       </div>
