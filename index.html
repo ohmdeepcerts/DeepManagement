@@ -11791,7 +11791,7 @@ function _vatFDownload(){
 
 // ─── Receipt preview panel ────────────────────────
 let _rcptList=[],_rcptIdx=0,_rcptZoom=1,_rcptRot=0,_rcptPanX=0,_rcptPanY=0;
-let _vrwList=[],_vrwIdx=0,_vrwZoom=1,_vrwRot=0,_vrwPanX=0,_vrwPanY=0,_vrwMonthFilter=null;
+let _vrwList=[],_vrwIdx=0,_vrwZoom=1,_vrwRot=0,_vrwPanX=0,_vrwPanY=0,_vrwMonthFilter=null,_vrwStatusFilter='pending';
 let _vatFZoom=1,_vatFRot=0,_vatFPanX=0,_vatFPanY=0;
 function vatPreviewReceipt(id){
   _rcptList=_vatTx.filter(t=>t.file_data);
@@ -11895,29 +11895,73 @@ function openVatReceiptReview(){
     return true;
   }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if(!_vrwList.length){toast('No VAT receipts with attachments found','e');return;}
-  _vrwIdx=0;_vrwZoom=1;_vrwRot=0;_vrwPanX=0;_vrwPanY=0;_vrwMonthFilter=null;
+  _vrwIdx=0;_vrwZoom=1;_vrwRot=0;_vrwPanX=0;_vrwPanY=0;_vrwMonthFilter=null;_vrwStatusFilter='pending';
   _vrwOpen();
 }
 function _vrwFilteredList(){
-  return _vrwMonthFilter?_vrwList.filter(r=>r.date?.slice(0,7)===_vrwMonthFilter):_vrwList;
+  const imp=new Set(JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').map(String));
+  const rej=new Set(JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]').map(String));
+  let list=_vrwMonthFilter?_vrwList.filter(r=>r.date?.slice(0,7)===_vrwMonthFilter):_vrwList;
+  if(_vrwStatusFilter==='pending')list=list.filter(r=>!imp.has(String(r.id))&&!rej.has(String(r.id)));
+  else if(_vrwStatusFilter==='added')list=list.filter(r=>imp.has(String(r.id)));
+  else if(_vrwStatusFilter==='rejected')list=list.filter(r=>rej.has(String(r.id)));
+  return list;
+}
+function _vrwSetStatus(s){_vrwStatusFilter=s;_vrwIdx=0;_vrwZoom=1;_vrwRot=0;_vrwPanX=0;_vrwPanY=0;_vrwOpen();}
+function _vrwUnreject(){
+  const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
+  const rej=JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]').filter(id=>id!==String(exp.id));
+  localStorage.setItem('vat_dismissed_exp',JSON.stringify(rej));
+  _vrwOpen();
+}
+function _vrwReject(){
+  const list=_vrwFilteredList();const exp=list[_vrwIdx];if(!exp)return;
+  const rej=JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]');
+  if(!rej.includes(String(exp.id)))rej.push(String(exp.id));
+  localStorage.setItem('vat_dismissed_exp',JSON.stringify(rej));
+  toast('Rejected','i');
+  // advance to next or re-render
+  const newList=_vrwFilteredList().filter(r=>!rej.includes(String(r.id)));
+  if(_vrwIdx>=newList.length)_vrwIdx=Math.max(0,newList.length-1);
+  _vrwOpen();
 }
 function _vrwOpen(){
   document.getElementById('vrwPanel')?.remove();
+  const imp=new Set(JSON.parse(localStorage.getItem('vat_imported_exp')||'[]').map(String));
+  const rej=new Set(JSON.parse(localStorage.getItem('vat_dismissed_exp')||'[]').map(String));
   const list=_vrwFilteredList();
   if(_vrwIdx>=list.length)_vrwIdx=Math.max(0,list.length-1);
   const exp=list.length?list[_vrwIdx]:null;
   const n=list.length,p=_vrwIdx+1;
   const months=[...new Set(_vrwList.map(r=>r.date?.slice(0,7)).filter(Boolean))].sort().reverse();
-  const imp=JSON.parse(localStorage.getItem('vat_imported_exp')||'[]');
-  const isAdded=!!(exp&&imp.includes(exp.id));
+  const isAdded=!!(exp&&imp.has(String(exp?.id)));
+  const isRejected=!!(exp&&rej.has(String(exp?.id)));
   const isPdf=!!(exp&&(exp.receipt_url||'').split('?')[0].toLowerCase().endsWith('.pdf'));
   const bs='background:none;border:1px solid rgba(255,255,255,.14);color:#ccc;border-radius:6px;cursor:pointer;';
+
+  // status counts for the full list (ignoring month filter for counts)
+  const baseList=_vrwMonthFilter?_vrwList.filter(r=>r.date?.slice(0,7)===_vrwMonthFilter):_vrwList;
+  const cntAll=baseList.length;
+  const cntAdded=baseList.filter(r=>imp.has(String(r.id))).length;
+  const cntRej=baseList.filter(r=>rej.has(String(r.id))).length;
+  const cntPending=cntAll-cntAdded-cntRej;
+  const statusTabs=[
+    ['pending',`Pending`,cntPending,'#f59e0b'],
+    ['added','Added',cntAdded,'#22c55e'],
+    ['rejected','Rejected',cntRej,'#ef4444'],
+    ['all','All',cntAll,'#6b7280'],
+  ].map(([v,l,c,col])=>{
+    const act=_vrwStatusFilter===v;
+    return`<button onclick="_vrwSetStatus('${v}')" style="flex-shrink:0;padding:4px 11px;border-radius:20px;border:1px solid ${act?col:'rgba(255,255,255,.13)'};background:${act?col:'rgba(255,255,255,.04)'};color:${act?'#fff':'#bbb'};font-size:11px;cursor:pointer;font-weight:${act?'600':'400'};">${l}<span style="opacity:.75;margin-left:4px;">${c}</span></button>`;
+  }).join('');
+
   const monthTabs=months.map(m=>{
     const [yr,mo]=m.split('-');const lbl=MONTHS[parseInt(mo)-1].slice(0,3)+' '+yr;
     const act=_vrwMonthFilter===m;
-    const cnt=_vrwList.filter(r=>r.date?.slice(0,7)===m).length;
-    const addedCnt=_vrwList.filter(r=>r.date?.slice(0,7)===m&&imp.includes(r.id)).length;
-    return `<button onclick="_vrwSetMonth('${m}')" style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid ${act?'var(--acc)':'rgba(255,255,255,.13)'};background:${act?'var(--acc)':'rgba(255,255,255,.04)'};color:${act?'#fff':'#bbb'};font-size:11px;cursor:pointer;">${lbl}<span style="opacity:.6;margin-left:4px;">${addedCnt}/${cnt}</span></button>`;
+    const mBase=_vrwList.filter(r=>r.date?.slice(0,7)===m);
+    const mPending=mBase.filter(r=>!imp.has(String(r.id))&&!rej.has(String(r.id))).length;
+    const mTotal=mBase.length;
+    return `<button onclick="_vrwSetMonth('${m}')" style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid ${act?'var(--acc)':'rgba(255,255,255,.13)'};background:${act?'var(--acc)':'rgba(255,255,255,.04)'};color:${act?'#fff':'#bbb'};font-size:11px;cursor:pointer;">${lbl}<span style="opacity:.6;margin-left:4px;">${mPending}/${mTotal}</span></button>`;
   }).join('');
   const mediaHtml=!exp
     ?`<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#444;font-size:14px;">No receipts in this period</div>`
@@ -11929,14 +11973,19 @@ function _vrwOpen(){
   const rcptNoVal=(exp?.vrw_receipt_no||'').replace(/"/g,'&quot;');
   document.body.insertAdjacentHTML('beforeend',`
   <div id="vrwPanel" style="position:fixed;inset:0;z-index:10300;background:#0c0c0c;display:flex;flex-direction:column;font-family:inherit;">
-    <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;min-height:44px;">
-      <button onclick="document.getElementById('vrwPanel').remove()" style="${bs}padding:3px 10px;font-size:12px;flex-shrink:0;"><i class="fa-solid fa-xmark"></i> Close</button>
-      <span style="font-size:12px;font-weight:700;color:#ddd;flex-shrink:0;white-space:nowrap;">VAT Review</span>
-      <div style="display:flex;gap:5px;flex:1;overflow-x:auto;padding:2px 0;scrollbar-width:none;">
-        <button onclick="_vrwSetMonth(null)" style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid ${!_vrwMonthFilter?'var(--acc)':'rgba(255,255,255,.13)'};background:${!_vrwMonthFilter?'var(--acc)':'rgba(255,255,255,.04)'};color:${!_vrwMonthFilter?'#fff':'#bbb'};font-size:11px;cursor:pointer;">All<span style="opacity:.6;margin-left:4px;">${imp.filter(id=>_vrwList.some(r=>r.id===id)).length}/${_vrwList.length}</span></button>
-        ${monthTabs}
+    <div style="background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;min-height:44px;">
+        <button onclick="document.getElementById('vrwPanel').remove()" style="${bs}padding:3px 10px;font-size:12px;flex-shrink:0;"><i class="fa-solid fa-xmark"></i> Close</button>
+        <span style="font-size:12px;font-weight:700;color:#ddd;flex-shrink:0;white-space:nowrap;">VAT Review</span>
+        <div style="display:flex;gap:5px;flex:1;overflow-x:auto;padding:2px 0;scrollbar-width:none;">
+          ${statusTabs}
+        </div>
+        <span style="font-size:11px;color:#666;flex-shrink:0;white-space:nowrap;">${exp?p+' / '+n:'—'}</span>
       </div>
-      <span style="font-size:11px;color:#666;flex-shrink:0;white-space:nowrap;">${exp?p+' / '+n:'—'}</span>
+      ${months.length>1?`<div style="display:flex;gap:5px;padding:0 12px 7px;overflow-x:auto;scrollbar-width:none;">
+        <button onclick="_vrwSetMonth(null)" style="flex-shrink:0;padding:3px 9px;border-radius:20px;border:1px solid ${!_vrwMonthFilter?'rgba(255,255,255,.4)':'rgba(255,255,255,.13)'};background:${!_vrwMonthFilter?'rgba(255,255,255,.12)':'rgba(255,255,255,.04)'};color:${!_vrwMonthFilter?'#fff':'#bbb'};font-size:10px;cursor:pointer;">All months</button>
+        ${monthTabs}
+      </div>`:``}
     </div>
     <div style="flex:1;display:flex;overflow:hidden;">
       <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
@@ -11955,6 +12004,7 @@ function _vrwOpen(){
       <div style="width:260px;flex-shrink:0;border-left:1px solid rgba(255,255,255,.07);background:#111;display:flex;flex-direction:column;overflow-y:auto;">
         ${exp?`<div style="padding:13px;border-bottom:1px solid rgba(255,255,255,.06);">
           ${isAdded?`<div style="background:rgba(34,197,94,.09);border:1px solid rgba(34,197,94,.22);border-radius:6px;padding:6px 10px;margin-bottom:10px;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;font-size:12px;"></i><span style="color:#86efac;font-size:11px;font-weight:600;">Added to VAT Records</span></div>`:''}
+          ${(!isAdded&&isRejected)?`<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:6px;padding:6px 10px;margin-bottom:10px;display:flex;align-items:center;gap:6px;justify-content:space-between;"><span style="display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-ban" style="color:#ef4444;font-size:12px;"></i><span style="color:#fca5a5;font-size:11px;font-weight:600;">Rejected</span></span><button onclick="_vrwUnreject()" style="background:none;border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;font-family:inherit;">Undo</button></div>`:''}
           <div style="margin-bottom:8px;"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Merchant</div><div style="font-size:13px;color:#e0e0e0;font-weight:600;word-break:break-word;">${exp.merchant||'—'}</div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px;">
             <div><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">Date</div><div style="font-size:12px;color:#ccc;">${exp.date||'—'}</div></div>
@@ -11970,7 +12020,10 @@ function _vrwOpen(){
           <button id="vrwAddBtn" onclick="${isAdded?'':'_vrwAddToVat()'}" ${isAdded?'disabled':''} style="background:${isAdded?'rgba(34,197,94,.08)':'var(--acc)'};border:1px solid ${isAdded?'rgba(34,197,94,.22)':'transparent'};color:${isAdded?'#86efac':'#fff'};border-radius:6px;padding:8px;font-size:12px;font-weight:600;cursor:${isAdded?'default':'pointer'};width:100%;font-family:inherit;">
             ${isAdded?'<i class="fa-solid fa-circle-check"></i> Added':'<i class="fa-solid fa-file-invoice"></i> Add to VAT Records'}
           </button>
-          <button onclick="_vrwDownload()" style="background:none;border:1px solid rgba(255,255,255,.13);color:#ccc;border-radius:6px;padding:7px;font-size:12px;cursor:pointer;width:100%;font-family:inherit;"><i class="fa-solid fa-download"></i> Download</button>
+          <div style="display:flex;gap:6px;">
+            <button onclick="_vrwDownload()" style="flex:1;background:none;border:1px solid rgba(255,255,255,.13);color:#ccc;border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit;"><i class="fa-solid fa-download"></i> Download</button>
+            ${!isAdded?`<button onclick="_vrwReject()" style="flex:1;background:${isRejected?'rgba(239,68,68,.1)':'none'};border:1px solid ${isRejected?'rgba(239,68,68,.4)':'rgba(255,255,255,.13)'};color:${isRejected?'#fca5a5':'#888'};border-radius:6px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit;" title="${isRejected?'Already rejected':'Mark as not applicable'}"><i class="fa-solid fa-ban"></i> ${isRejected?'Rejected':'Reject'}</button>`:''}
+          </div>
         </div>`:`<div style="padding:24px;color:#444;font-size:13px;text-align:center;">No receipts in this period</div>`}
       </div>
     </div>
