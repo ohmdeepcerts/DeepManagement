@@ -11242,6 +11242,7 @@ let _vatTx=[],_vatEditId=null,_vatFileData=null,_vatFileName=null,_vatScanQueue=
 let _vrwImportedIds=new Set(); // Supabase-sourced; never read from localStorage as source of truth
 let _vrwDismissedIds=new Set(); // Supabase-sourced; replaces vat_dismissed_exp localStorage
 let _vrwOverrides={}; // Supabase-sourced; replaces vat_vat_override localStorage; keyed by expense_id
+let _vrwUndoStack={}; // in-session undo history keyed by expense_id; array of previous override snapshots
 let _vatDashP='thisY',_vatDashCFrom='',_vatDashCTo='';
 let _vatLogP='all',_vatLogCFrom='',_vatLogCTo='',_vatLogDups=false;
 
@@ -12059,6 +12060,8 @@ function _vrwClickDate(el,expId,isoDate){
   const save=async()=>{
     const d=inp.value;
     if(d){
+      if(!_vrwUndoStack[expId])_vrwUndoStack[expId]=[];
+      _vrwUndoStack[expId].push(_vrwOverrides[expId]?{..._vrwOverrides[expId]}:null);
       if(!_vrwOverrides[expId]||typeof _vrwOverrides[expId]!=='object')_vrwOverrides[expId]={};
       _vrwOverrides[expId].date=d;
       await sb.from('vat_expense_meta').upsert({expense_id:String(expId),vat_override:_vrwOverrides[expId]},{onConflict:'expense_id'});
@@ -12080,6 +12083,9 @@ function _vrwClickCell(el,field,expId){
   disp.style.display='none';el.appendChild(inp);inp.focus();inp.select();
   const save=()=>{
     const v=+(Math.max(0,parseFloat(inp.value)||0)).toFixed(2);
+    // push snapshot before mutating so undo can restore it
+    if(!_vrwUndoStack[expId])_vrwUndoStack[expId]=[];
+    _vrwUndoStack[expId].push(_vrwOverrides[expId]?{..._vrwOverrides[expId]}:null);
     // No cross-field formula — each field is independent; only update the edited one
     const idMap={gross:'vrwGrossAmt',vat:'vrwVatAmt',net:'vrwNetAmt'};
     const el2=document.getElementById(idMap[field]);if(el2)el2.textContent='£'+v.toFixed(2);
@@ -12125,8 +12131,22 @@ async function _vrwReject(){
   _vrwOpen();
 }
 async function _vrwResetOverride(expId){
+  _vrwUndoStack[String(expId)]=[];
   delete _vrwOverrides[String(expId)];
   await sb.from('vat_expense_meta').upsert({expense_id:String(expId),vat_override:null},{onConflict:'expense_id'});
+  _vrwOpen();
+}
+async function _vrwUndoOverride(expId){
+  const stack=_vrwUndoStack[String(expId)];
+  if(!stack||!stack.length)return;
+  const prev=stack.pop();
+  if(prev===null){
+    delete _vrwOverrides[String(expId)];
+    await sb.from('vat_expense_meta').upsert({expense_id:String(expId),vat_override:null},{onConflict:'expense_id'});
+  } else {
+    _vrwOverrides[String(expId)]=prev;
+    await sb.from('vat_expense_meta').upsert({expense_id:String(expId),vat_override:prev},{onConflict:'expense_id'});
+  }
   _vrwOpen();
 }
 function _vrwOpen(){
@@ -12249,7 +12269,7 @@ function _vrwOpen(){
             <div onclick="_vrwClickCell(this,'net','${exp.id}')" style="${_cellSt}" ${_hov} title="Click to edit NET"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;pointer-events:none;">NET</div><div data-vrwval id="vrwNetAmt" style="font-size:14px;color:var(--txt);font-weight:700;pointer-events:none;">£${_n.toFixed(2)}</div></div>
             <div onclick="_vrwClickCell(this,'vat','${exp.id}')" style="${_cellSt};border-left:1px solid var(--bdr);border-right:1px solid var(--bdr);" ${_hov} title="Click to edit VAT"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;pointer-events:none;">VAT</div><div data-vrwval id="vrwVatAmt" style="font-size:14px;color:#d97706;font-weight:700;pointer-events:none;">£${_v.toFixed(2)}</div></div>
             <div onclick="_vrwClickCell(this,'gross','${exp.id}')" style="${_cellSt}" ${_hov} title="Click to edit GROSS"><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;pointer-events:none;">GROSS</div><div data-vrwval id="vrwGrossAmt" style="font-size:14px;color:var(--txt);font-weight:700;pointer-events:none;">£${_gd.toFixed(2)}</div></div>
-          </div><div style="font-size:10px;color:var(--txtm);text-align:center;margin-bottom:10px;">Click any value to edit &nbsp;·&nbsp; <button onclick="_vrwResetOverride('${exp.id}')" style="background:none;border:none;color:var(--txtm);font-size:10px;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;">Reset to 20%</button></div>`;})()}
+          </div><div style="font-size:10px;color:var(--txtm);text-align:center;margin-bottom:10px;">Click any value to edit &nbsp;·&nbsp; ${(_vrwUndoStack[String(exp.id)]?.length)?`<button onclick="_vrwUndoOverride('${exp.id}')" style="background:none;border:none;color:#f59e0b;font-size:10px;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;font-weight:600;" title="Undo last edit">↩ Undo</button> &nbsp;·&nbsp; `:''}${(_ovr&&Object.keys(_ovr).length)?`<button onclick="_vrwResetOverride('${exp.id}')" style="background:none;border:none;color:var(--txtm);font-size:10px;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;">Reset to 20%</button>`:`<span style="opacity:.45;">Reset to 20%</span>`}</div>`;})()}
           ${exp.category?`<div><div style="font-size:10px;color:var(--txtm);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Category</div><div style="font-size:13px;color:var(--txt);">${exp.category}</div></div>`:''}
         </div>
         <div style="padding:16px;border-bottom:1px solid var(--bdr);">
