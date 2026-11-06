@@ -1414,8 +1414,9 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
               <div class="fgl" style="grid-column:1/-1"><label>Client ID</label><input type="text" id="sDvsaClientId" placeholder="8be21c34-…" autocomplete="off"></div>
               <div class="fgl" style="grid-column:1/-1"><label>Client Secret</label><input type="password" id="sDvsaClientSecret" placeholder="kSQ8Q~…" autocomplete="new-password"></div>
               <div class="fgl" style="grid-column:1/-1"><label>API Key</label><input type="password" id="sDvsaApiKey" placeholder="pItPVDq3…" autocomplete="new-password"></div>
+              <div class="fgl" style="grid-column:1/-1"><label>DVLA VES API Key <span style="font-weight:400;color:var(--txtm);font-size:11px;">(road tax auto-refresh)</span></label><input type="password" id="sDvlaVesKey" placeholder="Enter DVLA Vehicle Enquiry Service API key" autocomplete="new-password"></div>
             </div>
-            <button class="btn btn-p btn-sm" onclick="saveDvsaSettings()"><i class="fa-solid fa-floppy-disk"></i> Save DVSA Credentials</button>
+            <button class="btn btn-p btn-sm" onclick="saveDvsaSettings()"><i class="fa-solid fa-floppy-disk"></i> Save API Credentials</button>
           </div>
         </div>
         <div class="card">
@@ -7661,6 +7662,7 @@ function loadSettings(){
   document.getElementById('sDvsaClientId').value=cfg.dvsa_client_id||'';
   if(cfg.dvsa_client_secret)document.getElementById('sDvsaClientSecret').value='••••••••••••••••';
   if(cfg.dvsa_api_key)document.getElementById('sDvsaApiKey').value='••••••••••••••••';
+  if(cfg.dvla_ves_api_key)document.getElementById('sDvlaVesKey').value='••••••••••••••••';
   const vad=document.getElementById('sVehAlertDays');
   if(vad)vad.value=(cfg.vehicle_alert_days||[30,15,5,4,2,1]).join(', ');
   renderBankList();renderCatList();
@@ -10189,10 +10191,12 @@ async function saveDvsaSettings(){
   const id=(document.getElementById('sDvsaClientId').value||'').trim();
   const secret=(document.getElementById('sDvsaClientSecret').value||'').trim();
   const key=(document.getElementById('sDvsaApiKey').value||'').trim();
-  if(!id){toast('Client ID is required','e');return;}
-  const payload={dvsa_client_id:id};
+  const vesKey=(document.getElementById('sDvlaVesKey').value||'').trim();
+  if(!id&&!vesKey){toast('Client ID or DVLA VES Key is required','e');return;}
+  const payload=id?{dvsa_client_id:id}:{};
   if(secret&&!secret.startsWith('•'))payload.dvsa_client_secret=secret;
   if(key&&!key.startsWith('•'))payload.dvsa_api_key=key;
+  if(vesKey&&!vesKey.startsWith('•'))payload.dvla_ves_api_key=vesKey;
   const{error}=await sb.from('settings').upsert({id:1,...payload});
   if(error){
     if(/column|schema/i.test(error.message)){toast('Run the SQL to add DVSA columns to settings table first','e');}
@@ -10414,34 +10418,61 @@ async function renderVehicles(){
 
 let _vehAutoRefreshing=false;
 async function _dvsaAutoRefreshMOT(cars){
-  if(_vehAutoRefreshing||!cfg.dvsa_client_id)return;
+  if(_vehAutoRefreshing)return;
+  const hasDvsa=!!cfg.dvsa_client_id;
+  const hasVes=!!cfg.dvla_ves_api_key;
+  if(!hasDvsa&&!hasVes)return;
   const toCheck=cars.filter(car=>{
-    if(!car.mot_expiry)return false;
-    const d=vehDays(car.mot_expiry);
-    return d!==null&&d<=10;
+    const motDays=car.mot_expiry?vehDays(car.mot_expiry):null;
+    const taxDays=car.tax_expiry?vehDays(car.tax_expiry):null;
+    const motNeedsCheck=hasDvsa&&motDays!==null&&motDays<=10;
+    const taxNeedsCheck=hasVes&&taxDays!==null&&taxDays<=10;
+    return motNeedsCheck||taxNeedsCheck;
   });
   if(!toCheck.length)return;
   let updated=false;
   for(const car of toCheck){
-    try{
-      const resp=await fetch(`${SUPA_URL}/functions/v1/dvsa-lookup`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY},
-        body:JSON.stringify({reg:car.reg})
-      });
-      const data=await resp.json();
-      if(!resp.ok||data.error)continue;
-      if(data.motTests&&data.motTests.length){
-        const passed=data.motTests.find(t=>t.testResult==='PASSED');
-        if(passed&&passed.expiryDate){
-          const newMot=passed.expiryDate.replace(/(\d{2})\.(\d{2})\.(\d{4})/,'$3-$2-$1');
-          if(newMot.length===10&&newMot!==car.mot_expiry){
-            await sb.from('vehicles').update({mot_expiry:newMot}).eq('id',car.id);
+    const motDays=car.mot_expiry?vehDays(car.mot_expiry):null;
+    const taxDays=car.tax_expiry?vehDays(car.tax_expiry):null;
+    // Refresh MOT via DVSA
+    if(hasDvsa&&motDays!==null&&motDays<=10){
+      try{
+        const resp=await fetch(`${SUPA_URL}/functions/v1/dvsa-lookup`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY},
+          body:JSON.stringify({reg:car.reg})
+        });
+        const data=await resp.json();
+        if(resp.ok&&!data.error&&data.motTests?.length){
+          const passed=data.motTests.find(t=>t.testResult==='PASSED');
+          if(passed?.expiryDate){
+            const newMot=passed.expiryDate.replace(/(\d{2})\.(\d{2})\.(\d{4})/,'$3-$2-$1');
+            if(newMot.length===10&&newMot!==car.mot_expiry){
+              await sb.from('vehicles').update({mot_expiry:newMot}).eq('id',car.id);
+              updated=true;
+            }
+          }
+        }
+      }catch(e){}
+    }
+    // Refresh road tax via DVLA VES
+    if(hasVes&&taxDays!==null&&taxDays<=10){
+      try{
+        const resp=await fetch(`${SUPA_URL}/functions/v1/dvla-ves-lookup`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':`Bearer ${SUPA_KEY}`,'apikey':SUPA_KEY},
+          body:JSON.stringify({reg:car.reg})
+        });
+        const data=await resp.json();
+        if(resp.ok&&!data.error&&data.taxDueDate){
+          const newTax=data.taxDueDate;
+          if(newTax.length===10&&newTax!==car.tax_expiry){
+            await sb.from('vehicles').update({tax_expiry:newTax}).eq('id',car.id);
             updated=true;
           }
         }
-      }
-    }catch(e){}
+      }catch(e){}
+    }
   }
   if(updated){
     _vehAutoRefreshing=true;
@@ -12021,7 +12052,9 @@ async function openVatReceiptReview(){
     return true;
   }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if(!_vrwList.length){toast('No VAT receipts with attachments found','e');return;}
-  _vrwIdx=0;_vrwZoom=1;_vrwRot=0;_vrwPanX=0;_vrwPanY=0;_vrwMonthFilter=null;_vrwStatusFilter='pending';_vrwUrlCache=new Map();
+  _vrwIdx=0;_vrwZoom=1;_vrwRot=0;_vrwPanX=0;_vrwPanY=0;_vrwMonthFilter=null;_vrwStatusFilter='pending';
+  // _vrwUrlCache intentionally NOT reset here — cached blobs survive across panel opens
+  // so Supabase Storage is only hit the first time each receipt is viewed per page load.
   _vrwOpen();
 }
 function _vrwFilteredList(){
@@ -12218,8 +12251,6 @@ function _vrwOpen(){
   const isViewable=isPdf||isImg;
   // trigger background fetch if not yet cached (will re-render when ready)
   if(exp&&!_vrwUrlCache.has(exp.id))_vrwFetchAndCache(exp.id,exp.receipt_url);
-  // pre-fetch the next receipt too for smoother navigation
-  const _nxt=list[_vrwIdx+1];if(_nxt&&!_vrwUrlCache.has(_nxt.id))_vrwFetchAndCache(_nxt.id,_nxt.receipt_url);
   const bs='background:none;border:1px solid rgba(255,255,255,.14);color:#ccc;border-radius:6px;cursor:pointer;';
 
   // status counts for the full list (ignoring month filter for counts)
@@ -12276,7 +12307,7 @@ function _vrwOpen(){
         <div style="color:#888;font-size:13px;">File type cannot be previewed</div>
         <a href="${exp.receipt_url}" target="_blank" style="background:#374151;color:#e5e7eb;padding:9px 20px;border-radius:7px;text-decoration:none;font-size:13px;font-weight:600;"><i class="fa-solid fa-download"></i> Download / Open file</a>
       </div>`;
-  const rcptNoVal=(exp?.vrw_receipt_no||'').replace(/"/g,'&quot;');
+  const rcptNoVal=(exp?.vrw_receipt_no||exp?.receipt_number||'').replace(/"/g,'&quot;');
   document.body.insertAdjacentHTML('beforeend',`
   <div id="vrwPanel" style="position:fixed;inset:0;z-index:10300;background:#0c0c0c;display:flex;flex-direction:column;font-family:inherit;">
     <div style="background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;">
@@ -12414,10 +12445,18 @@ async function _vrwAddToVat(){
   try{
     let fileData=null,fileName=null;
     try{
-      const res=await fetch(exp.receipt_url);const blob=await res.blob();
       const ext=(exp.receipt_url.split('?')[0].split('.').pop()||'jpg').slice(0,4);
       fileName=(rcptNo?vatSanitizeFName(rcptNo):(vatSanitizeFName(exp.merchant||'receipt')+'-'+(exp.date||'')))+'.'+ext;
-      fileData=await new Promise(resolve=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.readAsDataURL(blob);});
+      // Use already-cached data if available — avoids a second Storage fetch for egress
+      const _cached=_vrwUrlCache.get(exp.id);
+      if(_cached?.dataUrl){
+        fileData=_cached.dataUrl;
+      } else {
+        const res=await fetch(exp.receipt_url);const blob=await res.blob();
+        fileData=await new Promise(resolve=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.readAsDataURL(blob);});
+        // Also update cache so the viewer doesn't need to re-fetch
+        if(!_cached)_vrwUrlCache.set(exp.id,{dataUrl:fileData,mimeType:blob?.type||'image/jpeg'});
+      }
     }catch(fe){/* proceed without file */}
     const _baseGross=parseFloat(exp.amount)||0;
     const _ovr=_vrwOverrides[String(exp.id)]||null;
