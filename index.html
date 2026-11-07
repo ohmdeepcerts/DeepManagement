@@ -5042,18 +5042,19 @@ async function addLedRow(){
 }
 
 async function addLedRowSilent(){
+  if(_autoAddingRow)return;
   _autoAddingRow=true;
-  setTimeout(function(){_autoAddingRow=false;},2000);
   // Add next row WITHOUT disrupting current focus/typing
-  if(!ledgerStaff)return;
+  if(!ledgerStaff){_autoAddingRow=false;return;}
   const focused=document.activeElement; // remember focus
   const today=dateKey(new Date());
   const dateToUse=today.startsWith(`${ledgerYear}-${ledgerMonth}`)?today:`${ledgerYear}-${ledgerMonth}-01`;
   const r=await sb.from('expenses').insert({
     employee_id:ledgerStaff,date:dateToUse,merchant:'',category:'',amount:0,tags:[],status:'draft'
   }).select().single();
-  if(r.error){console.warn('Silent add row error:',r.error);return;}
+  if(r.error){console.warn('Silent add row error:',r.error);_autoAddingRow=false;return;}
   expenses.push(r.data);
+  _autoAddingRow=false;
   setSyncStatus('saved');
   // Append new row to tbody WITHOUT rebuilding the table
   const tbody=document.getElementById('ledBody');
