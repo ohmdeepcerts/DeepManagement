@@ -3044,16 +3044,19 @@ async function loadAllDataSilent(){
   const [empR,cfgR,attR,expR,batR,msgR]=await Promise.all([
     sb.from('employees').select('*').order('name'),
     sb.from('settings').select('*').eq('id',1).maybeSingle(),
-    sb.from('attendance').select('*').order('date',{ascending:false}),
-    sb.from('expenses').select('*').order('date',{ascending:false}),
+    sb.from('attendance').select('*').gte('date',_dataFromDate).order('date',{ascending:false}),
+    sb.from('expenses').select('*').gte('date',_dataFromDate).order('date',{ascending:false}),
     sb.from('expense_batches').select('*').order('submitted_at',{ascending:false}),
     sb.from('messages').select('*').order('created_at')
   ]);
   if(empR.error)throw empR.error;
   employees=empR.data||[];
   cfg=cfgR.data||{};
-  attendance=attR.data||[];
-  expenses=expR.data||[];
+  // Preserve historical months loaded on demand — only refresh the current window
+  const _histAtt=attendance.filter(a=>a.date<_dataFromDate);
+  const _histExp=expenses.filter(e=>e.date<_dataFromDate);
+  attendance=[..._histAtt,...(attR.data||[])];
+  expenses=[..._histExp,...(expR.data||[])];
   batches=batR.data||[];
   messages=msgR.data||[];
 
