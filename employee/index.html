@@ -4258,7 +4258,7 @@ async function fetchSettingsWithRetry(retries){
   retries=retries==null?2:retries;
   let last={data:null,error:null};
   for(let i=0;i<=retries;i++){
-    const r=await sb.from('settings').select('*').eq('id',1).single();
+    const r=await sb.from('settings').select('*').eq('id',1).maybeSingle();
     if(r.data)return r;
     last=r;
     if(i<retries)await new Promise(res=>setTimeout(res,500*(i+1)));
