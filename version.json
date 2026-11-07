@@ -1,1 +1,1 @@
-{"v":"2026.11.07.1"}
+{"v":"2026.11.07.1","notes":["Expense totals now show correctly for all months — no more missing amounts","Going back to older months (like September) now loads all expenses properly","Expenses no longer disappear after the page has been open for a while"]}

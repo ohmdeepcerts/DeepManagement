@@ -2883,7 +2883,7 @@ async function checkOfficeUpdate(){
     if(!sig)return;
     const stored=sessionStorage.getItem('dam_office_sig');
     if(!stored){sessionStorage.setItem('dam_office_sig',sig);return;}
-    if(sig!==stored&&!_updateNotified){_updateNotified=true;_showUpdateBanner();}
+    if(sig!==stored&&!_updateNotified){_updateNotified=true;window._updateNotes=data.notes||[];_showUpdateBanner();}
   }catch(e){/* offline etc — silent */}
 }
 function startOfficeUpdateCheck(){
@@ -2893,14 +2893,32 @@ function startOfficeUpdateCheck(){
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkOfficeUpdate();});
 }
 function _showUpdateBanner(){
-  if(document.getElementById('updateBanner'))return;
-  const b=document.createElement('div');
-  b.id='updateBanner';
-  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#92400e;color:#fff;display:flex;align-items:center;justify-content:center;gap:12px;padding:10px 18px;font-size:13px;font-weight:600;box-shadow:0 3px 14px rgba(0,0,0,0.35);';
-  b.innerHTML='<i class="fa-solid fa-arrows-rotate" style="font-size:15px;"></i>'
-    +'<span>A new version of the app is available — restart to get the latest updates.</span>'
-    +'<button onclick="forceHardReload()" style="background:#fff;color:#92400e;border:none;border-radius:7px;padding:6px 16px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;margin-left:4px;">↺ Restart Now</button>';
-  document.body.prepend(b);
+  if(document.getElementById('updatePopup'))return;
+  const notes=Array.isArray(window._updateNotes)&&window._updateNotes.length?window._updateNotes:['Bug fixes and improvements'];
+  const overlay=document.createElement('div');
+  overlay.id='updatePopup';
+  overlay.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML=`
+    <div style="background:#1e1e2e;border:1px solid #334155;border-radius:16px;padding:28px 28px 22px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.6);font-family:inherit;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <div style="background:#f59e0b;border-radius:8px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fa-solid fa-arrows-rotate" style="color:#1e1e2e;font-size:16px;"></i>
+        </div>
+        <div>
+          <div style="color:#f8fafc;font-size:16px;font-weight:700;">Update Available</div>
+          <div style="color:#94a3b8;font-size:12px;margin-top:1px;">A new version is ready</div>
+        </div>
+      </div>
+      <div style="color:#cbd5e1;font-size:13px;font-weight:600;margin-bottom:8px;">What's new:</div>
+      <ul style="margin:0 0 20px 0;padding-left:18px;display:flex;flex-direction:column;gap:6px;">
+        ${notes.map(n=>`<li style="color:#e2e8f0;font-size:13px;line-height:1.5;">${n}</li>`).join('')}
+      </ul>
+      <div style="display:flex;gap:10px;">
+        <button onclick="forceHardReload()" style="flex:1;background:#f59e0b;color:#1e1e2e;border:none;border-radius:9px;padding:10px 0;font-size:13px;font-weight:800;cursor:pointer;">↺ Update Now</button>
+        <button onclick="document.getElementById('updatePopup').remove()" style="flex:1;background:#334155;color:#e2e8f0;border:none;border-radius:9px;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;">Later</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
 }
 async function forceHardReload(){
   if('caches' in window){try{const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)));}catch(e){}}
