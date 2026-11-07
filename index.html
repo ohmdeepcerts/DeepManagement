@@ -597,14 +597,18 @@ tr:hover>td{background:var(--card2);transition:background 0.15s;}
 /* Force data tab content visibility */
 #settTab-data.active{display:block!important;visibility:visible!important;opacity:1!important;}
 @media print{
+  @page{margin:16mm 13mm;}
   .sidebar,.topbar,.bot-nav,.sync-badge,
   #syncBadge,.page-actions,.tab-bar,
   .no-print,[class*="modal"]{display:none!important;}
-  body{background:#fff!important;color:#000!important;}
+  body{background:#fff!important;color:#000!important;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
   .page.on{display:block!important;}
-  table{border-collapse:collapse!important;width:100%!important;}
+  table{border-collapse:collapse!important;width:100%!important;page-break-inside:auto;}
+  thead{display:table-header-group;}
+  tr{page-break-inside:avoid;break-inside:avoid;}
   th,td{border:1px solid #ccc!important;padding:6px 8px!important;font-size:11px!important;}
   th{background:#f1f5f9!important;color:#000!important;}
+  td{vertical-align:top;}
 }
 .ac-active{background:var(--card2);}
 /* FLEET VEHICLES */
@@ -6236,7 +6240,7 @@ function printExpenseReport(){
   const catTotals={};
   rows.forEach(e=>{const cat=e.category||'Uncategorized';catTotals[cat]=(catTotals[cat]||0)+(parseFloat(e.amount)||0);});
   const catRows=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
-  const html=`<div style="font-family:sans-serif;padding:0;">
+  const html=`<div style="font-family:sans-serif;padding:0;print-color-adjust:exact;-webkit-print-color-adjust:exact;">
     <div style="text-align:center;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:8px;">
       <strong style="font-size:15px;">${escapeHtml(co)}</strong><br>
       <span style="font-size:13px;">Expense Report — ${escapeHtml(emp.name)}${emp.role?' · '+escapeHtml(emp.role):''}</span><br>
