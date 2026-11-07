@@ -3045,7 +3045,7 @@ async function loadAllDataSilent(){
     sb.from('employees').select('*').order('name'),
     sb.from('settings').select('*').eq('id',1).maybeSingle(),
     sb.from('attendance').select('*').gte('date',_dataFromDate).order('date',{ascending:false}),
-    sb.from('expenses').select('*').gte('date',_dataFromDate).order('date',{ascending:false}),
+    sb.from('expenses').select('*').gte('date',_dataFromDate).order('date',{ascending:false}).range(0,4999),
     sb.from('expense_batches').select('*').order('submitted_at',{ascending:false}),
     sb.from('messages').select('*').order('created_at')
   ]);
@@ -3120,8 +3120,9 @@ const AppState = {
 // Computed once — covers current month + previous month
 function getDataFromDate(){
   const now=new Date();
-  const prev=new Date(now.getFullYear(),now.getMonth()-1,1);
-  return prev.toISOString().slice(0,10); // YYYY-MM-DD
+  const y=now.getMonth()===0?now.getFullYear()-1:now.getFullYear();
+  const m=now.getMonth()===0?12:now.getMonth(); // previous month number (1-based)
+  return `${y}-${String(m).padStart(2,'0')}-01`; // local date, no UTC shift
 }
 let _dataFromDate=getDataFromDate(); // e.g. "2026-05-01"
 // Tracks which "YYYY-MM" months have been fetched from Supabase, so historical
@@ -3204,7 +3205,7 @@ async function loadAllData(){
       // Load only current + previous month — massive performance improvement
       // Use loadMonthData(month, year) for historical months on demand
       sb.from('attendance').select('*').gte('date',_dataFromDate).order('date',{ascending:false}),
-      sb.from('expenses').select('*').gte('date',_dataFromDate).order('date',{ascending:false}),
+      sb.from('expenses').select('*').gte('date',_dataFromDate).order('date',{ascending:false}).range(0,4999),
       sb.from('expense_batches').select('*').order('submitted_at',{ascending:false}),
       sb.from('messages').select('*').order('created_at').limit(2000)
     ]);
